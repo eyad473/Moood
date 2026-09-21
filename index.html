@@ -641,10 +641,10 @@ function load(){
     if(saved) parsed = JSON.parse(saved);
   }catch(e){ parsed = null; }
 
-  // On the first V15 launch, do not let an old/empty localStorage value hide
-  // the embedded dataset. After V15 has initialized, an intentionally empty
-  // local database remains empty and is never repopulated automatically.
-  if(Array.isArray(parsed) && (parsed.length > 0 || initialized)){
+  // V15 safety bootstrap: an empty localStorage must never hide the
+  // embedded dataset. If a previous build accidentally stored [], restore
+  // the embedded records automatically. Non-empty saved data is preserved.
+  if(Array.isArray(parsed) && parsed.length > 0){
     data = parsed;
   }else{
     data = structuredClone(INITIAL_DATA);
