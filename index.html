@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>إدارة وكشف المخيمات — V14</title>
+<title>إدارة وكشف المخيمات — V15</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
 :root{--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#64748b;--line:#e5e7eb;--primary:#2563eb;--primary2:#1d4ed8;--danger:#dc2626;--ok:#059669;--warn:#d97706;--shadow:0 8px 30px rgba(15,23,42,.07);--radius:18px}
@@ -185,7 +185,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
 @media(max-width:700px){.excel-export-note{font-size:12px}}
 </style>
 <style>
-/* V14 visual/mobile upgrade */
+/* V15 visual/mobile upgrade */
 :root{--accent:#2563eb;--accent-soft:#eff6ff;--success:#059669;--success-soft:#ecfdf5;--warning:#d97706;--warning-soft:#fffbeb;--danger:#dc2626;--danger-soft:#fef2f2;--info:#0891b2;--info-soft:#ecfeff}
 body{background:linear-gradient(180deg,#f8fafc 0%,#eef2f7 100%)}
 .top{box-shadow:0 2px 18px rgba(15,23,42,.06)}
@@ -195,7 +195,7 @@ body{background:linear-gradient(180deg,#f8fafc 0%,#eef2f7 100%)}
 .stat.clickable,.mini-stat.clickable{cursor:pointer}.stat.clickable:active,.mini-stat.clickable:active{transform:scale(.985)}
 .dashboard-stat-icon{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-size:20px;background:var(--accent-soft);color:var(--accent);flex:0 0 auto}
 .stat-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.stat-arrow{font-size:18px;color:#94a3b8}
-.health-dashboard{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-top:15px}.health-tile{border:1px solid var(--line);background:#fff;border-radius:15px;padding:13px;cursor:pointer;text-align:right;transition:.18s;box-shadow:var(--shadow)}.health-tile:hover{transform:translateY(-2px);box-shadow:0 12px 25px rgba(15,23,42,.09)}.health-tile .icon{font-size:21px}.health-tile b{display:block;font-size:22px;margin-top:3px}.health-tile small{color:var(--muted)}.health-red{background:var(--danger-soft);border-color:#fecaca}.health-orange{background:var(--warning-soft);border-color:#fde68a}.health-green{background:var(--success-soft);border-color:#a7f3d0}.health-blue{background:#eff6ff;border-color:#bfdbfe}.health-purple{background:#faf5ff;border-color:#e9d5ff}.health-cyan{background:var(--info-soft);border-color:#a5f3fc}
+.health-dashboard{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-top:15px}.dashboard-status-grid{grid-template-columns:repeat(5,minmax(0,1fr));margin-top:15px}.health-tile{border:1px solid var(--line);background:#fff;border-radius:15px;padding:13px;cursor:pointer;text-align:right;transition:.18s;box-shadow:var(--shadow)}.health-tile:hover{transform:translateY(-2px);box-shadow:0 12px 25px rgba(15,23,42,.09)}.health-tile .icon{font-size:21px}.health-tile b{display:block;font-size:22px;margin-top:3px}.health-tile small{color:var(--muted)}.health-red{background:var(--danger-soft);border-color:#fecaca}.health-orange{background:var(--warning-soft);border-color:#fde68a}.health-green{background:var(--success-soft);border-color:#a7f3d0}.health-blue{background:#eff6ff;border-color:#bfdbfe}.health-purple{background:#faf5ff;border-color:#e9d5ff}.health-cyan{background:var(--info-soft);border-color:#a5f3fc}
 .dashboard-section-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:18px 0 8px}.dashboard-section-title h3{margin:0;font-size:15px}
 .family-status{box-shadow:0 2px 7px rgba(15,23,42,.05)}
 .person-click-card{cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:13px;padding:11px;text-align:right;transition:.16s}.person-click-card:hover{border-color:#93c5fd;background:#f8fbff;transform:translateY(-1px)}
@@ -204,12 +204,12 @@ body{background:linear-gradient(180deg,#f8fafc 0%,#eef2f7 100%)}
 .preview-modal .modalbox{width:min(1200px,100%)}.preview-table{max-height:60vh;overflow:auto;border:1px solid var(--line);border-radius:12px}.preview-table table{min-width:800px}
 .mobile-card-table{display:none}
 .sync-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;font-size:11px;font-weight:800;border:1px solid var(--line);background:#fff}.sync-dot{width:8px;height:8px;border-radius:50%;background:#94a3b8}.sync-pill.online .sync-dot{background:#10b981}.sync-pill.offline .sync-dot{background:#f59e0b}.sync-pill.syncing .sync-dot{background:#3b82f6;animation:pulse 1s infinite}@keyframes pulse{50%{opacity:.35}}
-@media(max-width:1100px){.health-dashboard{grid-template-columns:repeat(3,1fr)}.data-center-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:1100px){.health-dashboard{grid-template-columns:repeat(3,1fr)}.dashboard-status-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.data-center-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:700px){
  .topin{align-items:flex-start}.topin>.actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.topin>.actions .btn{width:100%;text-align:center}
  .tabs{scroll-snap-type:x proximity;padding-bottom:8px}.tab{scroll-snap-align:start;flex:0 0 auto}
  .stats{grid-template-columns:1fr 1fr!important}.stat{padding:13px}.stat .num{font-size:23px}.stat .label{font-size:12px}.dashboard-stat-icon{width:35px;height:35px;font-size:17px}
- .health-dashboard{grid-template-columns:repeat(2,1fr)}.health-tile{padding:10px}.health-tile b{font-size:19px}
+ .dashboard-status-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.health-dashboard{grid-template-columns:repeat(2,1fr)}.health-tile{padding:10px}.health-tile b{font-size:19px}
  .quality-summary-grid{grid-template-columns:1fr 1fr}.quality-summary-card:last-child{grid-column:1/-1}
  .data-center-grid{grid-template-columns:1fr 1fr}
  .tablewrap{border:0;overflow:visible}.tablewrap>.table{min-width:0}.tablewrap>.table thead{display:none}.tablewrap>.table tbody{display:grid;gap:9px}.tablewrap>.table tbody tr{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:13px;background:#fff;overflow:hidden;box-shadow:0 3px 12px rgba(15,23,42,.05)}.tablewrap>.table tbody td{border-bottom:1px solid #eef2f7!important;padding:9px;text-align:right!important;font-size:12px}.tablewrap>.table tbody td:nth-child(1){display:none}.tablewrap>.table tbody td:nth-child(2){grid-column:1/-1;background:#f8fafc;font-size:13px}.tablewrap>.table tbody td:nth-child(9){grid-column:1/-1}.tablewrap>.table tbody td:nth-child(10){grid-column:1/-1}.tablewrap>.table tbody td:before{content:attr(data-label);display:block;color:#94a3b8;font-size:10px;margin-bottom:2px}.tablewrap>.table tbody td:nth-child(2):before{display:none}
@@ -288,7 +288,7 @@ body{background:linear-gradient(180deg,#f8fafc 0%,#eef2f7 100%)}
    <span id="qualityBannerText">جاري فحص جودة البيانات...</span>
    <button class="btn no-print" onclick="openQualityModal()">فحص التفاصيل</button>
   </div>
-  <div class="grid" style="grid-template-columns:repeat(5,minmax(0,1fr));margin-top:15px">
+  <div class="grid dashboard-status-grid">
    <div class="mini-stat clickable" onclick="openDashboardList('complete')"><span class="muted">🟢 عائلات مكتملة</span><b id="dashComplete">0</b><button class="btn no-print" onclick="event.stopPropagation();openDashboardList('complete')">عرض</button></div>
    <div class="mini-stat clickable" onclick="openDashboardList('partial')"><span class="muted">🟡 عائلات جزئية</span><b id="dashPartial">0</b><button class="btn no-print" onclick="event.stopPropagation();openDashboardList('partial')">عرض</button></div>
    <div class="mini-stat clickable" onclick="openDashboardList('incomplete')"><span class="muted">🔴 عائلات ناقصة</span><b id="dashIncomplete">0</b><button class="btn no-print" onclick="event.stopPropagation();openDashboardList('incomplete')">عرض</button></div>
@@ -2110,7 +2110,7 @@ window.addEventListener('load',()=>{updateOfflineStatus(); if('serviceWorker' in
 
 
 <script>
-/* V14 dashboard + quality + data-center enhancements */
+/* V15 dashboard + quality + data-center enhancements */
 (function(){
   const fmt=n=>Number(n||0).toLocaleString('ar-EG');
   function rows(){return (typeof data!=='undefined' && Array.isArray(data))?data:[];}
