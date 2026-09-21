@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>إدارة وكشف المخيمات</title>
+<title>إدارة وكشف المخيمات — V14</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
 :root{--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#64748b;--line:#e5e7eb;--primary:#2563eb;--primary2:#1d4ed8;--danger:#dc2626;--ok:#059669;--warn:#d97706;--shadow:0 8px 30px rgba(15,23,42,.07);--radius:18px}
@@ -183,7 +183,44 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
 <style>
 .excel-export-note{font-size:13px;line-height:1.7}
 @media(max-width:700px){.excel-export-note{font-size:12px}}
-</style></head>
+</style>
+<style>
+/* V14 visual/mobile upgrade */
+:root{--accent:#2563eb;--accent-soft:#eff6ff;--success:#059669;--success-soft:#ecfdf5;--warning:#d97706;--warning-soft:#fffbeb;--danger:#dc2626;--danger-soft:#fef2f2;--info:#0891b2;--info-soft:#ecfeff}
+body{background:linear-gradient(180deg,#f8fafc 0%,#eef2f7 100%)}
+.top{box-shadow:0 2px 18px rgba(15,23,42,.06)}
+.btn{transition:transform .16s ease,box-shadow .16s ease,background .16s ease,border-color .16s ease}.btn:hover{transform:translateY(-1px);box-shadow:0 5px 14px rgba(15,23,42,.08)}.btn:active{transform:translateY(0) scale(.98)}
+.tab{transition:all .18s ease}.tab:hover{transform:translateY(-1px)}
+.stat,.mini-stat,.card,.familybox,.family-result-card,.family-card{transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}.stat:hover,.mini-stat:hover,.family-result-card:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(15,23,42,.10)}
+.stat.clickable,.mini-stat.clickable{cursor:pointer}.stat.clickable:active,.mini-stat.clickable:active{transform:scale(.985)}
+.dashboard-stat-icon{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-size:20px;background:var(--accent-soft);color:var(--accent);flex:0 0 auto}
+.stat-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.stat-arrow{font-size:18px;color:#94a3b8}
+.health-dashboard{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-top:15px}.health-tile{border:1px solid var(--line);background:#fff;border-radius:15px;padding:13px;cursor:pointer;text-align:right;transition:.18s;box-shadow:var(--shadow)}.health-tile:hover{transform:translateY(-2px);box-shadow:0 12px 25px rgba(15,23,42,.09)}.health-tile .icon{font-size:21px}.health-tile b{display:block;font-size:22px;margin-top:3px}.health-tile small{color:var(--muted)}.health-red{background:var(--danger-soft);border-color:#fecaca}.health-orange{background:var(--warning-soft);border-color:#fde68a}.health-green{background:var(--success-soft);border-color:#a7f3d0}.health-blue{background:#eff6ff;border-color:#bfdbfe}.health-purple{background:#faf5ff;border-color:#e9d5ff}.health-cyan{background:var(--info-soft);border-color:#a5f3fc}
+.dashboard-section-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:18px 0 8px}.dashboard-section-title h3{margin:0;font-size:15px}
+.family-status{box-shadow:0 2px 7px rgba(15,23,42,.05)}
+.person-click-card{cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:13px;padding:11px;text-align:right;transition:.16s}.person-click-card:hover{border-color:#93c5fd;background:#f8fbff;transform:translateY(-1px)}
+.quality-summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}.quality-summary-card{border:1px solid var(--line);border-radius:14px;padding:12px;background:#fff}.quality-summary-card b{display:block;font-size:22px}.quality-summary-card.error{background:var(--danger-soft);border-color:#fecaca}.quality-summary-card.warning{background:var(--warning-soft);border-color:#fde68a}.quality-summary-card.ok{background:var(--success-soft);border-color:#a7f3d0}
+.data-center-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}.data-center-card{border:1px solid var(--line);border-radius:14px;padding:13px;background:#fff}.data-center-card .label{color:var(--muted);font-size:12px}.data-center-card .value{font-weight:800;font-size:17px;margin-top:3px}
+.preview-modal .modalbox{width:min(1200px,100%)}.preview-table{max-height:60vh;overflow:auto;border:1px solid var(--line);border-radius:12px}.preview-table table{min-width:800px}
+.mobile-card-table{display:none}
+.sync-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;font-size:11px;font-weight:800;border:1px solid var(--line);background:#fff}.sync-dot{width:8px;height:8px;border-radius:50%;background:#94a3b8}.sync-pill.online .sync-dot{background:#10b981}.sync-pill.offline .sync-dot{background:#f59e0b}.sync-pill.syncing .sync-dot{background:#3b82f6;animation:pulse 1s infinite}@keyframes pulse{50%{opacity:.35}}
+@media(max-width:1100px){.health-dashboard{grid-template-columns:repeat(3,1fr)}.data-center-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){
+ .topin{align-items:flex-start}.topin>.actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.topin>.actions .btn{width:100%;text-align:center}
+ .tabs{scroll-snap-type:x proximity;padding-bottom:8px}.tab{scroll-snap-align:start;flex:0 0 auto}
+ .stats{grid-template-columns:1fr 1fr!important}.stat{padding:13px}.stat .num{font-size:23px}.stat .label{font-size:12px}.dashboard-stat-icon{width:35px;height:35px;font-size:17px}
+ .health-dashboard{grid-template-columns:repeat(2,1fr)}.health-tile{padding:10px}.health-tile b{font-size:19px}
+ .quality-summary-grid{grid-template-columns:1fr 1fr}.quality-summary-card:last-child{grid-column:1/-1}
+ .data-center-grid{grid-template-columns:1fr 1fr}
+ .tablewrap{border:0;overflow:visible}.tablewrap>.table{min-width:0}.tablewrap>.table thead{display:none}.tablewrap>.table tbody{display:grid;gap:9px}.tablewrap>.table tbody tr{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:13px;background:#fff;overflow:hidden;box-shadow:0 3px 12px rgba(15,23,42,.05)}.tablewrap>.table tbody td{border-bottom:1px solid #eef2f7!important;padding:9px;text-align:right!important;font-size:12px}.tablewrap>.table tbody td:nth-child(1){display:none}.tablewrap>.table tbody td:nth-child(2){grid-column:1/-1;background:#f8fafc;font-size:13px}.tablewrap>.table tbody td:nth-child(9){grid-column:1/-1}.tablewrap>.table tbody td:nth-child(10){grid-column:1/-1}.tablewrap>.table tbody td:before{content:attr(data-label);display:block;color:#94a3b8;font-size:10px;margin-bottom:2px}.tablewrap>.table tbody td:nth-child(2):before{display:none}
+ .family-member-table{min-width:0!important}.family-member-table thead{display:none}.family-member-table tbody tr{display:block;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;padding:8px;background:#fff}.family-member-table tbody td{display:block;border:0!important;padding:3px 0;text-align:right!important}.family-member-table tbody td:first-child{display:none}.family-member-table tbody td:before{color:#94a3b8;font-size:10px;margin-left:6px}
+ .modal{padding:7px}.modalbox{max-height:96vh;border-radius:16px}.modalhead{padding:12px}.modalbody{padding:12px}.modalfoot{padding:10px 12px}.formgrid{gap:8px}
+ .actions{gap:6px}.actions .btn{min-height:40px}.btn{min-height:40px}
+ .family-card{border-radius:16px}.family-info-grid{grid-template-columns:1fr 1fr!important}.family-info-item[style*="grid-column:1/-1"]{grid-column:1/-1!important}
+ .preview-table{max-height:58vh}.preview-modal .modalbox{width:100%}
+}
+</style>
+<style>.person-click-row{cursor:pointer}.person-click-row:hover td{background:#eff6ff!important}</style></head>
 <body>
 <div class="app">
 <header class="top">
@@ -191,7 +228,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
   <div class="brand"><div class="logo">م</div><div><h1>إدارة وكشف المخيمات</h1><small>نظام محلي لإدارة العائلات والمستفيدين</small><div id="offlineStatus" style="font-size:11px;color:#64748b;margin-top:2px"></div></div></div>
   <div class="actions no-print">
    <button class="btn primary" onclick="openFamilyModal()">＋ إضافة عائلة</button>
-   <button class="btn" onclick="exportExcel()">تصدير Excel</button>
+   <span id="headerSyncPill" class="sync-pill no-print"><span class="sync-dot"></span><span>محلي</span></span><button class="btn" onclick="exportExcel()">تصدير Excel</button>
    <button class="btn" onclick="backup()">نسخة احتياطية</button>
    <button class="btn" id="syncNowBtn" onclick="syncNow()">↻ مزامنة الآن</button>
    <label class="btn" style="display:inline-flex;align-items:center;gap:6px">استعادة <input id="restoreInput" type="file" accept=".json" hidden onchange="restoreBackup(event)"></label>
@@ -242,20 +279,30 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
 </section>
 <section id="dashboard" class="view active">
   <div class="grid stats">
-   <div class="stat"><div class="label">إجمالي الأفراد</div><div class="num" id="sPeople">0</div><div class="sub">كل أفراد الكشف</div></div>
-   <div class="stat"><div class="label">إجمالي العائلات</div><div class="num" id="sFamilies">0</div><div class="sub">بحسب رب الأسرة</div></div>
-   <div class="stat"><div class="label">داخل المخيم</div><div class="num" id="sInside">0</div><div class="sub">عائلات داخل المخيم</div></div>
-   <div class="stat"><div class="label">اكتمال البيانات</div><div class="num" id="sComplete">0%</div><div class="sub">نسبة العائلات المكتملة</div></div>
+   <div class="stat clickable" onclick="openDashboardList('all')"><div class="stat-top"><div><div class="label">إجمالي الأفراد</div><div class="num" id="sPeople">0</div><div class="sub">كل أفراد الكشف</div></div><div class="dashboard-stat-icon">👥</div></div></div>
+   <div class="stat clickable" onclick="showView('families')"><div class="stat-top"><div><div class="label">إجمالي العائلات</div><div class="num" id="sFamilies">0</div><div class="sub">بحسب رب الأسرة</div></div><div class="dashboard-stat-icon">🏠</div></div></div>
+   <div class="stat clickable" onclick="openDashboardList('inside')"><div class="stat-top"><div><div class="label">داخل المخيم</div><div class="num" id="sInside">0</div><div class="sub">عائلات داخل المخيم</div></div><div class="dashboard-stat-icon">📍</div></div></div>
+   <div class="stat clickable" onclick="openDashboardList('outside')"><div class="stat-top"><div><div class="label">خارج المخيم</div><div class="num" id="sOutside">0</div><div class="sub">عائلات خارج المخيم</div></div><div class="dashboard-stat-icon">↗️</div></div></div>
   </div>
   <div id="qualityBanner" class="quality-banner ok">
    <span id="qualityBannerText">جاري فحص جودة البيانات...</span>
    <button class="btn no-print" onclick="openQualityModal()">فحص التفاصيل</button>
   </div>
-  <div class="grid" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-top:15px">
-   <div class="mini-stat"><span class="muted">عائلات مكتملة</span><b id="dashComplete">0</b><button class="btn no-print" onclick="filterFamiliesStatus('مكتملة')">عرض</button></div>
-   <div class="mini-stat"><span class="muted">عائلات جزئية</span><b id="dashPartial">0</b><button class="btn no-print" onclick="filterFamiliesStatus('جزئية')">عرض</button></div>
-   <div class="mini-stat"><span class="muted">عائلات ناقصة</span><b id="dashIncomplete">0</b><button class="btn no-print" onclick="filterFamiliesStatus('غير مكتملة')">عرض</button></div>
-   <div class="mini-stat"><span class="muted">أخطاء تحتاج مراجعة</span><b id="dashErrors">0</b><button class="btn no-print" onclick="openQualityModal()">مراجعة</button></div>
+  <div class="grid" style="grid-template-columns:repeat(5,minmax(0,1fr));margin-top:15px">
+   <div class="mini-stat clickable" onclick="openDashboardList('complete')"><span class="muted">🟢 عائلات مكتملة</span><b id="dashComplete">0</b><button class="btn no-print" onclick="event.stopPropagation();openDashboardList('complete')">عرض</button></div>
+   <div class="mini-stat clickable" onclick="openDashboardList('partial')"><span class="muted">🟡 عائلات جزئية</span><b id="dashPartial">0</b><button class="btn no-print" onclick="event.stopPropagation();openDashboardList('partial')">عرض</button></div>
+   <div class="mini-stat clickable" onclick="openDashboardList('incomplete')"><span class="muted">🔴 عائلات ناقصة</span><b id="dashIncomplete">0</b><button class="btn no-print" onclick="event.stopPropagation();openDashboardList('incomplete')">عرض</button></div>
+   <div class="mini-stat clickable" onclick="openQualityModal()"><span class="muted">⚠️ أخطاء تحتاج مراجعة</span><b id="dashErrors">0</b><button class="btn no-print" onclick="event.stopPropagation();openQualityModal()">مراجعة</button></div>
+   <div class="mini-stat"><span class="muted">آخر تعديل</span><b id="dashLastModified" style="font-size:14px">—</b><span class="muted">محليًا</span></div>
+  </div>
+  <div class="dashboard-section-title"><h3>الحالات والمؤشرات السريعة</h3><span class="muted">اضغط على أي بطاقة لفتح الكشف</span></div>
+  <div class="health-dashboard">
+    <div class="health-tile health-red" onclick="openDashboardList('injured')"><span class="icon">🩹</span><b id="dashInjured">0</b><small>المصابون</small></div>
+    <div class="health-tile health-orange" onclick="openDashboardList('disabled')"><span class="icon">♿</span><b id="dashDisabled">0</b><small>ذوو الإعاقة</small></div>
+    <div class="health-tile health-purple" onclick="openDashboardList('pregnant')"><span class="icon">🤰</span><b id="dashPregnant">0</b><small>الحوامل</small></div>
+    <div class="health-tile health-cyan" onclick="openDashboardList('lactating')"><span class="icon">🍼</span><b id="dashLactating">0</b><small>المرضعات</small></div>
+    <div class="health-tile health-blue" onclick="openDashboardList('orphan')"><span class="icon">🧒</span><b id="dashOrphan">0</b><small>الأيتام</small></div>
+    <div class="health-tile health-green" onclick="openDashboardList('elderly')"><span class="icon">👴</span><b id="dashElderly">0</b><small>كبار السن</small></div>
   </div>
   <div class="chartgrid">
    <div class="card"><div class="cardhead"><h2>توزيع حسب الجنس</h2></div><div id="genderChart"></div></div>
@@ -306,7 +353,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
     <h2>الكشوفات المصنفة</h2>
     <div class="actions no-print">
       <button class="btn" onclick="printClassified()">🖨 طباعة الكشف</button>
-      <button class="btn" onclick="exportClassifiedExcel()">تصدير Excel</button>
+      <button class="btn" onclick="previewClassified()">👁 معاينة</button><button class="btn" onclick="exportClassifiedExcel()">تصدير Excel</button>
     </div>
    </div>
    <div class="notice no-print" style="margin-bottom:12px">
@@ -405,7 +452,18 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
 
  <section id="settings" class="view">
   <div class="card">
-   <div class="cardhead"><h2>الحماية والبيانات</h2></div>
+   <div class="cardhead"><h2>مركز الحماية والبيانات</h2><span id="settingsSyncPill" class="sync-pill"><span class="sync-dot"></span><span id="settingsSyncText">جارٍ التحقق</span></span></div>
+  <div class="data-center-grid no-print">
+   <div class="data-center-card"><div class="label">آخر نسخة احتياطية</div><div class="value" id="settingsLastBackup">لا توجد</div></div>
+   <div class="data-center-card"><div class="label">عدد العائلات</div><div class="value" id="settingsFamiliesCount">0</div></div>
+   <div class="data-center-card"><div class="label">عدد الأفراد</div><div class="value" id="settingsPeopleCount">0</div></div>
+   <div class="data-center-card"><div class="label">آخر تعديل</div><div class="value" id="settingsLastModified">لا يوجد</div></div>
+  </div>
+  <div class="actions no-print" style="margin-bottom:12px">
+    <button class="btn ok" onclick="backup()">⬇️ تصدير احتياطي الآن</button>
+    <button class="btn" onclick="openQualityModal()">🔎 فحص البيانات</button>
+    <button class="btn" onclick="saveNow()">💾 حفظ الآن</button>
+  </div>
    <div class="grid" style="grid-template-columns:repeat(2,1fr)">
     <div class="familybox"><b>حماية التطبيق برمز PIN</b><p class="muted">قفل واجهة التطبيق محلياً حتى لا تُفتح البيانات عند استخدام الهاتف من شخص آخر.</p><div class="actions"><button class="btn primary" onclick="setAppPin()">تعيين/تغيير PIN</button><button class="btn" onclick="lockApp()">قفل الآن</button><button class="btn danger" onclick="removeAppPin()">إزالة PIN</button></div><small id="pinStatus" class="muted"></small></div>
     <div class="familybox"><b>التخزين المحلي</b><p class="muted">البيانات تحفظ تلقائياً داخل هذا المتصفح باستخدام localStorage.</p><button class="btn ok" onclick="saveNow()">حفظ الآن</button></div>
@@ -581,11 +639,17 @@ function load(){
   data = Array.isArray(data)?data:[];
   rebuildFilters(); renderAll();
 }
+function touchLastModified(){
+  const now=new Date().toISOString();
+  try{localStorage.setItem("abuOreibanLastModified",now)}catch(e){}
+  if(typeof updateDataCenter==="function") updateDataCenter();
+}
 function saveNow(){
   localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
-  toast("تم حفظ البيانات على الهاتف/المتصفح");
+  touchLastModified();
+  toast("✓ تم حفظ البيانات على الهاتف بنجاح");
 }
-function autoSave(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data))}catch(e){toast("تعذر الحفظ المحلي: مساحة التخزين ممتلئة")}}
+function autoSave(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data));touchLastModified()}catch(e){toast("تعذر الحفظ المحلي: مساحة التخزين ممتلئة")}}
 function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200)}
 function showView(id){
  document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
@@ -631,7 +695,7 @@ function renderTable(){
  const ps=+document.getElementById("pageSize").value||25, start=(page-1)*ps, rows=filtered.slice(start,start+ps);
  document.getElementById("tbody").innerHTML=rows.map((r,i)=>{
   const idx=data.indexOf(r), health=healthBadge(r);
-  return `<tr><td>${start+i+1}</td><td><b>${esc(r["اسم الفرد"]||"")}</b><br><span class="muted">${esc(r["اسم رب الأسرة"]||"")}</span></td><td>${esc(r["رقم هوية الفرد"]||r["رقم هوية الأسرة"]||"")}</td><td>${esc(r["رقم الجوال"]||"")}</td><td>${esc(r["صلة القرابة"]||"")}</td><td>${esc(r["الجنس"]||"")}</td><td>${esc(r["العمر التقريبي"]||"")}</td><td>${esc(r["داخل/خارج المخيم"]||"")}</td><td>${health}</td><td class="no-print"><button class="btn" onclick="editPerson(${idx})">تعديل</button> <button class="btn danger" onclick="deletePerson(${idx})">حذف</button></td></tr>`
+  return `<tr><td data-label="#">${start+i+1}</td><td data-label="اسم الفرد"><b>${esc(r["اسم الفرد"]||"")}</b><br><span class="muted">${esc(r["اسم رب الأسرة"]||"")}</span></td><td data-label="رقم الهوية">${esc(r["رقم هوية الفرد"]||r["رقم هوية الأسرة"]||"")}</td><td data-label="الجوال">${esc(r["رقم الجوال"]||"")}</td><td data-label="صلة القرابة">${esc(r["صلة القرابة"]||"")}</td><td data-label="الجنس">${esc(r["الجنس"]||"")}</td><td data-label="العمر">${esc(r["العمر التقريبي"]||"")}</td><td data-label="الموقع">${esc(r["داخل/خارج المخيم"]||"")}</td><td data-label="الحالة الصحية">${health}</td><td data-label="إجراءات" class="no-print"><button class="btn" onclick="editPerson(${idx})">تعديل</button> <button class="btn danger" onclick="deletePerson(${idx})">حذف</button></td></tr>`
  }).join("") || `<tr><td colspan="10" class="empty">لا توجد نتائج</td></tr>`;
  document.getElementById("countLabel").textContent=`عرض ${rows.length} من ${filtered.length} سجل`;
  renderPages(Math.ceil(filtered.length/ps));
@@ -811,15 +875,31 @@ function downloadXLSX(matrix,name,opts={}){
  const bytes=zipStore(files);const blob=new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});downloadBlob(blob,name);
 }
 function backup(){
- const payload={app:"إدارة وكشف المخيمات",version:1,createdAt:new Date().toISOString(),columns:COLUMNS,data};
+ const createdAt=new Date().toISOString();
+ const payload={app:"إدارة وكشف المخيمات",version:14,createdAt,columns:COLUMNS,data};
  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json;charset=utf-8"});
- downloadBlob(blob,`نسخة-احتياطية-المخيم-${dateStamp()}.json`);toast("تم إنشاء النسخة الاحتياطية");
+ downloadBlob(blob,`نسخة-احتياطية-المخيم-${dateStamp()}.json`);
+ try{localStorage.setItem("abuOreibanLastBackup",createdAt)}catch(e){}
+ if(typeof updateDataCenter==="function") updateDataCenter();
+ toast("✓ تم إنشاء النسخة الاحتياطية بنجاح");
 }
 function restoreBackup(e){
- const f=e.target.files[0];if(!f)return;const reader=new FileReader();
- reader.onload=()=>{try{const p=JSON.parse(reader.result), rows=Array.isArray(p)?p:p.data;if(!Array.isArray(rows))throw Error();
- if(confirm(`سيتم استبدال البيانات الحالية بـ ${rows.length} سجل. هل تريد المتابعة؟`)){data=rows;renumber();autoSave();rebuildFilters();renderAll();toast("تمت استعادة النسخة الاحتياطية")}
- }catch(err){alert("ملف النسخة الاحتياطية غير صالح")}};
+ const f=e.target.files[0];if(!f)return;
+ const reader=new FileReader();
+ reader.onload=()=>{
+  try{
+   const p=JSON.parse(reader.result), rows=Array.isArray(p)?p:p.data;
+   if(!Array.isArray(rows))throw Error();
+   const currentCount=data.length;
+   if(!confirm(`سيتم استبدال البيانات الحالية (${currentCount} سجل) ببيانات النسخة (${rows.length} سجل).\n\nسيتم أولاً إنشاء نسخة أمان من البيانات الحالية. هل تريد المتابعة؟`))return;
+   try{
+    const safety={app:"إدارة وكشف المخيمات — نسخة أمان قبل الاستعادة",version:14,createdAt:new Date().toISOString(),columns:COLUMNS,data};
+    downloadBlob(new Blob([JSON.stringify(safety,null,2)],{type:"application/json;charset=utf-8"}),`نسخة-أمان-قبل-الاستعادة-${dateStamp()}.json`);
+   }catch(e){}
+   data=rows;renumber();autoSave();rebuildFilters();renderAll();
+   toast("✓ تمت استعادة النسخة الاحتياطية بنجاح");
+  }catch(err){alert("ملف النسخة الاحتياطية غير صالح")}
+ };
  reader.readAsText(f);e.target.value="";
 }
 function downloadBlob(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},100)}
@@ -1455,6 +1535,12 @@ function qualityScan(){
 
 function openQualityModal(){
   qualityIssues=qualityScan();
+  const seen=new Set();
+  qualityIssues=qualityIssues.filter(x=>{
+    const family=(x.indexes||[]).map(i=>String(data[i]?.["اسم رب الأسرة"]||"" )).sort().join('|');
+    const key=[x.type,x.kind,x.field||'',family,x.message||''].join('§');
+    if(seen.has(key))return false; seen.add(key); return true;
+  });
   const errors=qualityIssues.filter(x=>x.type==="error").length, warnings=qualityIssues.filter(x=>x.type==="warning").length;
   document.getElementById("qualitySummary").innerHTML=`<b>نتيجة الفحص:</b> ${errors} خطأ و${warnings} تنبيه. التكرارات تظهر كتَنبيهات للمراجعة فقط ويمكن تركها كما هي أو تعديلها، ورقم الجوال يمكن أن يتكرر بين أكثر من عائلة ولا يعتبر مشكلة.`;
   const box=document.getElementById("qualityIssues");
@@ -1726,16 +1812,37 @@ function styleExcelWorksheet(ws, options={}){
   if(!ws || !ws["!ref"]) return ws;
   const range=XLSX.utils.decode_range(ws["!ref"]);
   const headerRows=options.headerRows||1;
-  const minWidth=options.minWidth||10, maxWidth=options.maxWidth||48;
+  const minWidth=options.minWidth||9, maxWidth=options.maxWidth||52;
   const widths=[];
+  const headers=[];
   for(let c=range.s.c;c<=range.e.c;c++){
+    const hc=ws[XLSX.utils.encode_cell({r:headerRows-1,c})];
+    headers[c]=hc?.v==null?"":String(hc.v);
+  }
+  const widthForHeader=(h)=>{
+    const x=String(h||"").toLowerCase();
+    if(x==="#"||x.includes("تسلسل")) return 7;
+    if(x.includes("اسم")) return x.includes("رب الأسرة")?28:25;
+    if(x.includes("هوية")) return 17;
+    if(x.includes("جوال")||x.includes("هاتف")) return 16;
+    if(x.includes("تاريخ")) return 13;
+    if(x.includes("عمر")) return 9;
+    if(x.includes("جنس")||x.includes("حالة")||x.includes("داخل/خارج")||x.includes("صلة")) return 15;
+    if(x.includes("ملاحظ")||x.includes("تفاصيل")||x.includes("عنوان")||x.includes("سبب")) return 34;
+    return 18;
+  };
+  for(let c=range.s.c;c<=range.e.c;c++){
+    const target=widthForHeader(headers[c]);
     let maxLen=0;
     for(let r=range.s.r;r<=range.e.r;r++){
       const cell=ws[XLSX.utils.encode_cell({r,c})];
       const v=cell?.v==null?"":String(cell.v);
       maxLen=Math.max(maxLen,...v.split(/\r?\n/).map(s=>s.length));
     }
-    widths.push({wch:Math.min(maxWidth,Math.max(minWidth,Math.ceil(maxLen*1.08)+2))});
+    let w=target;
+    if(target===18) w=Math.min(maxWidth,Math.max(minWidth,Math.ceil(maxLen*0.75)+2));
+    if(headers[c]==="#") w=7;
+    widths.push({wch:Math.min(maxWidth,Math.max(minWidth,w))});
   }
   ws["!cols"]=widths;
   ws["!rows"]=[];
@@ -1747,17 +1854,12 @@ function styleExcelWorksheet(ws, options={}){
       lines=Math.max(lines,v.split(/\r?\n/).length);
       if(cell) cell.s={
         alignment:{horizontal:"center",vertical:"center",wrapText:true,readingOrder:2},
-        border:{
-          top:{style:"thin",color:{rgb:"B7B7B7"}},
-          bottom:{style:"thin",color:{rgb:"B7B7B7"}},
-          left:{style:"thin",color:{rgb:"B7B7B7"}},
-          right:{style:"thin",color:{rgb:"B7B7B7"}}
-        },
+        border:{top:{style:"thin",color:{rgb:"B7B7B7"}},bottom:{style:"thin",color:{rgb:"B7B7B7"}},left:{style:"thin",color:{rgb:"B7B7B7"}},right:{style:"thin",color:{rgb:"B7B7B7"}}},
         font:{name:"Arial",sz:r<headerRows?12:10,bold:r<headerRows},
         fill:r<headerRows?{patternType:"solid",fgColor:{rgb:"D9E2F3"}}:undefined
       };
     }
-    ws["!rows"][r]={hpt:r<headerRows?34:Math.min(60,Math.max(22,18+(lines-1)*12))};
+    ws["!rows"][r]={hpt:r<headerRows?34:Math.min(72,Math.max(22,18+(lines-1)*12))};
   }
   ws["!freeze"]={xSplit:0,ySplit:headerRows};
   ws["!autofilter"]={ref:ws["!ref"]};
@@ -1916,7 +2018,8 @@ function exportStyledExcel(rows,filename="كشف_أبو_عريبان",sheetName=
       if(p["حامل؟"]==="نعم") flags.push("حامل");
       if(p["مرضعة؟"]==="نعم") flags.push("مرضعة");
 
-      return `<tr>
+      const idx=data.indexOf(p);
+      return `<tr class="person-click-row" onclick="editPerson(${idx})" title="اضغط لعرض/تعديل بيانات الفرد">
         <td>${i+1}</td>
         <td><b>${esc(p["اسم الفرد"]||"")}</b></td>
         <td>${esc(p["صلة القرابة"]||"")}</td>
@@ -2005,5 +2108,81 @@ window.addEventListener('online',updateOfflineStatus); window.addEventListener('
 window.addEventListener('load',()=>{updateOfflineStatus(); if('serviceWorker' in navigator && location.protocol!=='file:') navigator.serviceWorker.register('./service-worker.js').catch(()=>{});});
 </script>
 
+
+<script>
+/* V14 dashboard + quality + data-center enhancements */
+(function(){
+  const fmt=n=>Number(n||0).toLocaleString('ar-EG');
+  function rows(){return (typeof data!=='undefined' && Array.isArray(data))?data:[];}
+  function fams(){
+    const m=new Map(); rows().forEach(r=>{const h=String(r["اسم رب الأسرة"]||"").trim(); if(!h)return; if(!m.has(h))m.set(h,[]); m.get(h).push(r)}); return [...m.values()];
+  }
+  function people(f){return rows().filter(r=>String(r["اسم رب الأسرة"]||"")===String(f?.[0]?.["اسم رب الأسرة"]||"") && String(r["رقم هوية الأسرة"]||"")===String(f?.[0]?.["رقم هوية الأسرة"]||""));}
+  function special(r,k){
+    if(k==='injured')return (r["إصابة؟"]||r["إصابة?"])==='نعم';
+    if(k==='disabled')return r["إعاقة؟"]==='نعم';
+    if(k==='pregnant')return r["حامل؟"]==='نعم';
+    if(k==='lactating')return r["مرضعة؟"]==='نعم';
+    if(k==='orphan')return r["يتيم/منفصل عن ذويه؟"]==='نعم';
+    if(k==='elderly')return (typeof ageOf==='function'?ageOf(r):parseInt(r["العمر التقريبي"],10))>=60;
+    return false;
+  }
+  window.openDashboardList=function(type){
+    showView('records');
+    ['q','rel','inside','health'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    const fm=fams(); let set=new Set();
+    if(type==='inside'||type==='outside'||type==='complete'||type==='partial'||type==='incomplete'){
+      const target=type==='inside'?'داخل المخيم':type==='outside'?'خارج المخيم':type==='complete'?'مكتملة':type==='partial'?'جزئية':'غير مكتملة';
+      fm.filter(g=>String(g[0]?.[type==='inside'||type==='outside'?'داخل/خارج المخيم':'حالة اكتمال بيانات الأسرة']||'')===target).forEach(g=>people(g).forEach(r=>set.add(rows().indexOf(r))));
+    }else if(type==='all') rows().forEach((r,i)=>set.add(i));
+    else rows().forEach((r,i)=>{if(special(r,type))set.add(i)});
+    filtered=rows().filter((r,i)=>set.has(i)); page=1; renderTable();
+    toast(`✓ تم فتح كشف ${type==='all'?'كل الأفراد':type==='inside'?'العائلات داخل المخيم':type==='outside'?'العائلات خارج المخيم':type==='complete'?'العائلات المكتملة':type==='partial'?'العائلات الجزئية':type==='incomplete'?'العائلات الناقصة':type==='injured'?'المصابين':type==='disabled'?'ذوي الإعاقة':type==='pregnant'?'الحوامل':type==='lactating'?'المرضعات':type==='orphan'?'الأيتام':'كبار السن'}`);
+  };
+  window.updateDataCenter=function(){
+    const fs=fams(); const n=rows().length;
+    const last=localStorage.getItem('abuOreibanLastModified'); const backup=localStorage.getItem('abuOreibanLastBackup');
+    const fmtDate=x=>x?new Date(x).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'}):'لا يوجد';
+    const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
+    set('settingsLastBackup',fmtDate(backup));set('settingsFamiliesCount',fmt(fs.length));set('settingsPeopleCount',fmt(n));set('settingsLastModified',fmtDate(last));set('dashLastModified',last?new Date(last).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}):'—');
+    const pill=document.getElementById('settingsSyncPill'), txt=document.getElementById('settingsSyncText'), hp=document.getElementById('headerSyncPill'); if(pill&&txt){pill.classList.toggle('online',navigator.onLine);pill.classList.toggle('offline',!navigator.onLine);txt.textContent=navigator.onLine?'متصل':'بدون إنترنت';} if(hp){hp.classList.toggle('online',navigator.onLine);hp.classList.toggle('offline',!navigator.onLine);const ht=hp.querySelector('span:last-child');if(ht)ht.textContent=navigator.onLine?'متصل':'محلي';}
+  };
+  const originalDashboard=window.renderDashboard;
+  window.renderDashboard=function(){
+    if(typeof originalDashboard==='function')originalDashboard();
+    const rs=rows(), fs=fams();
+    const famCount=(predicate)=>fs.filter(predicate).length;
+    const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=fmt(v)};
+    set('sOutside',famCount(g=>g[0]?.["داخل/خارج المخيم"]==='خارج المخيم'));
+    set('dashComplete',famCount(g=>g[0]?.["حالة اكتمال بيانات الأسرة"]==='مكتملة'));
+    set('dashPartial',famCount(g=>g[0]?.["حالة اكتمال بيانات الأسرة"]==='جزئية'));
+    set('dashIncomplete',famCount(g=>String(g[0]?.["حالة اكتمال بيانات الأسرة"]||'').includes('غير مكتملة')));
+    set('dashInjured',rs.filter(r=>special(r,'injured')).length);set('dashDisabled',rs.filter(r=>special(r,'disabled')).length);set('dashPregnant',rs.filter(r=>special(r,'pregnant')).length);set('dashLactating',rs.filter(r=>special(r,'lactating')).length);set('dashOrphan',rs.filter(r=>special(r,'orphan')).length);set('dashElderly',rs.filter(r=>special(r,'elderly')).length);
+    const issues=typeof qualityScan==='function'?qualityScan():[]; set('dashErrors',issues.filter(x=>x.type==='error').length);
+    updateDataCenter();
+  };
+  window.addEventListener('online',updateDataCenter); window.addEventListener('offline',updateDataCenter);
+  window.addEventListener('load',()=>setTimeout(updateDataCenter,150));
+})();
+
+/* Classified preview */
+function previewClassified(){
+  const rows=Array.isArray(classifiedRows)?classifiedRows:[];
+  if(!rows.length){toast('لا توجد بيانات للمعاينة');return;}
+  let modal=document.getElementById('classifiedPreviewModal');
+  if(!modal){
+    modal=document.createElement('div');modal.id='classifiedPreviewModal';modal.className='modal preview-modal';
+    modal.innerHTML='<div class="modalbox"><div class="modalhead"><b>معاينة الكشف قبل التصدير</b><button class="btn" onclick="closeModal(\'classifiedPreviewModal\')">✕</button></div><div class="modalbody"><div id="classifiedPreviewMeta" class="notice" style="margin-bottom:10px"></div><div id="classifiedPreviewBody" class="preview-table"></div></div><div class="modalfoot"><button class="btn primary" onclick="exportClassifiedExcel();closeModal(\'classifiedPreviewModal\')">تصدير Excel</button><button class="btn" onclick="printClassified();closeModal(\'classifiedPreviewModal\')">طباعة</button></div></div>';
+    document.body.appendChild(modal);
+  }
+  const cols=Array.isArray(selectedReportColumns)&&selectedReportColumns.length?selectedReportColumns:REPORT_COLUMNS.map(x=>x[0]);
+  const label=k=>{const x=REPORT_COLUMNS.find(a=>a[0]===k);return x?x[1]:k};
+  const escv=x=>String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  const sample=rows.slice(0,150);
+  document.getElementById('classifiedPreviewMeta').textContent=`${classifiedTitle||'كشف مصنف'} — ${rows.length.toLocaleString('ar-EG')} سجل. المعاينة تعرض أول 150 سجل فقط.`;
+  document.getElementById('classifiedPreviewBody').innerHTML='<table class="table"><thead><tr>'+cols.map(c=>`<th>${escv(label(c))}</th>`).join('')+'</tr></thead><tbody>'+sample.map(r=>'<tr>'+cols.map(c=>`<td>${escv(r[c]??'')}</td>`).join('')+'</tr>').join('')+'</tbody></table>';
+  modal.classList.add('show');
+}
+</script>
 </body>
 </html>
