@@ -296,6 +296,24 @@ html,body{width:100%;max-width:100%;overflow-x:hidden!important}
 .dist-smart-results{position:absolute;z-index:1000;top:calc(100% + 6px);right:0;left:0;background:#fff;border:1px solid rgba(15,23,42,.12);border-radius:14px;box-shadow:0 16px 40px rgba(15,23,42,.14);max-height:330px;overflow:auto;padding:5px}.dist-smart-item{width:100%;border:0;background:transparent;text-align:right;padding:11px 12px;border-radius:10px;display:flex;flex-direction:column;gap:3px;cursor:pointer}.dist-smart-item:hover{background:#f1f5f9}.dist-smart-name{font-weight:800;color:#0f172a}.dist-smart-meta{font-size:11px;color:#64748b}.dist-smart-empty{padding:16px;text-align:center;color:#64748b;font-size:12px}
 @media(max-width:700px){.dist-smart-results{max-height:260px}.dist-smart-item{padding:10px}.dist-smart-meta{font-size:10px}}
 </style>
+
+<style>
+.daily-header{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:18px;margin:0 0 14px;padding:20px 22px;border-radius:20px;background:linear-gradient(135deg,#101827 0%,#172235 55%,#0c1422 100%);color:#fff;box-shadow:0 14px 34px rgba(15,23,42,.20);border:1px solid rgba(255,255,255,.08)}
+.daily-header:before{content:"";position:absolute;inset:auto -80px -100px auto;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,.22),transparent 68%);pointer-events:none}
+.daily-header:after{content:"";position:absolute;top:-90px;left:28%;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(16,185,129,.13),transparent 68%);pointer-events:none}
+.daily-header-main{position:relative;z-index:1;min-width:0}
+.daily-greeting{font-size:clamp(22px,3vw,30px);font-weight:900;letter-spacing:-.4px;line-height:1.2}
+.daily-date{margin-top:6px;color:rgba(255,255,255,.76);font-size:13px;font-weight:700}
+.daily-clock{margin-top:3px;color:#fff;font-size:clamp(17px,2.4vw,22px);font-weight:850;font-variant-numeric:tabular-nums;direction:ltr;text-align:right;width:max-content;max-width:100%}
+.daily-online{position:relative;z-index:1;display:flex;align-items:center;gap:11px;min-width:168px;padding:12px 14px;border-radius:15px;background:rgba(255,255,255,.075);border:1px solid rgba(255,255,255,.10);backdrop-filter:blur(10px);transition:background .35s ease,border-color .35s ease,transform .25s ease}
+.daily-online small{display:block;color:rgba(255,255,255,.55);font-size:10px;margin-bottom:2px}
+.daily-online strong{display:block;font-size:13px;white-space:nowrap}
+.daily-online-dot{width:11px;height:11px;flex:0 0 11px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 5px rgba(34,197,94,.12),0 0 14px rgba(34,197,94,.35);animation:dailyPulse 2.1s ease-in-out infinite}
+.daily-online[data-state="offline"]{background:rgba(239,68,68,.11);border-color:rgba(248,113,113,.24)}
+.daily-online[data-state="offline"] .daily-online-dot{background:#ef4444;box-shadow:0 0 0 5px rgba(239,68,68,.12),0 0 14px rgba(239,68,68,.30)}
+@keyframes dailyPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.88);opacity:.72}}
+@media(max-width:700px){.daily-header{padding:16px;gap:10px;border-radius:16px}.daily-greeting{font-size:22px}.daily-date{font-size:11px}.daily-clock{font-size:17px}.daily-online{min-width:0;padding:10px 11px}.daily-online strong{font-size:11px}.daily-online small{font-size:9px}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -355,6 +373,17 @@ html,body{width:100%;max-width:100%;overflow-x:hidden!important}
   <div id="familyCardArea" style="display:none"></div>
 </section>
 <section id="dashboard" class="view active">
+  <section class="daily-header no-print" aria-label="معلومات اليوم والوقت والاتصال">
+    <div class="daily-header-main">
+      <div class="daily-greeting" id="dailyGreeting">مساء الخير</div>
+      <div class="daily-date" id="dailyDate">—</div>
+      <div class="daily-clock" id="dailyClock">—</div>
+    </div>
+    <div class="daily-online" id="dailyOnline" data-state="online">
+      <span class="daily-online-dot" aria-hidden="true"></span>
+      <div><small>حالة الاتصال</small><strong id="dailyOnlineText">متصل بالإنترنت</strong></div>
+    </div>
+  </section>
   <div class="grid stats">
    <div class="stat"><div class="label">إجمالي الأفراد</div><div class="num" id="sPeople">0</div><div class="sub">كل أفراد الكشف</div></div>
    <div class="stat"><div class="label">إجمالي العائلات</div><div class="num" id="sFamilies">0</div><div class="sub">بحسب رب الأسرة</div></div>
@@ -2824,13 +2853,21 @@ if ('serviceWorker' in navigator) {
   function distSearchNorm(v){return String(v??'').toLowerCase().replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[ًٌٍَُِّْـ]/g,'').replace(/\s+/g,' ').trim()}
   function renderBeneficiarySearch(){
     const panel=document.getElementById('distBeneficiarySearchPanel'); if(!panel)return;
-    const q=distSearchNorm(document.getElementById('distQ')?.value), selectedType=document.getElementById('distType')?.value||'';
+    const q=distSearchNorm(document.getElementById('distQ')?.value), selectedType=document.getElementById('distType')?.value||'', beneficiaryFilter=document.getElementById('distBeneficiary')?.value||'';
     if(q.length<2){panel.hidden=true;panel.innerHTML='';return}
     const candidates=new Map();
     for(const r of data){
       const name=String(r['اسم الفرد']||'').trim(), head=String(r['اسم رب الأسرة']||'').trim(), pid=String(r['رقم هوية الفرد']||'').trim(), fid=String(r['رقم هوية الأسرة']||'').trim();
-      const hay=distSearchNorm(name+' '+head+' '+pid+' '+fid); if(!hay.includes(q))continue;
-      const key=pid?('p|'+pid):('f|'+fid+'|'+head); if(!candidates.has(key))candidates.set(key,{kind:pid?'فرد':'عائلة',name:pid?name:head,head,pid,fid});
+      if(beneficiaryFilter==='عائلة'){
+        if(!head)continue;
+        const hay=distSearchNorm(head+' '+fid); if(!hay.includes(q))continue;
+        const key='f|'+fid+'|'+head;
+        if(!candidates.has(key))candidates.set(key,{kind:'عائلة',name:head,head,pid:'',fid});
+      }else{
+        const hay=distSearchNorm(name+' '+head+' '+pid+' '+fid); if(!hay.includes(q))continue;
+        const key=pid?('p|'+pid):('f|'+fid+'|'+head);
+        if(!candidates.has(key))candidates.set(key,{kind:pid?'فرد':'عائلة',name:pid?name:head,head,pid,fid});
+      }
     }
     const types=[...new Set(distributions.map(x=>x.type).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ar'));
     const arr=[...candidates.values()].slice(0,20).map(c=>{
@@ -2850,6 +2887,26 @@ if ('serviceWorker' in navigator) {
   const originalDistTypeChanged=window.renderDistributions;
   document.addEventListener('DOMContentLoaded',()=>{const input=document.getElementById('distName');if(input){input.addEventListener('input',renderSmart);input.addEventListener('focus',renderSmart)}document.addEventListener('click',e=>{const b=document.getElementById('distSmartResults');if(b&&!b.contains(e.target)&&e.target!==input)b.hidden=true})});
   window.addEventListener('load',()=>{const input=document.getElementById('distName');if(input){input.addEventListener('input',renderSmart);input.addEventListener('focus',renderSmart)}});
+
+  function updateDailyHeader(){
+    const now=new Date();
+    const hour=now.getHours();
+    const greeting=document.getElementById('dailyGreeting');
+    const dateEl=document.getElementById('dailyDate');
+    const clockEl=document.getElementById('dailyClock');
+    const online=document.getElementById('dailyOnline');
+    const onlineText=document.getElementById('dailyOnlineText');
+    if(greeting)greeting.textContent=(hour>=5&&hour<12)?'صباح الخير':'مساء الخير';
+    if(dateEl)dateEl.textContent=new Intl.DateTimeFormat('ar-EG',{weekday:'long',year:'numeric',month:'long',day:'numeric'}).format(now);
+    if(clockEl)clockEl.textContent=new Intl.DateTimeFormat('ar-EG',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true}).format(now);
+    const isOnline=navigator.onLine;
+    if(online){online.dataset.state=isOnline?'online':'offline';}
+    if(onlineText)onlineText.textContent=isOnline?'متصل بالإنترنت':'غير متصل بالإنترنت';
+  }
+  updateDailyHeader();
+  setInterval(updateDailyHeader,1000);
+  window.addEventListener('online',updateDailyHeader);
+  window.addEventListener('offline',updateDailyHeader);
 })();
 </script>
 </body>
