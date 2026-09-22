@@ -1874,7 +1874,10 @@ function syncLocalSave(silent=true){
   data=syncNormalizeRows(data);
   localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
   syncQueueReconcile();
-  if(!silent) toast(navigator.onLine?"تم حفظ البيانات":"تم حفظ البيانات محلياً — بانتظار المزامنة");
+  if(!silent) toast(navigator.onLine?"تم حفظ البيانات محلياً — جاري المزامنة":"تم حفظ البيانات محلياً — بانتظار عودة الإنترنت");
+  const n=syncPending.length;
+  const sn=document.getElementById("cloudSyncNotice");
+  if(sn && n>0 && !navigator.onLine) sn.textContent=`⚠️ ${n} تعديل محفوظ على الجهاز — بانتظار الإنترنت للمزامنة`;
 }
 
 /* طابور تغييرات محلي: أي تعديل أثناء انقطاع الإنترنت يبقى محفوظاً حتى ينجح رفعه. */
@@ -1972,21 +1975,72 @@ async function syncBootstrap(){
   return inserted;
 }
 async function syncPush(){
+  /* لا نحذف الطابور المحلي لمجرد أن الطلب وصل للخادم.
+     يبقى التغيير معلقاً حتى نعرف أن كل الدفعات قُبلت بنجاح. */
   const changes=syncBuildChanges();
-  if(!changes.length)return {accepted:0,conflicts:[],pending:0};
+  if(!changes.length)return {accepted:0,conflicts:[],pending:0,allAccepted:true};
   let accepted=0, conflicts=[];
   for(let i=0;i<changes.length;i+=100){
     const batch=changes.slice(i,i+100);
     const r=await syncFetch("/sync/push",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),changes:batch})});
-    accepted+=Number(r.accepted?.length||0);conflicts=conflicts.concat(r.conflicts||[]);
+    accepted+=Number(Array.isArray(r.accepted)?r.accepted.length:0);
+    conflicts=conflicts.concat(Array.isArray(r.conflicts)?r.conflicts:[]);
   }
-  if(conflicts.length){
-    await syncPull();
+  const allAccepted=!conflicts.length && accepted>=changes.length;
+  if(!allAccepted){
+    syncLoadPending();
+    return {accepted,conflicts,pending:syncPending.length,allAccepted:false};
   }
+  /* اعتبر الحالة مؤكدة فقط بعد قبول كل التغييرات. */
   syncSaveShadow(data);
   syncPending=[];
   syncSavePending();
-  return {accepted,conflicts,pending:syncPending.length};
+  return {accepted,conflicts,pending:0,allAccepted:true};
+}
+
+function syncApplyPendingOps(ops){
+  if(!Array.isArray(ops)||!ops.length)return;
+  const byId=new Map(data.map((r,i)=>[r.__syncId,i]));
+  for(const c of ops){
+    if(c.operation==='delete'){
+      const idx=byId.get(c.recordId);
+      if(idx!==undefined){data.splice(idx,1);byId.clear();data.forEach((r,i)=>byId.set(r.__syncId,i));}
+    }else if(c.operation==='upsert' && c.data){
+      const incoming=structuredClone(c.data);incoming.__syncId=c.recordId;
+      const idx=byId.get(c.recordId);
+      if(idx===undefined){data.push(incoming);byId.set(c.recordId,data.length-1);}
+      else data[idx]=incoming;
+    }
+  }
+  renumber();
+}
+
+async function syncOnlineReconcile(){
+  syncLoadShadow();
+  syncLoadPending();
+  const wanted=structuredClone(syncPending);
+  /* أولاً اجلب ما تغيّر على الأجهزة الأخرى. */
+  await syncPull();
+  /* ثم أعد تطبيق تغييرات هذا الجهاز التي كانت معلقة أثناء انقطاع النت،
+     حتى لا يقوم السحب باسترجاع السجل المحذوف/القديم فوق تعديل المستخدم. */
+  if(wanted.length){
+    syncApplyPendingOps(wanted);
+    syncLocalSave(true);
+    const result=await syncPush();
+    if(!result.allAccepted){
+      syncQueueReconcile();
+      return result;
+    }
+    /* بعد القبول نعمل سحباً أخيراً للتأكد من أن النسخة السحابية هي الحالة النهائية. */
+    await syncPull();
+    syncSaveShadow(data);
+    syncPending=[];syncSavePending();
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+    return result;
+  }
+  syncSaveShadow(data);
+  syncPending=[];syncSavePending();
+  return {accepted:0,conflicts:[],pending:0,allAccepted:true};
 }
 async function syncStart(reason="auto"){
   if(syncBusy || !navigator.onLine)return;
@@ -1995,7 +2049,7 @@ async function syncStart(reason="auto"){
     const h=await syncFetch("/health",{method:"GET"});
     if(!syncInitialized){
       syncLoadShadow();syncLoadPending();
-      const cloudBootKey="aboreiban_cloud_authoritative_v21";
+      const cloudBootKey="aboreiban_cloud_authoritative_v22";
       const cloudBootDone=localStorage.getItem(cloudBootKey)==="1";
       if(Number(h.records||0)===0){
         const n=await syncBootstrap();
@@ -2044,17 +2098,16 @@ async function syncStart(reason="auto"){
         }
         syncSaveShadow(data);
         syncPending=[];syncSavePending();
-        localStorage.setItem("aboreiban_cloud_authoritative_v21","1");
+        localStorage.setItem("aboreiban_cloud_authoritative_v22","1");
         syncInitialized=true;
         toast(`تمت مزامنة البيانات مع السحابة — ${data.length} سجل / ${familyMap().size} عائلة`);
       }
     }else{
-      const before=JSON.stringify(syncPending);
-      const pushed=await syncPush();
-      await syncPull();
-      syncLoadShadow();
-      syncQueueReconcile();
-      if(reason!=="timer" && navigator.onLine) toast(pushed.accepted||before!==JSON.stringify(syncPending)?"تمت مزامنة التعديلات مع السحابة ✓":"تم فحص السحابة والمزامنة محدثة ✓");
+      const pushed=await syncOnlineReconcile();
+      if(reason!=="timer" && navigator.onLine){
+        if(pushed?.allAccepted) toast(pushed.accepted?"تمت مزامنة التعديلات مع السحابة ✓":"تم فحص السحابة والمزامنة محدثة ✓");
+        else toast("التعديلات ما زالت محفوظة محلياً وستُعاد مزامنتها تلقائياً");
+      }
     }
   }catch(e){
     console.warn("Cloud sync:",e);
