@@ -27,9 +27,9 @@ function cleanString(value, max = 200) {
 }
 
 function requireAuth(request, env) {
-  // Set SYNC_API_KEY as a Worker secret before enabling writes.
-  // If no key is configured, the API is intentionally read/write-open for initial setup.
-  if (!env.SYNC_API_KEY) return { ok: true, deviceId: cleanString(request.headers.get("X-Device-Id"), 120) };
+  if (!env.SYNC_API_KEY) {
+    return { ok: true, deviceId: cleanString(request.headers.get("X-Device-Id"), 120) };
+  }
   const auth = request.headers.get("Authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
   if (token !== env.SYNC_API_KEY) return { ok: false, error: "غير مصرح" };
@@ -41,12 +41,10 @@ function validRecord(item) {
   const id = cleanString(item.recordId, 200);
   if (!id) return false;
   const updatedAt = Number(item.updatedAt);
-  if (!Number.isFinite(updatedAt) || updatedAt <= 0) return false;
-  return true;
+  return Number.isFinite(updatedAt) && updatedAt > 0;
 }
 
 async function ensureSchema(env) {
-  // Safe idempotent setup. This makes the Worker usable immediately after deployment.
   await env.DB.batch([
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS sync_records (
       record_id TEXT PRIMARY KEY,
@@ -81,6 +79,7 @@ async function health(env) {
   try {
     await ensureSchema(env);
     const row = await env.DB.prepare("SELECT COUNT(*) AS count FROM sync_records").first();
+    const live = await env.DB.prepare("SELECT COUNT(*) AS count FROM sync_records WHERE deleted = 0").first();
     const change = await env.DB.prepare("SELECT COALESCE(MAX(seq),0) AS seq FROM sync_changes").first();
     return json({
       ok: true,
@@ -88,6 +87,7 @@ async function health(env) {
       database: "mood",
       binding: "DB",
       records: Number(row?.count || 0),
+      activeRecords: Number(live?.count || 0),
       latestSeq: Number(change?.seq || 0),
       time: new Date().toISOString()
     });
@@ -124,15 +124,17 @@ async function pull(request, env) {
     createdAt: Number(r.created_at)
   }));
 
-  const latest = changes.length ? changes[changes.length - 1].seq : since;
+  const nextSince = changes.length ? changes[changes.length - 1].seq : since;
   const maxRow = await env.DB.prepare("SELECT COALESCE(MAX(seq),0) AS seq FROM sync_changes").first();
+  const countRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM sync_records WHERE deleted = 0").first();
 
   return json({
     ok: true,
     since,
-    latestSeq: Number(maxRow?.seq || latest || 0),
-    nextSince: latest,
+    latestSeq: Number(maxRow?.seq || nextSince || 0),
+    nextSince,
     hasMore: changes.length === limit,
+    serverActiveRecords: Number(countRow?.count || 0),
     changes
   });
 }
@@ -151,7 +153,9 @@ async function push(request, env) {
 
   const deviceId = cleanString(body.deviceId || auth.deviceId, 120);
   const incoming = Array.isArray(body.changes) ? body.changes : [];
-  if (incoming.length > 200) return json({ ok: false, error: "الحد الأقصى 200 تغيير في الطلب الواحد" }, 413);
+  if (incoming.length > 200) {
+    return json({ ok: false, error: "الحد الأقصى 200 تغيير في الطلب الواحد" }, 413);
+  }
 
   const accepted = [];
   const conflicts = [];
@@ -175,9 +179,34 @@ async function push(request, env) {
       continue;
     }
 
-    const already = await env.DB.prepare("SELECT seq FROM sync_changes WHERE op_id = ?").bind(opId).first();
+    // Idempotency: if this exact operation already reached D1, report it as accepted.
+    // This is important after an internet drop: the browser may retry a request that
+    // the Worker already committed. It must not stay pending forever.
+    const already = await env.DB.prepare(`
+      SELECT seq, record_id, operation, updated_at, version
+      FROM sync_changes
+      WHERE op_id = ?
+    `).bind(opId).first();
+
     if (already) {
-      skipped.push({ opId, recordId, reason: "مكرر" });
+      if (String(already.record_id) !== recordId) {
+        conflicts.push({
+          opId,
+          recordId,
+          reason: "opId مستخدم لسجل مختلف",
+          serverRecordId: already.record_id
+        });
+      } else {
+        accepted.push({
+          opId,
+          recordId,
+          version: Number(already.version),
+          updatedAt: Number(already.updated_at),
+          operation: already.operation,
+          idempotent: true,
+          seq: Number(already.seq)
+        });
+      }
       continue;
     }
 
@@ -212,30 +241,60 @@ async function push(request, env) {
           version = excluded.version,
           deleted = excluded.deleted,
           updated_by = excluded.updated_by
-      `).bind(recordId, dataJson ?? "{}", updatedAt, nextVersion, operation === "delete" ? 1 : 0, deviceId, createdAt),
+      `).bind(
+        recordId,
+        dataJson ?? "{}",
+        updatedAt,
+        nextVersion,
+        operation === "delete" ? 1 : 0,
+        deviceId,
+        createdAt
+      ),
       env.DB.prepare(`
         INSERT INTO sync_changes
           (op_id, record_id, operation, data_json, updated_at, version, device_id, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(opId, recordId, operation, dataJson, updatedAt, nextVersion, deviceId, createdAt)
+      `).bind(
+        opId,
+        recordId,
+        operation,
+        dataJson,
+        updatedAt,
+        nextVersion,
+        deviceId,
+        createdAt
+      )
     );
 
     accepted.push({ opId, recordId, version: nextVersion, updatedAt, operation });
   }
 
-  // A D1 batch is atomic: either the prepared writes all commit or none do.
   if (statements.length) {
-    await env.DB.batch(statements);
+    try {
+      await env.DB.batch(statements);
+    } catch (e) {
+      // Nothing is reported as accepted if the atomic D1 batch failed.
+      return json({
+        ok: false,
+        error: "فشل حفظ دفعة المزامنة في D1",
+        detail: String(e?.message || e),
+        accepted: [],
+        conflicts,
+        skipped
+      }, 500);
+    }
   }
 
   const latest = await env.DB.prepare("SELECT COALESCE(MAX(seq),0) AS seq FROM sync_changes").first();
+  const live = await env.DB.prepare("SELECT COUNT(*) AS count FROM sync_records WHERE deleted = 0").first();
 
   return json({
     ok: true,
     accepted,
     conflicts,
     skipped,
-    latestSeq: Number(latest?.seq || 0)
+    latestSeq: Number(latest?.seq || 0),
+    serverActiveRecords: Number(live?.count || 0)
   });
 }
 
@@ -250,41 +309,60 @@ async function bootstrap(request, env) {
   }
 
   let body;
-  try { body = await request.json(); } catch { return json({ ok: false, error: "JSON غير صالح" }, 400); }
+  try { body = await request.json(); }
+  catch { return json({ ok: false, error: "JSON غير صالح" }, 400); }
+
   const records = Array.isArray(body.records) ? body.records : [];
   if (!records.length) return json({ ok: false, error: "لا توجد سجلات" }, 400);
   if (records.length > 2000) return json({ ok: false, error: "عدد السجلات كبير؛ أرسلها على دفعات" }, 413);
 
   const deviceId = cleanString(body.deviceId || auth.deviceId, 120);
-  const statements = [];
+  let inserted = 0;
+  let ignored = 0;
   const t = now();
 
-  for (const item of records) {
-    if (!validRecord(item)) continue;
-    const recordId = cleanString(item.recordId, 200);
-    const updatedAt = Number(item.updatedAt);
-    const dataJson = JSON.stringify(item.data ?? {});
-    const opId = cleanString(item.opId || crypto.randomUUID(), 200);
-    const version = Math.max(1, Number(item.version || 1));
-    const operation = item.deleted ? "delete" : "upsert";
-    statements.push(
-      env.DB.prepare(`INSERT OR IGNORE INTO sync_records
-        (record_id, data_json, updated_at, version, deleted, updated_by, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)`)
-        .bind(recordId, dataJson, updatedAt, version, item.deleted ? 1 : 0, deviceId, t),
-      env.DB.prepare(`INSERT OR IGNORE INTO sync_changes
-        (op_id, record_id, operation, data_json, updated_at, version, device_id, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-        .bind(opId, recordId, operation, item.deleted ? null : dataJson, updatedAt, version, deviceId, t)
-    );
-  }
+  for (let i = 0; i < records.length; i += 100) {
+    const chunk = records.slice(i, i + 100);
+    const statements = [];
 
-  for (let i = 0; i < statements.length; i += 200) {
-    await env.DB.batch(statements.slice(i, i + 200));
+    for (const item of chunk) {
+      if (!validRecord(item)) {
+        ignored++;
+        continue;
+      }
+
+      const recordId = cleanString(item.recordId, 200);
+      const updatedAt = Number(item.updatedAt);
+      const dataJson = JSON.stringify(item.data ?? {});
+      const opId = cleanString(item.opId || crypto.randomUUID(), 200);
+      const version = Math.max(1, Number(item.version || 1));
+      const operation = item.deleted ? "delete" : "upsert";
+
+      statements.push(
+        env.DB.prepare(`INSERT OR IGNORE INTO sync_records
+          (record_id, data_json, updated_at, version, deleted, updated_by, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)`)
+          .bind(recordId, dataJson, updatedAt, version, item.deleted ? 1 : 0, deviceId, t),
+        env.DB.prepare(`INSERT OR IGNORE INTO sync_changes
+          (op_id, record_id, operation, data_json, updated_at, version, device_id, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+          .bind(opId, recordId, operation, item.deleted ? null : dataJson, updatedAt, version, deviceId, t)
+      );
+    }
+
+    if (statements.length) {
+      await env.DB.batch(statements);
+      inserted += statements.length / 2;
+    }
   }
 
   const latest = await env.DB.prepare("SELECT COALESCE(MAX(seq),0) AS seq FROM sync_changes").first();
-  return json({ ok: true, inserted: records.length, latestSeq: Number(latest?.seq || 0) });
+  return json({
+    ok: true,
+    inserted,
+    ignored,
+    latestSeq: Number(latest?.seq || 0)
+  });
 }
 
 export default {
@@ -302,8 +380,6 @@ export default {
 
     const url = new URL(request.url);
     try {
-      // Keep the API on the same Worker URL, while serving the app UI from /public.
-      // /health and /sync/* stay JSON endpoints used by the app's cloud sync.
       if (url.pathname === "/health") return await health(env);
       if (url.pathname === "/sync/pull" && request.method === "GET") return await pull(request, env);
       if (url.pathname === "/sync/push" && request.method === "POST") return await push(request, env);
