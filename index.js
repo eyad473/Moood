@@ -212,7 +212,7 @@ async function push(request, env) {
           version = excluded.version,
           deleted = excluded.deleted,
           updated_by = excluded.updated_by
-      `).bind(recordId, dataJson ?? "{}", updatedAt, nextVersion, operation === "delete" ? 1 : 0, deviceId, current ? undefined : createdAt),
+      `).bind(recordId, dataJson ?? "{}", updatedAt, nextVersion, operation === "delete" ? 1 : 0, deviceId, createdAt),
       env.DB.prepare(`
         INSERT INTO sync_changes
           (op_id, record_id, operation, data_json, updated_at, version, device_id, created_at)
@@ -302,11 +302,14 @@ export default {
 
     const url = new URL(request.url);
     try {
-      if (url.pathname === "/" || url.pathname === "/health") return await health(env);
+      // Keep the API on the same Worker URL, while serving the app UI from /public.
+      // /health and /sync/* stay JSON endpoints used by the app's cloud sync.
+      if (url.pathname === "/health") return await health(env);
       if (url.pathname === "/sync/pull" && request.method === "GET") return await pull(request, env);
       if (url.pathname === "/sync/push" && request.method === "POST") return await push(request, env);
       if (url.pathname === "/sync/bootstrap" && request.method === "POST") return await bootstrap(request, env);
-      return json({ ok: false, error: "المسار غير موجود" }, 404);
+      if (env.ASSETS) return await env.ASSETS.fetch(request);
+      return json({ ok: false, error: "واجهة التطبيق غير مفعلة: اربط Static Assets" }, 404);
     } catch (e) {
       return json({ ok: false, error: "خطأ داخلي", detail: String(e?.message || e) }, 500);
     }
