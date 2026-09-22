@@ -6,7 +6,3 @@ compatibility_date = "2026-09-20"
 binding = "DB"
 database_name = "mood"
 database_id = "6231567a-ca81-400e-916d-f9a11806b343"
-
-[assets]
-directory = "./public"
-binding = "ASSETS"
