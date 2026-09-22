@@ -225,6 +225,42 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
 @media(max-width:600px){#toast{left:14px;right:14px;bottom:84px;text-align:center}#abConfirmBox{border-radius:22px;padding:20px}}
 </style>
 <div id="abConfirmBackdrop" aria-hidden="true"><div id="abConfirmBox" role="dialog" aria-modal="true"><div id="abConfirmIcon">✓</div><div id="abConfirmTitle">تأكيد العملية</div><div id="abConfirmText"></div><div id="abConfirmActions"><button class="ab-cancel" id="abConfirmCancel">إلغاء</button><button class="ab-ok" id="abConfirmOk">متابعة</button></div></div></div>
+
+<style id="ab-mobile-v32-fix">
+/* V32 — إصلاح شامل لواجهة الهاتف بدون تغيير تصميم التطبيق */
+html,body{width:100%;max-width:100%;overflow-x:hidden!important}
+@media(max-width:700px){
+  .wrap{width:100%;max-width:100%;overflow-x:hidden;padding:9px}
+  .card,.chart-card,.stat,.family-card,.familybox{max-width:100%;min-width:0;overflow:hidden}
+  .field,.field *{min-width:0;max-width:100%}
+  .field input,.field select,.field textarea{width:100%;min-width:0;max-width:100%;font-size:13px}
+  /* النوافذ: جسم قابل للتمرير + شريط حفظ ثابت داخل النافذة */
+  .modal{padding:6px!important;align-items:stretch!important;overflow:hidden!important}
+  .modalbox{width:100%!important;max-width:100%!important;height:calc(100dvh - 12px)!important;max-height:calc(100dvh - 12px)!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;border-radius:15px!important}
+  .modalhead{flex:0 0 auto!important;min-height:52px;padding:9px 11px!important}
+  .modalbody{flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overflow-x:hidden!important;padding:11px!important;-webkit-overflow-scrolling:touch}
+  .modalbody form{min-height:100%;display:flex;flex-direction:column}
+  .modalbody .formgrid{flex:0 0 auto}
+  .modalfoot{flex:0 0 auto!important;position:relative!important;bottom:auto!important;z-index:5;padding:9px 10px!important;min-height:58px;display:flex!important;align-items:center;gap:7px!important;background:rgba(255,255,255,.98)!important;box-shadow:0 -5px 16px rgba(15,23,42,.08);padding-bottom:max(9px,env(safe-area-inset-bottom))!important}
+  .modalfoot .btn{flex:1 1 0!important;min-height:42px!important;font-size:12px!important;white-space:nowrap}
+  /* لا تمدد أفقي داخل إدارة العائلات */
+  #families .tablewrap,#records .tablewrap,#classified .tablewrap{max-width:100%;overflow-x:auto}
+  #families .table,#records .table,#classified .table{min-width:700px}
+  /* شريط الهاتف ثابت فعلياً ولا يتحرك مع المحتوى */
+  .mobile-bottom-nav{position:fixed!important;left:0!important;right:0!important;bottom:0!important;width:100vw!important;max-width:100vw!important;height:auto!important;min-height:64px!important;transform:none!important;margin:0!important;display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:2px!important;overflow:hidden!important;padding:4px 3px max(4px,env(safe-area-inset-bottom))!important;box-sizing:border-box!important;touch-action:manipulation!important}
+  .mobile-bottom-nav button{width:100%!important;min-width:0!important;max-width:100%!important;height:55px!important;min-height:55px!important;padding:3px 1px!important;margin:0!important;transform:none!important;gap:2px!important;overflow:hidden!important}
+  .mobile-bottom-nav button:active{transform:none!important}
+  .mobile-bottom-nav button span{font-size:17px!important;line-height:18px!important}
+  .mobile-bottom-nav button small{font-size:8.5px!important;line-height:11px!important;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  body{padding-bottom:74px!important}
+  /* الحقول التي كانت تُظهر عناصر خارج الشاشة */
+  .family-result-card,.family-card-body,.family-info-grid,.family-result-grid{min-width:0;max-width:100%}
+  .family-info-grid{grid-template-columns:1fr!important}
+}
+/* Toast صغير جداً: لا يغطي الشاشة */
+#toast,.toast{width:auto!important;max-width:min(78vw,250px)!important;min-width:0!important;padding:6px 10px!important;border-radius:9px!important;font-size:10.5px!important;line-height:1.25!important;font-weight:700!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;box-shadow:0 8px 22px rgba(0,0,0,.14)!important}
+@media(max-width:700px){#toast,.toast{left:50%!important;right:auto!important;top:max(10px,env(safe-area-inset-top))!important;bottom:auto!important;transform:translateX(-50%) translateY(-10px) scale(.98)!important;max-width:72vw!important;padding:6px 9px!important;font-size:10px!important}#toast.show,.toast.show{transform:translateX(-50%) translateY(0) scale(1)!important}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -688,7 +724,7 @@ function saveNow(){
   toast("تم حفظ البيانات على الهاتف/المتصفح");
 }
 function autoSave(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data))}catch(e){toast("تعذر الحفظ المحلي: مساحة التخزين ممتلئة")}}
-function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200)}
+function toast(msg){const t=document.getElementById("toast");let m=String(msg||"");const compact={"تم حفظ البيانات محلياً — جاري المزامنة":"تم الحفظ والمزامنة جاريًا","تم حفظ البيانات محلياً — بانتظار عودة الإنترنت":"تم الحفظ محلياً","السحابة متصلة والبيانات متاحة":"تمت المزامنة","تعذر الاتصال بالسحابة حالياً":"تعذر الاتصال بالسحابة","تمت المزامنة بنجاح":"تمت المزامنة","تم الحفظ بنجاح":"تم الحفظ"};m=compact[m]||m;if(m.length>34)m=m.slice(0,34)+"…";t.textContent=m;t.classList.add("show");clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>t.classList.remove("show"),1900)}
 function showView(id){
  document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
  document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.view===id));
