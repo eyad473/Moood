@@ -201,6 +201,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
   <button class="tab" data-view="families">إدارة العائلات</button>
   <button class="tab" data-view="records">السجلات</button>
   <button class="tab" data-view="classified">الكشوفات المصنفة</button>
+  <button class="tab" data-view="syncCenter">☁️ مركز المزامنة</button>
   <button class="tab" data-view="settings">الحماية والبيانات</button>
 </nav>
 
@@ -242,6 +243,12 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
    <div class="stat"><div class="label">إجمالي العائلات</div><div class="num" id="sFamilies">0</div><div class="sub">بحسب رب الأسرة</div></div>
    <div class="stat"><div class="label">داخل المخيم</div><div class="num" id="sInside">0</div><div class="sub">عائلات داخل المخيم</div></div>
    <div class="stat"><div class="label">اكتمال البيانات</div><div class="num" id="sComplete">0%</div><div class="sub">نسبة العائلات المكتملة</div></div>
+  </div>
+  <div class="dashboard-live-grid">
+   <div class="live-card live-cloud"><div class="live-icon">☁️</div><div><span>السحابة</span><b id="dashCloudStatus">جاري الفحص...</b><small id="dashCloudMeta">—</small></div><button class="btn no-print" onclick="showView('syncCenter')">المزامنة</button></div>
+   <div class="live-card"><div class="live-icon">👶</div><div><span>الأطفال</span><b id="dashChildren">0</b><small>0–17 سنة</small></div><button class="btn no-print" onclick="openSmartReport('children')">عرض</button></div>
+   <div class="live-card"><div class="live-icon">🩺</div><div><span>الحالات الصحية</span><b id="dashHealthTotal">0</b><small>مزمن + إصابة + إعاقة</small></div><button class="btn no-print" onclick="openSmartReport('health')">عرض</button></div>
+   <div class="live-card"><div class="live-icon">📋</div><div><span>بيانات تحتاج مراجعة</span><b id="dashMissingPeople">0</b><small>أفراد لديهم بيانات ناقصة</small></div><button class="btn no-print" onclick="openSmartReport('missing')">عرض</button></div>
   </div>
   <div id="qualityBanner" class="quality-banner ok">
    <span id="qualityBannerText">جاري فحص جودة البيانات...</span>
@@ -382,6 +389,9 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
 
    <div class="actions no-print" style="margin-bottom:14px">
      <button class="btn primary" onclick="runCustomReport()">إنشاء الكشف المخصص</button>
+     <button class="btn" onclick="saveCurrentReportTemplate()">حفظ إعداد الكشف</button>
+     <select id="savedReportTemplate" class="btn" onchange="loadReportTemplate(this.value)" style="max-width:260px"><option value="">الكشوف المحفوظة</option></select>
+     <button class="btn danger" onclick="deleteCurrentReportTemplate()">حذف الإعداد</button>
      <button class="btn" onclick="clearCustomReport()">مسح الشروط</button>
    </div>
 
@@ -399,13 +409,29 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
   </div>
  </section>
 
+ <section id="syncCenter" class="view">
+  <div class="card">
+   <div class="cardhead"><div><h2>مركز المزامنة السحابية</h2><p class="muted">مراقبة اتصال التطبيق بقاعدة Cloudflare D1 وإدارة المزامنة بين الأجهزة.</p></div><button class="btn primary no-print" onclick="syncCenterNow()">🔄 مزامنة الآن</button></div>
+   <div class="grid sync-cards" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+    <div class="mini-stat"><span class="muted">حالة الاتصال</span><b id="syncStatusValue">جاري الفحص...</b><small id="syncStatusSub" class="muted">—</small></div>
+    <div class="mini-stat"><span class="muted">السجلات على السحابة</span><b id="syncCloudRecords">—</b><small class="muted">من قاعدة D1</small></div>
+    <div class="mini-stat"><span class="muted">آخر رقم مزامنة</span><b id="syncLatestSeq">—</b><small class="muted">سجل التغييرات</small></div>
+    <div class="mini-stat"><span class="muted">تعديلات محلية معلقة</span><b id="syncPending">—</b><small id="syncLastText" class="muted">لم يتم الفحص بعد</small></div>
+   </div>
+   <div class="sync-panel">
+    <div><b>مزامنة آمنة</b><p class="muted">البيانات الحالية لا تُستبدل عشوائياً. التعديلات تُرسل للسحابة وتُجلب من الأجهزة الأخرى حسب نظام الإصدارات.</p></div>
+    <div class="actions no-print"><button class="btn" onclick="syncCenterNow()">فحص السيرفر</button><button class="btn" onclick="syncPull().then(refreshSyncCenter).catch(e=>toast('تعذر جلب التحديثات'))">جلب التحديثات</button><button class="btn" onclick="syncPush().then(refreshSyncCenter).catch(e=>toast('تعذر رفع التعديلات'))">رفع التعديلات</button></div>
+   </div>
+  </div>
+ </section>
+
  <section id="settings" class="view">
   <div class="card">
    <div class="cardhead"><h2>الحماية والبيانات</h2></div>
    <div class="grid" style="grid-template-columns:repeat(2,1fr)">
     <div class="familybox"><b>حماية التطبيق برمز PIN</b><p class="muted">قفل واجهة التطبيق محلياً حتى لا تُفتح البيانات عند استخدام الهاتف من شخص آخر.</p><div class="actions"><button class="btn primary" onclick="setAppPin()">تعيين/تغيير PIN</button><button class="btn" onclick="lockApp()">قفل الآن</button><button class="btn danger" onclick="removeAppPin()">إزالة PIN</button></div><small id="pinStatus" class="muted"></small></div>
     <div class="familybox"><b>التخزين المحلي</b><p class="muted">البيانات تحفظ تلقائياً داخل هذا المتصفح باستخدام localStorage.</p><button class="btn ok" onclick="saveNow()">حفظ الآن</button></div>
-    <div class="familybox"><b>نسخة احتياطية</b><p class="muted">أنشئ JSON يحتوي على كامل قاعدة البيانات الحالية.</p><button class="btn" onclick="backup()">إنشاء نسخة احتياطية</button></div>
+    <div class="familybox"><b>نسخة احتياطية كاملة</b><p class="muted">أنشئ JSON متوافقاً مع الإصدارات الحالية ويحفظ البيانات ومعرّفات المزامنة اللازمة للاستعادة.</p><button class="btn" onclick="backup()">إنشاء نسخة احتياطية</button></div>
     <div class="familybox"><b>استعادة</b><p class="muted">يمكن استعادة نسخة JSON سابقة. سيتم استبدال البيانات الحالية بعد التأكيد.</p><label class="btn">اختيار ملف JSON <input type="file" accept=".json" hidden onchange="restoreBackup(event)"></label></div>
     <div class="familybox"><b>تصدير</b><p class="muted">تصدير مباشر إلى ملف Excel مرتب ومنسق بصيغة XLSX.</p><button class="btn" onclick="exportExcel()">تصدير Excel</button></div>
    </div>
@@ -448,11 +474,11 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
      <div class="field span2"><label>اسم الفرد *</label><input id="p_name" required></div>
      <div class="field"><label>اسم رب الأسرة *</label><input id="p_head" required list="headsList"><datalist id="headsList"></datalist></div>
      <div class="field"><label>رقم هوية الفرد</label><input id="p_id"></div>
-     <div class="field"><label>صلة القرابة</label><input id="p_rel"></div>
+     <div class="field"><label>صلة القرابة</label><select id="p_rel"><option value="">اختر صلة القرابة</option><option>رب الأسرة</option><option>زوج</option><option>زوجة</option><option>ابن</option><option>ابنة</option><option>أب</option><option>أم</option><option>أخ</option><option>أخت</option><option>جد</option><option>جدة</option><option>حفيد</option><option>حفيدة</option><option>حما</option><option>حماة</option><option>قريب</option><option>أخرى</option></select></div>
      <div class="field"><label>الجنس</label><select id="p_gender"><option></option><option>ذكر</option><option>انثى</option><option>أنثى</option></select></div>
-     <div class="field"><label>الحالة الاجتماعية</label><input id="p_marital"></div>
+     <div class="field"><label>الحالة الاجتماعية</label><select id="p_marital"><option value="">اختر الحالة الاجتماعية</option><option>أعزب/عزباء</option><option>متزوج/متزوجة</option><option>مطلق/مطلقة</option><option>أرمل/أرملة</option><option>منفصل/منفصلة</option></select></div>
      <div class="field"><label>تاريخ الميلاد</label><input id="p_birth" type="date"></div>
-     <div class="field"><label>العمر التقريبي</label><input id="p_age"></div>
+     <div class="field"><label>العمر المحسوب تلقائياً</label><input id="p_age" readonly placeholder="يُحسب تلقائياً من تاريخ الميلاد"><small id="p_age_hint" class="muted">أدخل تاريخ الميلاد ليتم حساب العمر تلقائياً.</small></div>
      <div class="field"><label>مرض مزمن؟</label><select id="p_chronic"><option>لا</option><option>نعم</option></select></div>
      <div class="field"><label>نوع المرض</label><input id="p_disease"></div>
      <div class="field"><label>إصابة؟</label><select id="p_injury"><option>لا</option><option>نعم</option></select></div>
@@ -2146,6 +2172,167 @@ function exportStyledExcel(rows,filename="كشف_أبو_عريبان",sheetName=
     area.style.display="";
     area.scrollIntoView({behavior:"smooth",block:"start"});
   };
+})();
+</script>
+
+
+<script>
+/* ================= V15 — تجربة استخدام + أمان الاستعادة + مزامنة ================= */
+(function(){
+  const REL_OPTIONS=["","رب الأسرة","زوج","زوجة","ابن","ابنة","أب","أم","أخ","أخت","جد","جدة","حفيد","حفيدة","حما","حماة","قريب","أخرى"];
+  const MARITAL_OPTIONS=["","أعزب/عزباء","متزوج/متزوجة","مطلق/مطلقة","أرمل/أرملة","منفصل/منفصلة"];
+
+  function ageParts(dateStr){
+    if(!dateStr)return null;
+    const d=new Date(dateStr+"T00:00:00");
+    if(Number.isNaN(d.getTime()))return null;
+    const now=new Date();
+    if(d>now)return null;
+    let y=now.getFullYear()-d.getFullYear();
+    let m=now.getMonth()-d.getMonth();
+    let day=now.getDate()-d.getDate();
+    if(day<0){m--; const prev=new Date(now.getFullYear(),now.getMonth(),0); day+=prev.getDate();}
+    if(m<0){y--;m+=12;}
+    return {years:y,months:m,days:day};
+  }
+  function ageLabel(dateStr){const a=ageParts(dateStr);if(!a)return "";return `${a.years} سنة${a.months?` و ${a.months} شهر`:""}${a.days?` و ${a.days} يوم`:""}`;}
+  function ageYears(dateStr){const a=ageParts(dateStr);return a?a.years:null;}
+  function updatePersonAge(){
+    const birth=document.getElementById("p_birth"), age=document.getElementById("p_age"), hint=document.getElementById("p_age_hint");
+    if(!birth||!age)return;
+    if(birth.value){
+      const a=ageParts(birth.value);
+      if(a){age.value=String(a.years);if(hint)hint.textContent=`العمر الحالي: ${ageLabel(birth.value)} — يُحدّث تلقائياً.`;return;}
+    }
+    if(hint)hint.textContent="أدخل تاريخ الميلاد ليتم حساب العمر تلقائياً.";
+  }
+  function ensureSelectValue(id,value,options){
+    const el=document.getElementById(id);if(!el)return;
+    const v=String(value??"");
+    if(v && ![...el.options].some(o=>o.value===v)){
+      const o=document.createElement("option");o.value=v;o.textContent=v+" (قديم)";el.appendChild(o);
+    }
+    el.value=v;
+  }
+  function patchPersonForm(){
+    const rel=document.getElementById("p_rel"),mar=document.getElementById("p_marital");
+    if(rel){rel.innerHTML=REL_OPTIONS.map(v=>`<option value="${esc(v)}">${esc(v||"اختر صلة القرابة")}</option>`).join("");}
+    if(mar){mar.innerHTML=MARITAL_OPTIONS.map(v=>`<option value="${esc(v)}">${esc(v||"اختر الحالة الاجتماعية")}</option>`).join("");}
+    const birth=document.getElementById("p_birth");
+    if(birth){birth.addEventListener("change",updatePersonAge);birth.addEventListener("input",updatePersonAge);}
+  }
+
+  // Override person editor without changing the existing data model.
+  window.openPersonModal=function(idx=null){
+    document.getElementById("personForm").reset();document.getElementById("p_index").value=idx==null?"":idx;
+    document.getElementById("personModalTitle").textContent=idx==null?"إضافة فرد":"تعديل فرد";
+    if(idx!=null && data[idx]){
+      const r=data[idx];
+      setv("p_name",r["اسم الفرد"]);setv("p_head",r["اسم رب الأسرة"]);setv("p_id",r["رقم هوية الفرد"]);
+      ensureSelectValue("p_rel",r["صلة القرابة"],REL_OPTIONS);ensureSelectValue("p_marital",r["الحالة الاجتماعية"],MARITAL_OPTIONS);
+      setv("p_gender",r["الجنس"]);setv("p_birth",r["تاريخ الميلاد"]);setv("p_age",r["العمر التقريبي"]);
+      setv("p_chronic",r["مرض مزمن؟"]||r["مرض مزمن?"]);setv("p_disease",r["نوع المرض"]);setv("p_injury",r["إصابة؟"]||r["إصابة?"]);setv("p_injuryreason",r["سبب الإصابة"]);setv("p_injurydetails",r["تفاصيل الإصابة"]);setv("p_disability",r["إعاقة؟"]);setv("p_disabilitytype",r["نوع الإعاقة"]);setv("p_orphan",r["يتيم/منفصل عن ذويه؟"]||r["يتيم/منفصل عن ذويه?"]);setv("p_preg",r["حامل؟"]);setv("p_lact",r["مرضعة؟"]);setv("p_notes",r["ملاحظات الفرد"]);
+    }
+    patchPersonForm();updatePersonAge();document.getElementById("personModal").classList.add("show");
+  };
+  window.fillPerson=function(r){
+    setv("p_name",r["اسم الفرد"]);setv("p_head",r["اسم رب الأسرة"]);setv("p_id",r["رقم هوية الفرد"]);ensureSelectValue("p_rel",r["صلة القرابة"],REL_OPTIONS);setv("p_gender",r["الجنس"]);ensureSelectValue("p_marital",r["الحالة الاجتماعية"],MARITAL_OPTIONS);setv("p_birth",r["تاريخ الميلاد"]);setv("p_age",r["العمر التقريبي"]);setv("p_chronic",r["مرض مزمن؟"]||r["مرض مزمن?"]);setv("p_disease",r["نوع المرض"]);setv("p_injury",r["إصابة؟"]||r["إصابة?"]);setv("p_injuryreason",r["سبب الإصابة"]);setv("p_injurydetails",r["تفاصيل الإصابة"]);setv("p_disability",r["إعاقة؟"]);setv("p_disabilitytype",r["نوع الإعاقة"]);setv("p_orphan",r["يتيم/منفصل عن ذويه؟"]||r["يتيم/منفصل عن ذويه?"]);setv("p_preg",r["حامل؟"]);setv("p_lact",r["مرضعة؟"]);setv("p_notes",r["ملاحظات الفرد"]);updatePersonAge();
+  };
+  window.savePerson=function(e){
+    e.preventDefault();const idx=document.getElementById("p_index").value,r=idx===""?emptyRecord():data[+idx];
+    const head=v("p_head").trim(),name=v("p_name").trim();if(!name||!head){alert("اسم الفرد واسم رب الأسرة مطلوبان");return;}
+    r["اسم الفرد"]=name;r["اسم رب الأسرة"]=head;r["رقم هوية الفرد"]=v("p_id");r["صلة القرابة"]=v("p_rel");r["الجنس"]=v("p_gender");r["الحالة الاجتماعية"]=v("p_marital");r["تاريخ الميلاد"]=v("p_birth");
+    const calculated=ageYears(v("p_birth"));if(calculated!==null)r["العمر التقريبي"]=String(calculated); // لا نكتب العمر يدوياً؛ نحسبه من تاريخ الميلاد
+    else if(!filled(r["العمر التقريبي"]))r["العمر التقريبي"]="";
+    r["مرض مزمن?"]=r["مرض مزمن؟"]=v("p_chronic");r["نوع المرض"]=v("p_disease");r["إصابة؟"]=v("p_injury");r["سبب الإصابة"]=v("p_injuryreason");r["تفاصيل الإصابة"]=v("p_injurydetails");r["إعاقة؟"]=v("p_disability");r["نوع الإعاقة"]=v("p_disabilitytype");r["يتيم/منفصل عن ذويه?"]=r["يتيم/منفصل عن ذويه؟"]=v("p_orphan");r["حامل؟"]=v("p_preg");r["مرضعة؟"]=v("p_lact");r["ملاحظات الفرد"]=v("p_notes");
+    const fm=familyMap().get(head)?.[0];if(fm){["رقم هوية الأسرة","رقم الجوال","رقم جوال بديل","العنوان","داخل/خارج المخيم","حالة اكتمال بيانات الأسرة","المحافظة الأصلية","حالة المسكن الأصلي","نوع السكن الحالي","ملاحظات الأسرة"].forEach(k=>r[k]=fm[k]||"");}
+    if(idx===""){r["#"]=String(data.length+1);syncRecordId(r,data.length);data.push(r);}else{syncRecordId(r,+idx);}
+    autoSave();closeModal("personModal");rebuildFilters();renderAll();toast(idx===""?"تمت إضافة الفرد وحساب العمر تلقائياً":"تم تعديل الفرد");
+  };
+
+  // Better restore: validates, shows metadata, creates a safety backup, and accepts old v1 backups.
+  window.backup=function(){
+    data=syncNormalizeRows(data);
+    const payload={app:"إدارة وكشف المخيمات",schemaVersion:2,version:2,createdAt:new Date().toISOString(),columns:COLUMNS,data,meta:{recordCount:data.length,familyCount:familyMap().size,syncCursor:Number(syncCursor||0),deviceId:syncDeviceId()}};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json;charset=utf-8"});downloadBlob(blob,`نسخة-احتياطية-المخيم-${dateStamp()}-${data.length}-سجل.json`);toast(`تم إنشاء نسخة احتياطية كاملة — ${data.length} سجل`);
+  };
+  function normalizeRestoredRows(rows){
+    return rows.map((r,i)=>{const x=Object.assign(emptyRecord(),r||{});x["#"]=String(i+1);syncRecordId(x,i);if(!x["العمر التقريبي"]&&x["تاريخ الميلاد"]){const a=ageYears(x["تاريخ الميلاد"]);if(a!==null)x["العمر التقريبي"]=String(a);}return x;});
+  }
+  window.restoreBackup=function(e){
+    const f=e.target.files?.[0];if(!f)return;
+    const reader=new FileReader();reader.onload=()=>{
+      try{
+        const p=JSON.parse(reader.result),rows=Array.isArray(p)?p:p?.data;
+        if(!Array.isArray(rows)||!rows.length)throw Error("لا توجد سجلات صالحة");
+        const normalized=normalizeRestoredRows(rows), familyCount=new Set(normalized.map(r=>r["اسم رب الأسرة"]).filter(Boolean)).size;
+        const oldLabel=p?.schemaVersion?`نسخة النظام ${p.schemaVersion}`:"نسخة قديمة متوافقة";
+        if(!confirm(`تم التحقق من النسخة بنجاح.\n\n${oldLabel}\nالأفراد: ${normalized.length}\nالعائلات: ${familyCount}\n\nسيتم حفظ نسخة أمان من البيانات الحالية أولاً، ثم استعادة هذه النسخة على الجهاز.\n\nهل تريد المتابعة؟`))return;
+        // Safety copy of the current state before replacing anything.
+        try{const safety={app:"إدارة وكشف المخيمات",schemaVersion:2,createdAt:new Date().toISOString(),columns:COLUMNS,data:syncNormalizeRows(structuredClone(data)),meta:{type:"pre-restore-safety",recordCount:data.length}};downloadBlob(new Blob([JSON.stringify(safety,null,2)],{type:"application/json;charset=utf-8"}),`نسخة-أمان-قبل-الاستعادة-${dateStamp()}.json`);}catch(_e){}
+        data=normalized;syncSaveShadow(data);syncLocalSave(true);rebuildFilters();renderAll();
+        // Do not automatically overwrite the cloud. The cloud remains recoverable.
+        syncInitialized=true;toast(`تمت الاستعادة بنجاح — ${data.length} سجل / ${familyCount} عائلة`);
+      }catch(err){alert("ملف النسخة الاحتياطية غير صالح أو لا يحتوي على بيانات قابلة للاستعادة.");}
+    };reader.readAsText(f);e.target.value="";
+  };
+
+  // Saved custom report templates — filters + advanced conditions + columns.
+  const REPORT_TEMPLATES_KEY="aboreiban_report_templates_v1";
+  function getTemplates(){try{return JSON.parse(localStorage.getItem(REPORT_TEMPLATES_KEY)||"{}")}catch(e){return {}}}
+  function refreshReportTemplates(){const s=document.getElementById("savedReportTemplate");if(!s)return;const g=getTemplates();s.innerHTML='<option value="">الكشوف المحفوظة</option>'+Object.keys(g).sort((a,b)=>a.localeCompare(b,"ar")).map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");}
+  window.saveCurrentReportTemplate=function(){
+    const name=(document.getElementById("cr_name")?.value||"").trim();if(!name){alert("اكتب اسم الكشف أولاً");return;}
+    syncReportColumns();const t=getTemplates();t[name]={name,gender:document.getElementById("cr_gender").value,min:document.getElementById("cr_minage").value,max:document.getElementById("cr_maxage").value,special:document.getElementById("cr_special").value,rel:document.getElementById("cr_rel").value,sort:document.getElementById("cr_sort").value,onlySelected:document.getElementById("cr_only_selected")?.checked||false,columns:[...selectedReportColumns],conditions:JSON.parse(JSON.stringify(reportConditions||[])),conditionMode:document.querySelector('input[name="conditionMode"]:checked')?.value||"and"};localStorage.setItem(REPORT_TEMPLATES_KEY,JSON.stringify(t));refreshReportTemplates();document.getElementById("savedReportTemplate").value=name;toast("تم حفظ إعداد الكشف");
+  };
+  window.loadReportTemplate=function(name){if(!name)return;const t=getTemplates()[name];if(!t)return;document.getElementById("cr_name").value=t.name||name;document.getElementById("cr_gender").value=t.gender||"";document.getElementById("cr_minage").value=t.min||"";document.getElementById("cr_maxage").value=t.max||"";document.getElementById("cr_special").value=t.special||"";document.getElementById("cr_rel").value=t.rel||"";document.getElementById("cr_sort").value=t.sort||"family";if(document.getElementById("cr_only_selected"))document.getElementById("cr_only_selected").checked=!!t.onlySelected;selectedReportColumns=[...(t.columns||[])];reportConditions=JSON.parse(JSON.stringify(t.conditions||[]));const radio=document.querySelector(`input[name="conditionMode"][value="${t.conditionMode||"and"}"]`);if(radio)radio.checked=true;initReportColumns();renderConditionRows();runCustomReport();toast("تم تحميل إعداد الكشف");};
+  window.deleteCurrentReportTemplate=function(){const s=document.getElementById("savedReportTemplate"),name=s?.value;if(!name){toast("اختر كشفاً محفوظاً أولاً");return;}if(confirm(`حذف إعداد الكشف «${name}»؟`)){const t=getTemplates();delete t[name];localStorage.setItem(REPORT_TEMPLATES_KEY,JSON.stringify(t));refreshReportTemplates();toast("تم حذف إعداد الكشف");}};
+
+  // Smart dashboard.
+  function dashboardCounts(){
+    const children=data.filter(r=>{const a=ageOf(r);return a!==null&&a>=0&&a<=17}).length;
+    const chronic=data.filter(r=>r["مرض مزمن؟"]==="نعم"||r["مرض مزمن?"]==="نعم").length;
+    const injury=data.filter(r=>(r["إصابة؟"]||r["إصابة?"])==="نعم").length;
+    const disability=data.filter(r=>r["إعاقة؟"]==="نعم").length;
+    const missing=data.filter(r=>!filled(r["اسم الفرد"])||!filled(r["رقم هوية الفرد"])||!filled(r["تاريخ الميلاد"])).length;
+    return {children,chronic,injury,disability,missing,health:chronic+injury+disability};
+  }
+  const oldRenderDashboard=window.renderDashboard;
+  window.renderDashboard=function(){if(typeof oldRenderDashboard==="function")oldRenderDashboard();const c=dashboardCounts();for(const [id,vv] of Object.entries({dashChildren:c.children,dashHealthTotal:c.health,dashMissingPeople:c.missing})){const el=document.getElementById(id);if(el)el.textContent=Number(vv).toLocaleString('ar-EG');}refreshSyncCenter(false);};
+  window.openSmartReport=function(type){showView("classified");setTimeout(()=>{if(type==="children")setReportPreset("children");else if(type==="missing"){document.getElementById("cr_name").value="كشف البيانات الناقصة";document.getElementById("cr_gender").value="";document.getElementById("cr_minage").value="";document.getElementById("cr_maxage").value="";document.getElementById("cr_special").value="";document.getElementById("cr_rel").value="";selectedReportColumns=["اسم الفرد","اسم رب الأسرة","رقم هوية الفرد","رقم الجوال","تاريخ الميلاد","العمر التقريبي","الجنس","الحالة الاجتماعية"];reportConditions=[{field:"اسم الفرد",op:"empty",value:""},{field:"رقم هوية الفرد",op:"empty",value:""},{field:"تاريخ الميلاد",op:"empty",value:""}];const rm=document.querySelector('input[name="conditionMode"][value="or"]');if(rm)rm.checked=true;initReportColumns();renderConditionRows();runCustomReport();}else{document.getElementById("cr_name").value="كشف الحالات الصحية";document.getElementById("cr_special").value="";selectedReportColumns=["اسم الفرد","اسم رب الأسرة","رقم هوية الفرد","رقم الجوال","الجنس","العمر التقريبي","مرض مزمن؟","إصابة؟","إعاقة؟"];reportConditions=[{field:"مرض مزمن؟",op:"eq",value:"نعم"},{field:"إصابة؟",op:"eq",value:"نعم"},{field:"إعاقة؟",op:"eq",value:"نعم"}];const rh=document.querySelector('input[name="conditionMode"][value="or"]');if(rh)rh.checked=true;initReportColumns();renderConditionRows();runCustomReport();}},50);};
+
+  // Sync center.
+  window.refreshSyncCenter=async function(showToast=true){
+    const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+    try{
+      const h=await syncFetch("/health",{method:"GET"});
+      set("syncStatusValue","متصل ✓");set("syncStatusSub",new Date(h.time||Date.now()).toLocaleString('ar-EG'));set("syncCloudRecords",Number(h.records||0).toLocaleString('ar-EG'));set("syncLatestSeq",Number(h.latestSeq||0).toLocaleString('ar-EG'));
+      const changes=syncBuildChanges().length;set("syncPending",String(changes));set("syncLastText",`آخر فحص: ${new Date().toLocaleTimeString('ar-EG')}`);set("dashCloudStatus","متصل ✓");set("dashCloudMeta",`${Number(h.records||0).toLocaleString('ar-EG')} سجل على السحابة`);
+      if(showToast)toast("السحابة متصلة والبيانات متاحة");return h;
+    }catch(e){set("syncStatusValue","غير متصل");set("syncStatusSub","سيتم الاحتفاظ بالبيانات محلياً");set("syncCloudRecords","—");set("syncLatestSeq","—");set("syncPending",String(syncBuildChanges().length));set("dashCloudStatus","غير متصل");set("dashCloudMeta","البيانات المحلية محفوظة");if(showToast)toast("تعذر الاتصال بالسحابة حالياً");return null;}
+  };
+  window.syncCenterNow=async function(){try{await syncStart("manual");await refreshSyncCenter(false);toast("تمت المزامنة وفحص السحابة");}catch(e){await refreshSyncCenter(false);toast("تعذر إتمام المزامنة");}};
+
+  // Extend view behavior for sync center.
+  const baseShowView=window.showView;
+  window.showView=function(id){if(typeof baseShowView==="function")baseShowView(id);if(id==="syncCenter")setTimeout(()=>refreshSyncCenter(false),50);if(id==="classified")setTimeout(refreshReportTemplates,50);};
+
+  // Styles and final init.
+  const style=document.createElement("style");style.textContent=`
+    .dashboard-live-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}
+    .live-card{display:flex;align-items:center;gap:11px;padding:14px;border:1px solid var(--border,#e5e7eb);border-radius:15px;background:var(--card,#fff);box-shadow:0 3px 12px rgba(0,0,0,.04)}
+    .live-card>div:nth-child(2){flex:1;min-width:0}.live-card span{display:block;font-size:12px;color:var(--muted,#6b7280)}.live-card b{display:block;font-size:20px;margin:2px 0}.live-card small{display:block;color:var(--muted,#6b7280);font-size:11px}.live-icon{font-size:27px}.live-card .btn{white-space:nowrap}
+    .sync-panel{margin-top:14px;padding:15px;border:1px solid var(--border,#e5e7eb);border-radius:15px;background:var(--bg,#f8fafc);display:flex;justify-content:space-between;gap:15px;align-items:center}.sync-panel .actions{display:flex;flex-wrap:wrap;gap:8px}
+    #p_age{background:#f3f4f6;font-weight:700}.modal .field small{margin-top:4px;display:block}
+    @media(max-width:900px){.dashboard-live-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sync-cards{grid-template-columns:repeat(2,minmax(0,1fr))!important}.sync-panel{flex-direction:column;align-items:stretch}}
+    @media(max-width:600px){.dashboard-live-grid{grid-template-columns:1fr}.live-card{padding:12px}.sync-cards{grid-template-columns:1fr!important}.sync-panel .actions{display:grid;grid-template-columns:1fr}.sync-panel .btn{width:100%}}
+  `;document.head.appendChild(style);
+
+  function init(){
+    patchPersonForm();refreshReportTemplates();setTimeout(()=>{try{renderDashboard()}catch(e){}},80);setTimeout(()=>refreshSyncCenter(false),300);
+    const birth=document.getElementById("p_birth");if(birth)birth.addEventListener("change",updatePersonAge);
+  }
+  init();
 })();
 </script>
 
