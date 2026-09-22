@@ -1745,9 +1745,11 @@ const SYNC_API_URL = "https://moood.eyad2000515.workers.dev";
 const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
+const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
 let syncBusy = false;
 let syncTimer = null;
 let syncShadow = [];
+let syncPending = [];
 let syncCursor = Number(localStorage.getItem(SYNC_CURSOR_KEY) || 0);
 let syncInitialized = false;
 
@@ -1780,25 +1782,58 @@ function syncSaveShadow(rows){
   syncShadow=syncNormalizeRows(structuredClone(rows));
   localStorage.setItem(SYNC_SHADOW_KEY,JSON.stringify(syncShadow));
 }
-function syncLocalSave(silent=true){
-  localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
-  if(!silent) toast("تم حفظ البيانات على الهاتف/المتصفح");
+function syncLoadPending(){
+  try{syncPending=Array.isArray(JSON.parse(localStorage.getItem(SYNC_PENDING_KEY)||"[]"))?JSON.parse(localStorage.getItem(SYNC_PENDING_KEY)||"[]"):[]}catch(e){syncPending=[]}
 }
-function syncBuildChanges(){
+function syncSavePending(){
+  localStorage.setItem(SYNC_PENDING_KEY,JSON.stringify(syncPending));
+}
+function syncLocalSave(silent=true){
   data=syncNormalizeRows(data);
-  const oldMap=new Map(syncShadow.map(r=>[r.__syncId,r]));
-  const newMap=new Map(data.map(r=>[r.__syncId,r]));
-  const changes=[];
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+  syncQueueReconcile();
+  if(!silent) toast(navigator.onLine?"تم حفظ البيانات":"تم حفظ البيانات محلياً — بانتظار المزامنة");
+}
+
+/* طابور تغييرات محلي: أي تعديل أثناء انقطاع الإنترنت يبقى محفوظاً حتى ينجح رفعه. */
+function syncQueueReconcile(){
+  data=syncNormalizeRows(data);
+  const shadowMap=new Map(syncShadow.map(r=>[r.__syncId,r]));
+  const dataMap=new Map(data.map(r=>[r.__syncId,r]));
+  const existing=new Map(syncPending.map(c=>[c.recordId,c]));
+  const next=[];
+
   for(const r of data){
-    const id=r.__syncId, old=oldMap.get(id);
+    const id=r.__syncId, old=shadowMap.get(id);
     if(!old || syncComparable(old)!==syncComparable(r)){
-      changes.push({opId:crypto.randomUUID(),recordId:id,operation:"upsert",updatedAt:Date.now(),data:r});
+      const prev=existing.get(id);
+      next.push({
+        opId:prev?.opId||crypto.randomUUID(),
+        recordId:id,
+        operation:"upsert",
+        updatedAt:Date.now(),
+        data:structuredClone(r)
+      });
     }
   }
   for(const old of syncShadow){
-    if(!newMap.has(old.__syncId)) changes.push({opId:crypto.randomUUID(),recordId:old.__syncId,operation:"delete",updatedAt:Date.now()});
+    if(!dataMap.has(old.__syncId)){
+      const prev=existing.get(old.__syncId);
+      next.push({
+        opId:prev?.opId||crypto.randomUUID(),
+        recordId:old.__syncId,
+        operation:"delete",
+        updatedAt:Date.now()
+      });
+    }
   }
-  return changes;
+  syncPending=next;
+  syncSavePending();
+  return syncPending;
+}
+function syncBuildChanges(){
+  syncQueueReconcile();
+  return syncPending.map(c=>structuredClone(c));
 }
 async function syncFetch(path, options={}){
   const headers={"Content-Type":"application/json","X-Device-Id":syncDeviceId(),...(options.headers||{})};
@@ -1818,7 +1853,7 @@ function syncApplyChanges(changes){
       const incoming=structuredClone(c.data);incoming.__syncId=c.recordId;
       const idx=byId.get(c.recordId);
       if(idx===undefined){data.push(incoming);byId.set(c.recordId,data.length-1);changed=true}
-      else {data[idx]=incoming;changed=true}
+      else if(syncComparable(data[idx])!==syncComparable(incoming)){data[idx]=incoming;changed=true}
     }
   }
   return changed;
@@ -1828,11 +1863,18 @@ async function syncPull(){
   let loops=0;
   while(loops++<20){
     const r=await syncFetch(`/sync/pull?since=${encodeURIComponent(cursor)}&limit=500`,{method:"GET"});
-    if(syncApplyChanges(r.changes)){renumber();syncLocalSave(true);rebuildFilters();renderAll();try{qualityIssues=qualityScan();renderDashboard()}catch(e){}}
+    if(syncApplyChanges(r.changes)){
+      renumber();
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+      rebuildFilters();
+      renderAll();
+      try{qualityIssues=qualityScan();renderDashboard()}catch(e){}
+    }
     cursor=Number(r.nextSince||cursor);
     syncCursor=cursor;localStorage.setItem(SYNC_CURSOR_KEY,String(cursor));
     if(!r.hasMore)break;
   }
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
   return cursor;
 }
 async function syncBootstrap(){
@@ -1843,12 +1885,13 @@ async function syncBootstrap(){
   inserted=Number(r.inserted||0);latest=Number(r.latestSeq||latest);
   syncCursor=latest;localStorage.setItem(SYNC_CURSOR_KEY,String(latest));
   syncSaveShadow(data);
+  syncPending=[];syncSavePending();
   syncLocalSave(true);
   return inserted;
 }
 async function syncPush(){
   const changes=syncBuildChanges();
-  if(!changes.length)return {accepted:0,conflicts:[]};
+  if(!changes.length)return {accepted:0,conflicts:[],pending:0};
   let accepted=0, conflicts=[];
   for(let i=0;i<changes.length;i+=100){
     const batch=changes.slice(i,i+100);
@@ -1859,7 +1902,9 @@ async function syncPush(){
     await syncPull();
   }
   syncSaveShadow(data);
-  return {accepted,conflicts};
+  syncPending=[];
+  syncSavePending();
+  return {accepted,conflicts,pending:syncPending.length};
 }
 async function syncStart(reason="auto"){
   if(syncBusy || !navigator.onLine)return;
@@ -1867,33 +1912,61 @@ async function syncStart(reason="auto"){
   try{
     const h=await syncFetch("/health",{method:"GET"});
     if(!syncInitialized){
-      syncLoadShadow();
+      syncLoadShadow();syncLoadPending();
       if(Number(h.records||0)===0){
         const n=await syncBootstrap();
         syncInitialized=true;
         toast(`تم إنشاء قاعدة المزامنة السحابية — ${n} سجل`);
       }else{
+        /* أول اتصال بعد تحديث التطبيق: نعيد قراءة سجل التغييرات من البداية حتى لا يفوتنا
+           سجل قديم حُذف محلياً أو لم يعد موجوداً في نسخة الجهاز. وبعدها نعيد تطبيق
+           أي تعديلات محلية معلّقة ونرفعها بأمان. */
+        const pendingBackup=structuredClone(syncPending);
+        syncCursor=0;
+        localStorage.setItem(SYNC_CURSOR_KEY,"0");
         await syncPull();
+        if(pendingBackup.length){
+          const byId=new Map(data.map((r,i)=>[r.__syncId,i]));
+          for(const c of pendingBackup){
+            if(c.operation==="delete"){
+              const idx=byId.get(c.recordId);
+              if(idx!==undefined){data.splice(idx,1);byId.clear();data.forEach((r,i)=>byId.set(r.__syncId,i));}
+            }else if(c.operation==="upsert" && c.data){
+              const incoming=structuredClone(c.data);incoming.__syncId=c.recordId;
+              const idx=byId.get(c.recordId);
+              if(idx===undefined){data.push(incoming);byId.set(c.recordId,data.length-1);}
+              else data[idx]=incoming;
+            }
+          }
+          localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+          syncPending=pendingBackup;syncSavePending();
+          await syncPush();
+          await syncPull();
+        }
         syncSaveShadow(data);
+        syncPending=[];syncSavePending();
         syncInitialized=true;
         toast("تمت مزامنة البيانات مع السحابة");
       }
     }else{
-      const before=JSON.stringify(syncShadow);
+      const before=JSON.stringify(syncPending);
       const pushed=await syncPush();
       await syncPull();
       syncLoadShadow();
-      if(pushed.accepted||before!==JSON.stringify(syncShadow)) toast("تمت مزامنة التعديلات مع جميع الأجهزة");
+      syncQueueReconcile();
+      if(pushed.accepted||before!==JSON.stringify(syncPending)) toast("تمت مزامنة التعديلات مع جميع الأجهزة");
     }
   }catch(e){
     console.warn("Cloud sync:",e);
-    if(reason!=="timer") toast("المزامنة غير متاحة الآن — البيانات المحلية محفوظة");
+    syncQueueReconcile();
+    if(reason!=="timer") toast("لا يوجد اتصال بالسحابة — البيانات محفوظة محلياً وبانتظار المزامنة");
   }finally{syncBusy=false}
 }
 function installCloudSync(){
   data=syncNormalizeRows(data);
   syncLoadShadow();
-  // Replace local-save hooks without changing the existing UI/functions.
+  syncLoadPending();
+  syncQueueReconcile();
   window.saveNow=function(){
     try{syncLocalSave(false);syncStart("manual")}catch(e){toast("تعذر حفظ البيانات محلياً")}
   };
@@ -1901,6 +1974,7 @@ function installCloudSync(){
     try{syncLocalSave(true);clearTimeout(window.__syncSaveTimer);window.__syncSaveTimer=setTimeout(()=>syncStart("auto"),350)}catch(e){toast("تعذر الحفظ المحلي: مساحة التخزين ممتلئة")}
   };
   window.addEventListener("online",()=>syncStart("online"));
+  window.addEventListener("offline",()=>{syncQueueReconcile();toast("انقطع الإنترنت — تم تفعيل وضع العمل دون اتصال")});
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")syncStart("visible")});
   clearInterval(syncTimer);syncTimer=setInterval(()=>syncStart("timer"),5000);
   setTimeout(()=>syncStart("startup"),700);
