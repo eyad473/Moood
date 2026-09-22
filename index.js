@@ -105,13 +105,23 @@ async function pull(request, env) {
   const since = Math.max(0, Number(url.searchParams.get("since") || 0));
   const limit = Math.min(1000, Math.max(1, Number(url.searchParams.get("limit") || 500)));
 
-  const result = await env.DB.prepare(`
-    SELECT seq, record_id, operation, data_json, updated_at, version, device_id, created_at
-    FROM sync_changes
-    WHERE seq > ?
-    ORDER BY seq ASC
-    LIMIT ?
-  `).bind(since, limit).all();
+  const scope = cleanString(url.searchParams.get("scope"), 40);
+  const prefix = scope === "distributions" ? "dist:%" : scope === "records" ? "r-%" : null;
+  const result = prefix
+    ? await env.DB.prepare(`
+      SELECT seq, record_id, operation, data_json, updated_at, version, device_id, created_at
+      FROM sync_changes
+      WHERE seq > ? AND record_id LIKE ?
+      ORDER BY seq ASC
+      LIMIT ?
+    `).bind(since, prefix, limit).all()
+    : await env.DB.prepare(`
+      SELECT seq, record_id, operation, data_json, updated_at, version, device_id, created_at
+      FROM sync_changes
+      WHERE seq > ?
+      ORDER BY seq ASC
+      LIMIT ?
+    `).bind(since, limit).all();
 
   const changes = (result.results || []).map(r => ({
     seq: Number(r.seq),
