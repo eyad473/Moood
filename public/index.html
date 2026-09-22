@@ -189,6 +189,13 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
 .excel-export-note{font-size:13px;line-height:1.7}
 @media(max-width:700px){.excel-export-note{font-size:12px}}
 </style>
+
+<style id="distribution-ui">
+.dist-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}.dist-stat{border:1px solid var(--line);border-radius:15px;padding:13px;background:linear-gradient(180deg,#fff,#f8fafc)}.dist-stat span{display:block;color:var(--muted);font-size:11px}.dist-stat b{display:block;font-size:24px;margin-top:5px}.dist-filters{grid-template-columns:2fr repeat(4,1fr)!important}.dist-insight{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;border:1px solid #e7edf5;border-radius:14px;background:#f8fbff;margin-bottom:12px}.dist-insight b{display:block;font-size:12px}.dist-insight span{display:block;color:var(--muted);font-size:10px;margin-top:3px}.dist-table td{font-size:11px}.dist-actions{display:flex;gap:5px;justify-content:center}.dist-empty{text-align:center;padding:35px;color:var(--muted)}#distModal .modalbox{width:min(900px,100%)}#distModal .formgrid{grid-template-columns:repeat(3,1fr)}
+@media(max-width:700px){.dist-stats{grid-template-columns:repeat(2,1fr)}.dist-filters{grid-template-columns:1fr!important}.dist-table{min-width:760px!important}.dist-insight{align-items:flex-start}.dist-insight>span{flex:0 0 auto}.dist-stat b{font-size:21px}#distModal .modalbox{max-height:calc(100dvh - 16px);height:calc(100dvh - 16px);display:flex;flex-direction:column}#distModal .modalbody{overflow:auto;flex:1;min-height:0}#distModal .formgrid{grid-template-columns:1fr!important}.dist-modal-foot{position:sticky!important;bottom:0!important;flex-shrink:0!important}}
+
+.dist-coverage-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:10px 0 14px}.dist-coverage-stats>div{background:linear-gradient(135deg,#f8fafc,#fff);border:1px solid #e8edf4;border-radius:14px;padding:12px}.dist-coverage-stats span{display:block;color:#64748b;font-size:11px}.dist-coverage-stats b{display:block;font-size:21px;margin-top:4px}.dist-coverage .tablewrap{max-height:330px;overflow:auto}@media(max-width:700px){.dist-coverage-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.dist-coverage .filters{grid-template-columns:1fr!important}.dist-coverage .actions{width:100%}.dist-coverage .actions .btn{flex:1}}
+</style>
 <style id="mobile-nav-fix">
 .mobile-bottom-nav{display:none}
 @media(max-width:700px){
@@ -247,7 +254,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden!important}
   #families .tablewrap,#records .tablewrap,#classified .tablewrap{max-width:100%;overflow-x:auto}
   #families .table,#records .table,#classified .table{min-width:700px}
   /* شريط الهاتف ثابت فعلياً ولا يتحرك مع المحتوى */
-  .mobile-bottom-nav{position:fixed!important;left:0!important;right:0!important;bottom:0!important;width:100vw!important;max-width:100vw!important;height:auto!important;min-height:64px!important;transform:none!important;margin:0!important;display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:2px!important;overflow:hidden!important;padding:4px 3px max(4px,env(safe-area-inset-bottom))!important;box-sizing:border-box!important;touch-action:manipulation!important}
+  .mobile-bottom-nav{position:fixed!important;left:0!important;right:0!important;bottom:0!important;width:100vw!important;max-width:100vw!important;height:auto!important;min-height:64px!important;transform:none!important;margin:0!important;display:grid!important;grid-template-columns:repeat(8,minmax(0,1fr))!important;gap:2px!important;overflow:hidden!important;padding:4px 3px max(4px,env(safe-area-inset-bottom))!important;box-sizing:border-box!important;touch-action:manipulation!important}
   .mobile-bottom-nav button{width:100%!important;min-width:0!important;max-width:100%!important;height:55px!important;min-height:55px!important;padding:3px 1px!important;margin:0!important;transform:none!important;gap:2px!important;overflow:hidden!important}
   .mobile-bottom-nav button:active{transform:none!important}
   .mobile-bottom-nav button span{font-size:17px!important;line-height:18px!important}
@@ -280,6 +287,7 @@ html,body{width:100%;max-width:100%;overflow-x:hidden!important}
   <button class="tab active" data-view="dashboard">لوحة القيادة</button>
   <button class="tab" data-view="familySearch">🔎 بحث العائلات</button>
   <button class="tab" data-view="families">إدارة العائلات</button>
+  <button class="tab" data-view="distributions">إدارة التوزيعات</button>
   <button class="tab" data-view="records">السجلات</button>
   <button class="tab" data-view="classified">الكشوفات المصنفة</button>
   <button class="tab" data-view="syncCenter">☁️ مركز المزامنة</button>
@@ -397,6 +405,27 @@ html,body{width:100%;max-width:100%;overflow-x:hidden!important}
   </div>
  </section>
 
+
+ <section id="distributions" class="view">
+  <div class="card">
+   <div class="cardhead"><div><h2>إدارة التوزيعات</h2><div class="muted" style="font-size:11px;margin-top:3px">تسجيل وتتبع كل مساعدة تصل إلى طفل أو عائلة مع مزامنة سحابية</div></div><div class="actions no-print"><button class="btn primary" onclick="openDistributionModal()">＋ تسجيل توزيع</button><button class="btn" onclick="exportDistributionsCSV()">تصدير CSV</button></div></div>
+   <div class="dist-stats"><div class="dist-stat"><span>إجمالي التوزيعات</span><b id="distTotal">0</b></div><div class="dist-stat"><span>هذا الشهر</span><b id="distMonth">0</b></div><div class="dist-stat"><span>للأطفال</span><b id="distChildren">0</b></div><div class="dist-stat"><span>للعائلات</span><b id="distFamilies">0</b></div></div>
+   <div class="filters no-print dist-filters"><div class="field"><label>بحث</label><input id="distQ" oninput="renderDistributions()" placeholder="اسم الطفل، رب الأسرة، نوع المساعدة..." /></div><div class="field"><label>نوع المستفيد</label><select id="distBeneficiary" onchange="renderDistributions()"><option value="">الكل</option><option value="طفل">طفل</option><option value="فرد">فرد</option><option value="عائلة">عائلة</option></select></div><div class="field"><label>نوع التوزيع</label><select id="distType" onchange="renderDistributions()"><option value="">الكل</option></select></div><div class="field"><label>من تاريخ</label><input id="distFrom" type="date" onchange="renderDistributions()" /></div><div class="field"><label>إلى تاريخ</label><input id="distTo" type="date" onchange="renderDistributions()" /></div></div>
+   <div class="dist-insight"><div><b>سجل التوزيعات</b><span>كل عملية لها رقم مرجعي وتاريخ وبيانات المستفيد والكمية والملاحظات.</span></div><span id="distSyncState" class="badge">محلي</span></div>
+   <div class="dist-coverage card" style="margin:14px 0 0;padding:16px">
+    <div class="cardhead" style="margin-bottom:12px"><div><h3 style="margin:0">كشف من لم يستلم المساعدة</h3><div class="muted" style="font-size:11px;margin-top:4px">اعرف فوراً من استلم ومن لم يستلم حسب نوع المساعدة، ثم صدّر الكشف أو استخدمه للتوزيع التالي.</div></div><span class="badge">استحقاق ذكي</span></div>
+    <div class="filters no-print" style="margin-bottom:10px">
+      <div class="field"><label>نوع المستفيد</label><select id="distCoverageScope" onchange="renderDistributionCoverage()"><option value="children">الأطفال</option><option value="families">العائلات</option></select></div>
+      <div class="field"><label>نوع المساعدة</label><select id="distCoverageType" onchange="renderDistributionCoverage()"><option value="">اختر المساعدة</option></select></div>
+      <div class="field"><label>حالة الكشف</label><select id="distCoverageStatus" onchange="renderDistributionCoverage()"><option value="not_received">لم يستلم</option><option value="received">استلم</option><option value="all">الكل</option></select></div>
+      <div class="actions no-print" style="align-self:end"><button class="btn primary" onclick="exportDistributionCoverageExcel()">تصدير Excel</button><button class="btn" onclick="startNextDistributionFromCoverage()">توزيع جديد لغير المستلمين</button></div>
+    </div>
+    <div class="dist-coverage-stats"><div><span>المستهدف</span><b id="covTotal">0</b></div><div><span>استلم</span><b id="covReceived">0</b></div><div><span>لم يستلم</span><b id="covMissing">0</b></div><div><span>التغطية</span><b id="covPercent">0%</b></div></div>
+    <div class="tablewrap"><table class="table"><thead><tr><th>#</th><th>الاسم</th><th>رب الأسرة</th><th>رقم الهوية</th><th>الحالة</th><th>آخر استلام</th></tr></thead><tbody id="distCoverageTbody"></tbody></table></div>
+   </div>
+   <div class="tablewrap dist-tablewrap"><table class="table dist-table"><thead><tr><th>التاريخ</th><th>المستفيد</th><th>العائلة</th><th>التوزيع</th><th>الكمية</th><th>رقم المرجع</th><th>بواسطة</th><th>إجراءات</th></tr></thead><tbody id="distTbody"></tbody></table></div>
+  </div>
+ </section>
 
  <section id="classified" class="view">
   <div class="card">
@@ -726,10 +755,14 @@ function saveNow(){
 function autoSave(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data))}catch(e){toast("تعذر الحفظ المحلي: مساحة التخزين ممتلئة")}}
 function toast(msg){const t=document.getElementById("toast");let m=String(msg||"");const compact={"تم حفظ البيانات محلياً — جاري المزامنة":"تم الحفظ والمزامنة جاريًا","تم حفظ البيانات محلياً — بانتظار عودة الإنترنت":"تم الحفظ محلياً","السحابة متصلة والبيانات متاحة":"تمت المزامنة","تعذر الاتصال بالسحابة حالياً":"تعذر الاتصال بالسحابة","تمت المزامنة بنجاح":"تمت المزامنة","تم الحفظ بنجاح":"تم الحفظ"};m=compact[m]||m;if(m.length>34)m=m.slice(0,34)+"…";t.textContent=m;t.classList.add("show");clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>t.classList.remove("show"),1900)}
 function showView(id){
- document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));
- document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.view===id));
- document.getElementById(id).classList.add("active");
- if(id==="records")renderTable(); if(id==="families")renderFamilies(); if(id==="classified")renderClassified(); if(id==="familySearch"){setTimeout(()=>document.getElementById("familySearchInput")?.focus(),50);}
+ const current=document.querySelector(".view.active"); if(current?.id===id)return;
+ requestAnimationFrame(()=>{document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.view===id));const target=document.getElementById(id);if(target)target.classList.add("active");
+  if(id==="records")requestAnimationFrame(renderTable);
+  else if(id==="families")requestAnimationFrame(renderFamiliesFast);
+  else if(id==="classified")requestAnimationFrame(renderClassified);
+  else if(id==="distributions")requestAnimationFrame(renderDistributions);
+  else if(id==="familySearch")setTimeout(()=>document.getElementById("familySearchInput")?.focus(),50);
+ });
 }
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>showView(b.dataset.view));
 
@@ -866,7 +899,15 @@ function renumber(){data.forEach((r,i)=>r["#"]=String(i+1))}
 function closeModal(id){document.getElementById(id).classList.remove("show")}
 document.querySelectorAll(".modal").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)m.classList.remove("show")}));
 
-function renderAll(){applyFilters();renderFamilies();renderDashboard()}
+function renderAll(){applyFilters();renderFamiliesFast();renderDashboard()}
+let __familyCache={key:"",html:""};
+function renderFamiliesFast(){
+ const q=(document.getElementById("fq")?.value||"").toLowerCase().trim(),fs=document.getElementById("fsize")?.value||"",st=document.getElementById("fstatus")?.value||"";
+ const key=q+"|"+fs+"|"+st+"|"+data.length+"|"+(data[0]?.__syncId||"")+"|"+(data[data.length-1]?.__syncId||"");
+ if(__familyCache.key===key){document.getElementById("familyList").innerHTML=__familyCache.html;return;}
+ renderFamiliesCore(); __familyCache={key,html:document.getElementById("familyList").innerHTML};
+}
+
 function renderDashboard(){
  const fm=familyMap(), inside=new Set(), complete=new Set();
  fm.forEach((rows,h)=>{const r=rows[0]||{};if(r["داخل/خارج المخيم"]==="داخل المخيم")inside.add(h);if(r["حالة اكتمال بيانات الأسرة"]==="مكتملة")complete.add(h)});
@@ -1628,10 +1669,10 @@ function exportQualityExcel(){
 
 function filterFamiliesStatus(status){
   showView("families");
-  const el=document.getElementById("fstatus"); if(el){el.value=status;renderFamilies()}
+  const el=document.getElementById("fstatus"); if(el){el.value=status;renderFamiliesFast()}
 }
 
-function renderFamilies(){
+function renderFamiliesCore(){
   const q=(document.getElementById("fq")?.value||"").toLowerCase().trim();
   const fs=document.getElementById("fsize")?.value||"";
   const st=document.getElementById("fstatus")?.value||"";
@@ -1844,7 +1885,7 @@ saveFamily=function(e){
   const newId=smartDigits(v("f_id"));
   const dup=smartFamilyDuplicate(v("f_head"),newId,old);
   if(dup){alert(`تم منع التكرار: هذه العائلة موجودة بالفعل باسم «${dup["اسم رب الأسرة"]||"—"}»${dup["رقم هوية الأسرة"]?` ورقم الهوية ${dup["رقم هوية الأسرة"]}`:""}. افتح العائلة الموجودة بدل إنشاء نسخة ثانية.`);return}
-  _saveFamilyV5(e);syncComputedStatuses(true);renderDashboard();renderFamilies();qualityIssues=qualityScan();
+  _saveFamilyV5(e);syncComputedStatuses(true);renderDashboard();renderFamiliesFast();qualityIssues=qualityScan();
   if(qualityIssues.some(x=>x.type==="error"))toast("تم الحفظ، لكن يوجد خطأ يحتاج مراجعة — راجع فحص الجودة");
 };
 const _savePersonV5=savePerson;
@@ -1858,7 +1899,7 @@ savePerson=function(e){
     alert(`تم منع التكرار الذكي: يوجد بالفعل سجل لهذا الشخص (${label}).\n\nالاسم: ${dup.row["اسم الفرد"]||"—"}\nرب الأسرة: ${dup.row["اسم رب الأسرة"]||"—"}\nرقم الهوية: ${dup.row["رقم هوية الفرد"]||"غير موجود"}\n\nلن يتم إنشاء سجل مكرر.`);
     return;
   }
-  _savePersonV5(e);syncComputedStatuses(true);renderDashboard();renderFamilies();qualityIssues=qualityScan();
+  _savePersonV5(e);syncComputedStatuses(true);renderDashboard();renderFamiliesFast();qualityIssues=qualityScan();
   if(qualityIssues.some(x=>x.type==="error"))toast("تم الحفظ، لكن يوجد خطأ يحتاج مراجعة — راجع فحص الجودة");
 };
 const _deleteFamilyV5=deleteFamily;
@@ -1886,6 +1927,67 @@ function initV5(){
  if(localStorage.getItem("aboreiban_pin_hash"))setTimeout(()=>lockApp(),350);
 }
 
+
+/* ================= كشف الاستحقاق والتوزيع التالي ================= */
+function distCoverageTypes(){return [...new Set(distributions.map(x=>x.type).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ar"));}
+function distCoverageKeyPerson(r){const fid=distNorm(r["رقم هوية الأسرة"]),pid=distNorm(r["رقم هوية الفرد"]);return pid?"p:"+fid+"|"+pid:"pn:"+fid+"|"+distNorm(r["اسم الفرد"]);}
+function distCoverageKeyFamily(r){const fid=distNorm(r["رقم هوية الأسرة"]);return fid?"f:"+fid:"fn:"+distNorm(r["اسم رب الأسرة"]);}
+function distCoverageTypeFill(){const sel=document.getElementById("distCoverageType");if(!sel)return;const old=sel.value;sel.innerHTML='<option value="">اختر المساعدة</option>'+distCoverageTypes().map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");if(distCoverageTypes().includes(old))sel.value=old;}
+function distCoverageUniverse(scope){
+  if(scope==="families"){
+    const m=new Map();data.forEach(r=>{const k=distCoverageKeyFamily(r);if(!m.has(k))m.set(k,{key:k,name:distNorm(r["اسم رب الأسرة"]),familyName:distNorm(r["اسم رب الأسرة"]),id:distNorm(r["رقم هوية الأسرة"]),age:""})});return [...m.values()];
+  }
+  const m=new Map();data.forEach(r=>{const age=Number(r["العمر التقريبي"]);if(!Number.isFinite(age)||age>=18)return;const name=distNorm(r["اسم الفرد"]);if(!name)return;const k=distCoverageKeyPerson(r);if(!m.has(k))m.set(k,{key:k,name,familyName:distNorm(r["اسم رب الأسرة"]),id:distNorm(r["رقم هوية الفرد"]),age})});return [...m.values()];
+}
+function distCoverageReceived(scope,type){
+  const m=new Map();if(!type)return m;
+  distributions.filter(x=>distNorm(x.type)===type).forEach(x=>{const k=scope==="families"?(x.familyId?"f:"+distNorm(x.familyId):"fn:"+distNorm(x.familyName)):(x.personId?"p:"+distNorm(x.familyId)+"|"+distNorm(x.personId):"pn:"+distNorm(x.familyId)+"|"+distNorm(x.beneficiaryName));if(!k)return;const old=m.get(k);if(!old||String(x.date)>String(old.date))m.set(k,{date:x.date,quantity:x.quantity,reference:x.reference})});return m;
+}
+function renderDistributionCoverage(){
+  distCoverageTypeFill();const scope=document.getElementById("distCoverageScope")?.value||"children",type=document.getElementById("distCoverageType")?.value||"",status=document.getElementById("distCoverageStatus")?.value||"not_received";const tbody=document.getElementById("distCoverageTbody");if(!tbody)return;
+  if(!type){tbody.innerHTML='<tr><td colspan="6"><div class="dist-empty">اختر نوع المساعدة لعرض المستلمين وغير المستلمين</div></td></tr>';["covTotal","covReceived","covMissing","covPercent"].forEach(id=>document.getElementById(id).textContent=id==="covPercent"?"0%":"0");return;}
+  const universe=distCoverageUniverse(scope),received=distCoverageReceived(scope,type);let rows=universe.map(x=>({...x,received:received.has(x.key),last:received.get(x.key)?.date||""}));if(status==="not_received")rows=rows.filter(x=>!x.received);if(status==="received")rows=rows.filter(x=>x.received);const total=universe.length,got=universe.filter(x=>received.has(x.key)).length;
+  document.getElementById("covTotal").textContent=total;document.getElementById("covReceived").textContent=got;document.getElementById("covMissing").textContent=Math.max(0,total-got);document.getElementById("covPercent").textContent=total?Math.round(got*100/total)+"%":"0%";
+  tbody.innerHTML=rows.length?rows.map((x,i)=>`<tr><td>${i+1}</td><td><b>${esc(x.name)}</b>${x.age!==""?`<div class="muted">العمر ${esc(x.age)}</div>`:""}</td><td>${esc(x.familyName||"—")}</td><td>${esc(x.id||"—")}</td><td>${x.received?'<span class="badge success">استلم</span>':'<span class="badge">لم يستلم</span>'}</td><td>${esc(x.last||"—")}</td></tr>`).join(""):'<tr><td colspan="6"><div class="dist-empty">لا توجد نتائج</div></td></tr>';
+}
+function exportDistributionCoverageExcel(){
+  const scope=document.getElementById("distCoverageScope")?.value||"children",type=document.getElementById("distCoverageType")?.value||"",status=document.getElementById("distCoverageStatus")?.value||"not_received";if(!type){toast("اختر نوع المساعدة أولاً");return}
+  const universe=distCoverageUniverse(scope),received=distCoverageReceived(scope,type);let rows=universe.map(x=>({"نوع الكشف":scope==="families"?"عائلات":"أطفال","نوع المساعدة":type,"الاسم":x.name,"رب الأسرة":x.familyName,"رقم الهوية":x.id,"الحالة":received.has(x.key)?"استلم":"لم يستلم","تاريخ آخر استلام":received.get(x.key)?.date||"","المرجع":received.get(x.key)?.reference||""}));if(status==="not_received")rows=rows.filter(x=>x["الحالة"]==="لم يستلم");if(status==="received")rows=rows.filter(x=>x["الحالة"]==="استلم");exportStyledExcel(rows,`كشف_${scope==="families"?"العائلات":"الأطفال"}_غير_المستلمين_${type}`,"كشف الاستحقاق");}
+function closeDistBulkModal(){const m=document.getElementById("distBulkModal");m?.classList.remove("show");m?.setAttribute("aria-hidden","true")}
+function updateBulkSelected(){const n=document.querySelectorAll('#bulkTbody input[type="checkbox"]:checked').length;const el=document.getElementById("bulkSelectedCount");if(el)el.textContent=n+" محدد"}
+function toggleAllDistBulk(v){document.querySelectorAll('#bulkTbody input[type="checkbox"]').forEach(x=>x.checked=v);updateBulkSelected()}
+function startNextDistributionFromCoverage(){
+ const type=document.getElementById("distCoverageType")?.value||"";if(!type){toast("اختر نوع المساعدة أولاً");return}
+ const scope=document.getElementById("distCoverageScope")?.value||"children",received=distCoverageReceived(scope,type),universe=distCoverageUniverse(scope),missing=universe.filter(x=>!received.has(x.key));
+ if(!missing.length){toast("لا يوجد مستفيدون غير مستلمين لهذه المساعدة");return}
+ document.getElementById("bulkScopeLabel").value=scope==="families"?"عائلات":"أطفال";document.getElementById("bulkType").value=type;document.getElementById("bulkDate").value=distToday();document.getElementById("bulkQty").value=1;document.getElementById("bulkUnit").value=scope==="families"?"طرد":"حقيبة";document.getElementById("bulkBy").value="";
+ document.getElementById("bulkTbody").innerHTML=missing.map((x,i)=>`<tr><td><input type="checkbox" data-key="${esc(x.key)}" onchange="updateBulkSelected()"></td><td>${i+1}</td><td><b>${esc(x.name)}</b></td><td>${esc(x.familyName||"—")}</td><td>${esc(x.id||"—")}</td></tr>`).join("");document.getElementById("bulkAll").checked=false;updateBulkSelected();const m=document.getElementById("distBulkModal");m.classList.add("show");m.setAttribute("aria-hidden","false");
+}
+function saveBulkDistribution(){
+ const scope=document.getElementById("bulkScopeLabel").value==="عائلات"?"families":"children",type=distNorm(document.getElementById("bulkType").value),qty=Number(document.getElementById("bulkQty").value||1),unit=distNorm(document.getElementById("bulkUnit").value),date=document.getElementById("bulkDate").value||distToday(),by=distNorm(document.getElementById("bulkBy").value);const keys=[...document.querySelectorAll('#bulkTbody input[type="checkbox"]:checked')].map(x=>x.dataset.key);if(!keys.length){toast("حدد مستفيداً واحداً على الأقل");return}
+ const universe=new Map(distCoverageUniverse(scope).map(x=>[x.key,x]));let added=0;keys.forEach(k=>{const x=universe.get(k);if(!x)return;const obj={id:distId(),beneficiaryType:scope==="families"?"عائلة":"طفل",beneficiaryName:x.name,personId:scope==="families"?"":x.id,familyId:data.find(r=>distCoverageKeyFamily(r)===distCoverageKeyFamily({"رقم هوية الأسرة":scope==="families"?x.id:data.find(q=>distCoverageKeyPerson(q)===x.key)?.["رقم هوية الأسرة"]||""}))?.["رقم هوية الأسرة"]||"",familyName:x.familyName,type,quantity:qty,unit,date,reference:"DST-"+Date.now().toString().slice(-8)+"-"+(added+1),distributedBy:by,notes:"توزيع جماعي من كشف غير المستلمين",updatedAt:Date.now()};if(scope==="families"){obj.familyId=x.id}else{const rr=data.find(r=>distCoverageKeyPerson(r)===x.key);obj.familyId=rr?.["رقم هوية الأسرة"]||""}distributions.push(obj);added++});distSave();closeDistBulkModal();renderDistributions();toast(`تم تسجيل ${added} توزيع`);distSyncSoon()}
+
+/* ================= إدارة التوزيعات — Offline First + D1 Sync ================= */
+const DIST_KEY="aboreiban_distributions_v1", DIST_SHADOW_KEY="aboreiban_dist_shadow_v1", DIST_PENDING_KEY="aboreiban_dist_pending_v1", DIST_CURSOR_KEY="aboreiban_dist_cursor_v1";
+let distributions=[]; let distShadow=[]; let distCursor=Number(localStorage.getItem(DIST_CURSOR_KEY)||0); let distBusy=false;
+function distId(){return "dist:"+(crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random().toString(16).slice(2));}
+function distLoad(){try{distributions=JSON.parse(localStorage.getItem(DIST_KEY)||"[]");if(!Array.isArray(distributions))distributions=[]}catch(e){distributions=[]}}
+function distSave(){localStorage.setItem(DIST_KEY,JSON.stringify(distributions))}
+function distNorm(x){return String(x??"").replace(/\s+/g," ").trim()}
+function distToday(){return new Date().toISOString().slice(0,10)}
+function openDistributionModal(id=""){const m=document.getElementById("distModal"); if(!m)return; const r=distributions.find(x=>x.id===id); document.getElementById("distId").value=r?.id||""; document.getElementById("distBeneficiaryForm").value=r?.beneficiaryType||"طفل"; document.getElementById("distName").value=r?.beneficiaryName||""; document.getElementById("distPersonId").value=r?.personId||""; document.getElementById("distFamilyId").value=r?.familyId||""; document.getElementById("distFamilyName").value=r?.familyName||""; document.getElementById("distTypeForm").value=r?.type||""; document.getElementById("distQty").value=r?.quantity||1; document.getElementById("distUnit").value=r?.unit||""; document.getElementById("distDate").value=r?.date||distToday(); document.getElementById("distRef").value=r?.reference||("DST-"+new Date().getTime().toString().slice(-8)); document.getElementById("distBy").value=r?.distributedBy||""; document.getElementById("distNotes").value=r?.notes||""; document.getElementById("distModalTitle").textContent=r?"تعديل التوزيع":"تسجيل توزيع"; distFillNames();m.classList.add("show");m.setAttribute("aria-hidden","false");}
+function closeDistributionModal(){const m=document.getElementById("distModal");m?.classList.remove("show");m?.setAttribute("aria-hidden","true")}
+function distFillNames(){const dl=document.getElementById("distNames");if(!dl)return; const people=[...new Set(data.map(r=>r["اسم الفرد"]).filter(Boolean))];const heads=[...new Set(data.map(r=>r["اسم رب الأسرة"]).filter(Boolean))];dl.innerHTML=[...people,...heads].slice(0,1200).map(x=>`<option value="${esc(x)}">`).join("")}
+function distBeneficiaryChanged(){const t=document.getElementById("distBeneficiaryForm")?.value||"طفل"; if(t!=="عائلة"){const name=distNorm(document.getElementById("distName")?.value);const r=data.find(x=>distNorm(x["اسم الفرد"])===name);if(r){document.getElementById("distPersonId").value=r["رقم هوية الفرد"]||"";document.getElementById("distFamilyId").value=r["رقم هوية الأسرة"]||"";document.getElementById("distFamilyName").value=r["اسم رب الأسرة"]||""}}}
+function saveDistribution(){const id=document.getElementById("distId").value||distId();const obj={id,beneficiaryType:distNorm(document.getElementById("distBeneficiaryForm").value),beneficiaryName:distNorm(document.getElementById("distName").value),personId:distNorm(document.getElementById("distPersonId").value),familyId:distNorm(document.getElementById("distFamilyId").value),familyName:distNorm(document.getElementById("distFamilyName").value),type:distNorm(document.getElementById("distTypeForm").value),quantity:Number(document.getElementById("distQty").value||1),unit:distNorm(document.getElementById("distUnit").value),date:document.getElementById("distDate").value||distToday(),reference:distNorm(document.getElementById("distRef").value),distributedBy:distNorm(document.getElementById("distBy").value),notes:distNorm(document.getElementById("distNotes").value),updatedAt:Date.now()};if(!obj.beneficiaryName||!obj.type){toast("أدخل اسم المستفيد ونوع التوزيع");return}const i=distributions.findIndex(x=>x.id===id);if(i<0)distributions.push(obj);else distributions[i]=obj;distSave();closeDistributionModal();renderDistributions();toast("تم حفظ التوزيع");distSyncSoon()}
+function deleteDistribution(id){if(!confirm("حذف سجل التوزيع؟"))return;distributions=distributions.filter(x=>x.id!==id);distSave();renderDistributions();toast("تم حذف التوزيع");distSyncSoon()}
+function renderDistributions(){const q=distNorm(document.getElementById("distQ")?.value).toLowerCase(),bt=document.getElementById("distBeneficiary")?.value||"",ty=document.getElementById("distType")?.value||"",from=document.getElementById("distFrom")?.value||"",to=document.getElementById("distTo")?.value||"";const types=[...new Set(distributions.map(x=>x.type).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ar"));const sel=document.getElementById("distType");if(sel){const old=sel.value;sel.innerHTML='<option value="">الكل</option>'+types.map(x=>`<option>${esc(x)}</option>`).join("");sel.value=types.includes(old)?old:""}const arr=distributions.filter(x=>{const blob=[x.beneficiaryName,x.familyName,x.type,x.reference,x.notes].join(" ").toLowerCase();return(!q||blob.includes(q))&&(!bt||x.beneficiaryType===bt)&&(!ty||x.type===ty)&&(!from||x.date>=from)&&(!to||x.date<=to)}).sort((a,b)=>String(b.date).localeCompare(String(a.date)));document.getElementById("distTbody").innerHTML=arr.length?arr.map(x=>`<tr><td>${esc(x.date)}</td><td><b>${esc(x.beneficiaryName)}</b><div class="muted">${esc(x.beneficiaryType)}</div></td><td>${esc(x.familyName||"—")}</td><td>${esc(x.type)}</td><td>${esc(x.quantity)} ${esc(x.unit)}</td><td>${esc(x.reference||"—")}</td><td>${esc(x.distributedBy||"—")}</td><td><div class="dist-actions"><button class="pagebtn" onclick="openDistributionModal('${x.id}')">تعديل</button><button class="pagebtn" onclick="deleteDistribution('${x.id}')">حذف</button></div></td></tr>`).join(""):'<tr><td colspan="8"><div class="dist-empty">لا توجد توزيعات مطابقة</div></td></tr>';document.getElementById("distTotal").textContent=distributions.length;const ym=distToday().slice(0,7);document.getElementById("distMonth").textContent=distributions.filter(x=>String(x.date).startsWith(ym)).length;document.getElementById("distChildren").textContent=distributions.filter(x=>x.beneficiaryType==="طفل").length;document.getElementById("distFamilies").textContent=distributions.filter(x=>x.beneficiaryType==="عائلة").length;document.getElementById("distSyncState").textContent=navigator.onLine?"متصل — بانتظار المزامنة":"دون اتصال";renderDistributionCoverage()}
+function exportDistributionsCSV(){const rows=[["التاريخ","نوع المستفيد","اسم المستفيد","رقم هوية الفرد","رقم هوية الأسرة","رب الأسرة","نوع التوزيع","الكمية","الوحدة","المرجع","بواسطة","ملاحظات"],...distributions.map(x=>[x.date,x.beneficiaryType,x.beneficiaryName,x.personId,x.familyId,x.familyName,x.type,x.quantity,x.unit,x.reference,x.distributedBy,x.notes])];const csv="\uFEFF"+rows.map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(",")).join("\n");const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="توزيعات_مخيم_أبو_عريبان.csv";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
+function distBuildChanges(){const old=new Map(distShadow.map(x=>[x.id,x])),now=new Map(distributions.map(x=>[x.id,x])),out=[];for(const r of distributions){const o=old.get(r.id);if(!o||JSON.stringify(o)!==JSON.stringify(r))out.push({opId:crypto.randomUUID(),recordId:r.id,operation:"upsert",updatedAt:r.updatedAt||Date.now(),data:r})}for(const o of distShadow)if(!now.has(o.id))out.push({opId:crypto.randomUUID(),recordId:o.id,operation:"delete",updatedAt:Date.now()});return out}
+function distSavePending(c){localStorage.setItem(DIST_PENDING_KEY,JSON.stringify(c||[]))}function distLoadPending(){try{return JSON.parse(localStorage.getItem(DIST_PENDING_KEY)||"[]")}catch(e){return[]}}
+async function distSync(){if(distBusy||!navigator.onLine)return;distBusy=true;try{let pending=distLoadPending();if(!pending.length){pending=distBuildChanges();distSavePending(pending)}if(pending.length){const r=await syncFetch("/sync/push",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),changes:pending})});const accepted=new Set([...(r.accepted||[]).map(x=>typeof x==="string"?x:x.opId),...(r.skipped||[]).filter(x=>x.reason==="مكرر").map(x=>x.opId)]);if(accepted.size>=pending.length){distShadow=structuredClone(distributions);localStorage.setItem(DIST_SHADOW_KEY,JSON.stringify(distShadow));distSavePending([])}else{distSavePending(distBuildChanges())}}const pr=await syncFetch(`/sync/pull?scope=distributions&since=${distCursor}&limit=500`,{method:"GET"});for(const c of pr.changes||[]){if(c.recordId?.startsWith("dist:")){if(c.operation==="delete")distributions=distributions.filter(x=>x.id!==c.recordId);else if(c.data){const i=distributions.findIndex(x=>x.id===c.recordId);if(i<0)distributions.push(c.data);else distributions[i]=c.data}}}distCursor=Number(pr.nextSince||distCursor);localStorage.setItem(DIST_CURSOR_KEY,String(distCursor));distSave();renderDistributions();document.getElementById("distSyncState").textContent="تمت المزامنة"}catch(e){document.getElementById("distSyncState").textContent="بانتظار الاتصال"}finally{distBusy=false}}
+function distSyncSoon(){distSavePending(distBuildChanges());if(navigator.onLine)setTimeout(distSync,250);}
+function distInit(){try{distLoad();distShadow=JSON.parse(localStorage.getItem(DIST_SHADOW_KEY)||"[]");if(!Array.isArray(distShadow))distShadow=[]}catch(e){distShadow=[]}renderDistributions();window.addEventListener("online",()=>setTimeout(distSync,400));setTimeout(()=>{if(navigator.onLine)distSync()},1200)}
 
 /* ================= مزامنة سحابية D1 — Worker moood — V24 offline-first ================= */
 const SYNC_API_URL = "https://moood.eyad2000515.workers.dev";
@@ -2496,6 +2598,7 @@ function exportStyledExcel(rows,filename="كشف_أبو_عريبان",sheetName=
     const birth=document.getElementById("p_birth");if(birth)birth.addEventListener("change",updatePersonAge);
   }
   init();
+  try{distInit()}catch(e){}
 })();
 </script>
 
@@ -2507,12 +2610,16 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 
+
+<div id="distBulkModal" class="modal" aria-hidden="true"><div class="modalbox" style="max-width:980px"><div class="modalhead"><div><b>توزيع على غير المستلمين</b><div class="muted" style="font-size:10px;margin-top:2px">حدد المستفيدين الذين سيستلمون الدفعة الجديدة ثم احفظهم دفعة واحدة.</div></div><button class="btn" onclick="closeDistBulkModal()">إغلاق</button></div><div class="modalbody"><div class="formgrid"><div class="field"><label>نوع المستفيد</label><input id="bulkScopeLabel" readonly></div><div class="field"><label>نوع المساعدة</label><input id="bulkType" readonly></div><div class="field"><label>الكمية لكل مستفيد</label><input id="bulkQty" type="number" min="1" value="1"></div><div class="field"><label>الوحدة</label><input id="bulkUnit" placeholder="حقيبة / طرد / قطعة"></div><div class="field"><label>تاريخ التوزيع</label><input id="bulkDate" type="date"></div><div class="field"><label>تم بواسطة</label><input id="bulkBy" placeholder="اسم المسؤول / الفريق"></div></div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:14px 0 8px"><b>المستفيدون غير المستلمين</b><span id="bulkSelectedCount" class="badge">0 محدد</span></div><div class="tablewrap" style="max-height:430px;overflow:auto"><table class="table"><thead><tr><th><input type="checkbox" id="bulkAll" onchange="toggleAllDistBulk(this.checked)"></th><th>#</th><th>الاسم</th><th>رب الأسرة</th><th>رقم الهوية</th></tr></thead><tbody id="bulkTbody"></tbody></table></div></div><div class="modalfoot"><button class="btn primary" onclick="saveBulkDistribution()">حفظ التوزيع للمحدد</button><button class="btn" onclick="closeDistBulkModal()">إلغاء</button></div></div></div><div id="distModal" class="modal" aria-hidden="true"><div class="modalbox"><div class="modalhead"><div><b id="distModalTitle">تسجيل توزيع</b><div class="muted" style="font-size:10px;margin-top:2px">حفظ محلي فوري + مزامنة سحابية</div></div><button class="btn" onclick="closeDistributionModal()">إغلاق</button></div><div class="modalbody"><input type="hidden" id="distId"><div class="formgrid"><div class="field"><label>نوع المستفيد</label><select id="distBeneficiaryForm" onchange="distBeneficiaryChanged()"><option value="طفل">طفل</option><option value="فرد">فرد</option><option value="عائلة">عائلة</option></select></div><div class="field span2"><label>اسم المستفيد / رب الأسرة</label><input id="distName" list="distNames" placeholder="اختر أو اكتب الاسم"><datalist id="distNames"></datalist></div><div class="field"><label>رقم هوية المستفيد</label><input id="distPersonId" placeholder="اختياري"></div><div class="field"><label>رقم هوية الأسرة</label><input id="distFamilyId" placeholder="اختياري"></div><div class="field"><label>اسم رب الأسرة</label><input id="distFamilyName" placeholder="يُعبأ تلقائياً عند الاختيار"></div><div class="field"><label>نوع التوزيع</label><input id="distTypeForm" list="distTypeList" placeholder="حقيبة مدرسية، طرد صحي..." required><datalist id="distTypeList"><option value="حقيبة مدرسية"><option value="طرد صحي"><option value="سلة غذائية"><option value="ملابس"><option value="مياه"><option value="مساعدة نقدية"><option value="مستلزمات أطفال"><option value="مستلزمات طبية"></datalist></div><div class="field"><label>الكمية</label><input id="distQty" type="number" min="1" value="1"></div><div class="field"><label>الوحدة</label><input id="distUnit" placeholder="حقيبة / طرد / قطعة"></div><div class="field"><label>تاريخ التوزيع</label><input id="distDate" type="date"></div><div class="field"><label>رقم المرجع</label><input id="distRef" placeholder="يُولد تلقائياً"></div><div class="field"><label>تم بواسطة</label><input id="distBy" placeholder="اسم المسؤول / الفريق"></div><div class="field span3"><label>ملاحظات</label><textarea id="distNotes" rows="3" placeholder="تفاصيل إضافية، حالة الاستلام، ملاحظات..." style="width:100%;resize:vertical"></textarea></div></div></div><div class="modalfoot dist-modal-foot"><button class="btn primary" onclick="saveDistribution()">حفظ التوزيع</button><button class="btn" onclick="closeDistributionModal()">إلغاء</button></div></div></div>
+
 <nav class="mobile-bottom-nav no-print" aria-label="التنقل الرئيسي للموبايل">
   <button type="button" data-mobile-view="dashboard"><span>⌂</span><small>الرئيسية</small></button>
   <button type="button" data-mobile-view="familySearch"><span>⌕</span><small>البحث</small></button>
   <button type="button" data-mobile-view="families"><span>👨‍👩‍👧</span><small>العائلات</small></button>
   <button type="button" data-mobile-view="records"><span>▤</span><small>السجلات</small></button>
   <button type="button" data-mobile-view="classified"><span>▥</span><small>الكشوفات</small></button>
+  <button type="button" data-mobile-view="distributions"><span>◫</span><small>التوزيعات</small></button>
   <button type="button" data-mobile-view="syncCenter"><span>☁</span><small>السحابة</small></button>
   <button type="button" data-mobile-view="settings"><span>⚙</span><small>الإعدادات</small></button>
 </nav>
