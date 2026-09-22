@@ -185,6 +185,20 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
 <style>
 .excel-export-note{font-size:13px;line-height:1.7}
 @media(max-width:700px){.excel-export-note{font-size:12px}}
+
+/* ================= V17: تجربة هاتف + متابعة حية ================= */
+.live-control-panel{margin-top:14px;background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;border-radius:18px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:14px;box-shadow:0 12px 30px rgba(15,23,42,.14)}
+.live-control-main{display:flex;align-items:center;gap:10px;min-width:0}.live-control-main b{display:block;font-size:14px}.live-control-main span{display:block;color:#cbd5e1;font-size:11px;margin-top:2px}.live-pulse-dot{width:10px;height:10px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 5px rgba(34,197,94,.12);animation:livePulse 1.8s infinite}
+.live-control-metrics{display:flex;gap:14px;align-items:center;flex-wrap:wrap;color:#cbd5e1;font-size:11px}.live-control-metrics b{color:#fff;font-size:14px}
+@keyframes livePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.78)}}
+.quick-actions-mobile{display:none}.cloud-live-panel{margin-top:14px;border:1px solid var(--line);border-radius:18px;padding:15px;background:linear-gradient(180deg,#fbfdff,#fff)}
+.cloud-live-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.cloud-live-head b{display:block}.cloud-live-head span{display:block;font-size:11px;margin-top:3px}.cloud-badge{padding:6px 10px!important;border-radius:999px;background:#eef2f7;color:#475569;font-weight:800!important;white-space:nowrap}
+.cloud-live-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}.cloud-live-grid>div{background:#f8fafc;border:1px solid var(--line);border-radius:13px;padding:11px}.cloud-live-grid small{display:block;color:var(--muted);font-size:11px}.cloud-live-grid b{display:block;margin-top:3px;font-size:14px}
+.pending-list-wrap{margin-top:12px}.pending-list-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.pending-list-head span{font-size:11px;background:#fff7ed;color:#9a3412;border-radius:999px;padding:4px 8px;font-weight:800}.pending-list{max-height:180px;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:7px}.pending-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px;border-bottom:1px solid var(--line);font-size:11px}.pending-item:last-child{border-bottom:0}.pending-item b{font-size:12px}.pending-op{font-size:10px;border-radius:999px;padding:3px 7px;background:#fff7ed;color:#9a3412;font-weight:800;white-space:nowrap}
+.mobile-dock{display:none}
+@media(max-width:900px){.cloud-live-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.topin{padding:9px 10px}.brand{gap:8px}.logo{width:40px;height:40px;border-radius:12px}.brand h1{font-size:15px}.top .actions{display:none}.wrap{padding:9px 9px 88px}.tabs{display:none!important}.live-control-panel{display:block;padding:13px}.live-control-metrics{margin-top:10px;gap:9px}.quick-actions-mobile{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:10px}.quick-action{min-height:58px;border:1px solid var(--line);background:#fff;border-radius:14px;font-weight:800;color:var(--text);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-shadow:0 5px 15px rgba(15,23,42,.05)}.quick-action span{font-size:10px}.dashboard-live-grid{grid-template-columns:1fr!important}.stats{grid-template-columns:1fr 1fr!important;gap:8px}.stat{padding:13px}.stat .num{font-size:23px}.card{padding:12px;border-radius:15px}.cardhead{align-items:flex-start}.cardhead h2{font-size:15px}.cloud-live-grid{grid-template-columns:1fr 1fr;gap:7px}.cloud-live-grid>div{padding:9px}.mobile-dock{position:fixed;display:grid;grid-template-columns:repeat(5,1fr);bottom:0;left:0;right:0;z-index:80;background:rgba(255,255,255,.97);backdrop-filter:blur(16px);border-top:1px solid var(--line);padding:7px 6px calc(7px + env(safe-area-inset-bottom));box-shadow:0 -8px 25px rgba(15,23,42,.08)}.mobile-dock button{border:0;background:transparent;color:#64748b;min-height:52px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-weight:800}.mobile-dock button span{font-size:19px;line-height:20px}.mobile-dock button small{font-size:9px}.mobile-dock button.active{background:#eef2ff;color:#1d4ed8}.mobile-dock .dock-add{background:#172033;color:#fff;transform:translateY(-7px);box-shadow:0 7px 18px rgba(15,23,42,.18)}.mobile-dock .dock-add span{font-size:24px}.pending-list{max-height:140px}}
+@media(prefers-reduced-motion:reduce){.live-pulse-dot{animation:none}}
 </style></head>
 <body>
 <div class="app">
@@ -209,6 +223,13 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
   <button class="tab" data-view="syncCenter">☁️ مركز المزامنة</button>
   <button class="tab" data-view="settings">الحماية والبيانات</button>
 </nav>
+ <nav class="mobile-dock no-print" aria-label="التنقل السريع">
+  <button type="button" onclick="showView('dashboard')" data-dock-view="dashboard"><span>⌂</span><small>الرئيسية</small></button>
+  <button type="button" onclick="showView('familySearch')" data-dock-view="familySearch"><span>⌕</span><small>بحث</small></button>
+  <button type="button" class="dock-add" onclick="openFamilyModal()"><span>＋</span><small>إضافة</small></button>
+  <button type="button" onclick="showView('families')" data-dock-view="families"><span>♙</span><small>العائلات</small></button>
+  <button type="button" onclick="showView('syncCenter')" data-dock-view="syncCenter"><span>☁</span><small>السحابة</small></button>
+ </nav>
 
  
 <section id="familySearch" class="view">
@@ -248,6 +269,16 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
    <div class="stat"><div class="label">إجمالي العائلات</div><div class="num" id="sFamilies">0</div><div class="sub">بحسب رب الأسرة</div></div>
    <div class="stat"><div class="label">داخل المخيم</div><div class="num" id="sInside">0</div><div class="sub">عائلات داخل المخيم</div></div>
    <div class="stat"><div class="label">اكتمال البيانات</div><div class="num" id="sComplete">0%</div><div class="sub">نسبة العائلات المكتملة</div></div>
+  </div>
+  <div class="live-control-panel no-print">
+   <div class="live-control-main"><div class="live-pulse-dot" id="livePulseDot"></div><div><b>لوحة المتابعة الحية</b><span id="liveDashboardState">البيانات المحلية محدثة</span></div></div>
+   <div class="live-control-metrics"><span>محلي: <b id="liveLocalCount">0</b></span><span>معلق: <b id="livePendingCount">0</b></span><span>سحابة: <b id="liveCloudCount">—</b></span><span id="liveClock">—</span></div>
+  </div>
+  <div class="quick-actions-mobile no-print">
+   <button type="button" class="quick-action" onclick="openFamilyModal()">＋<span>إضافة عائلة</span></button>
+   <button type="button" class="quick-action" onclick="openPersonModal()">＋<span>إضافة فرد</span></button>
+   <button type="button" class="quick-action" onclick="showView('familySearch');document.getElementById('familySearchInput')?.focus()">⌕<span>بحث</span></button>
+   <button type="button" class="quick-action" onclick="syncCenterNow()">☁<span>مزامنة</span></button>
   </div>
   <div class="dashboard-live-grid">
    <div class="live-card live-cloud"><div class="live-icon">☁️</div><div><span>السحابة</span><b id="dashCloudStatus">جاري الفحص...</b><small id="dashCloudMeta">—</small></div><button class="btn no-print" onclick="showView('syncCenter')">المزامنة</button></div>
@@ -426,6 +457,16 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
    <div class="sync-panel">
     <div><b>مزامنة آمنة</b><p class="muted">البيانات الحالية لا تُستبدل عشوائياً. التعديلات تُرسل للسحابة وتُجلب من الأجهزة الأخرى حسب نظام الإصدارات.</p></div>
     <div class="actions no-print"><button class="btn" onclick="syncCenterNow()">فحص السيرفر</button><button class="btn" onclick="syncPull().then(refreshSyncCenter).catch(e=>toast('تعذر جلب التحديثات'))">جلب التحديثات</button><button class="btn" onclick="syncPush().then(refreshSyncCenter).catch(e=>toast('تعذر رفع التعديلات'))">رفع التعديلات</button></div>
+   </div>
+   <div class="cloud-live-panel no-print">
+    <div class="cloud-live-head"><div><b>المتابعة المباشرة</b><span id="cloudLiveMessage" class="muted">جاهز للمزامنة</span></div><span id="cloudLiveBadge" class="cloud-badge">—</span></div>
+    <div class="cloud-live-grid">
+     <div><small>جهازك</small><b id="syncDeviceShort">—</b></div>
+     <div><small>آخر مزامنة ناجحة</small><b id="syncLastSuccess">لم تتم بعد</b></div>
+     <div><small>الطابور المحلي</small><b id="syncPendingDetail">0</b></div>
+     <div><small>حالة الشبكة</small><b id="syncNetworkDetail">—</b></div>
+    </div>
+    <div class="pending-list-wrap"><div class="pending-list-head"><b>التعديلات المعلقة</b><span id="pendingListCount">0</span></div><div id="syncPendingList" class="pending-list"><div class="muted">لا توجد تعديلات معلقة</div></div></div>
    </div>
   </div>
  </section>
@@ -2412,6 +2453,32 @@ function exportStyledExcel(rows,filename="كشف_أبو_عريبان",sheetName=
     const birth=document.getElementById("p_birth");if(birth)birth.addEventListener("change",updatePersonAge);
   }
   init();
+})();
+</script>
+
+
+<script>
+(function(){
+ const escV17=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));
+ const fmt=n=>Number(n||0).toLocaleString('ar-EG');
+ const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
+ function pendingSnapshot(){try{if(typeof syncBuildChanges==='function')return syncBuildChanges()}catch(e){}try{return JSON.parse(localStorage.getItem('aboreiban_sync_pending_v2')||'[]')}catch(e){return []}}
+ function updateDock(){const current=document.querySelector('.view.active')?.id||'dashboard';document.querySelectorAll('[data-dock-view]').forEach(b=>b.classList.toggle('active',b.dataset.dockView===current))}
+ function updateLiveLocal(){
+  const pending=pendingSnapshot(),count=Array.isArray(data)?data.length:0;
+  set('liveLocalCount',fmt(count));set('livePendingCount',fmt(pending.length));set('syncPendingDetail',fmt(pending.length));set('pendingListCount',fmt(pending.length));set('syncNetworkDetail',navigator.onLine?'متصل بالإنترنت':'بدون إنترنت');set('liveClock',new Date().toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}));
+  const dot=document.getElementById('livePulseDot'),state=document.getElementById('liveDashboardState');if(dot)dot.style.background=navigator.onLine?'#22c55e':'#f59e0b';if(state)state.textContent=navigator.onLine?(pending.length?`${fmt(pending.length)} تعديل بانتظار الرفع`:'متصل — لا توجد تعديلات معلقة'):(pending.length?`${fmt(pending.length)} تعديل محفوظ محليًا`:'وضع عدم الاتصال — الحفظ المحلي فعال');
+  const list=document.getElementById('syncPendingList');if(list){if(!pending.length)list.innerHTML='<div class="muted" style="padding:9px">لا توجد تعديلات معلقة — البيانات متزامنة.</div>';else list.innerHTML=pending.slice(0,30).map(c=>{const row=Array.isArray(data)?data.find(r=>r.__syncId===c.recordId):null;const name=row?.["اسم الفرد"]||row?.["اسم رب الأسرة"]||"سجل";const op=c.operation==="delete"?"حذف":"تعديل/إضافة";return `<div class="pending-item"><span><b>${escV17(name)}</b><br><span class="muted">${escV17(row?.["اسم رب الأسرة"]||"")}</span></span><span class="pending-op">${op}</span></div>`}).join('')+(pending.length>30?`<div class="muted" style="padding:8px;text-align:center">و ${fmt(pending.length-30)} تعديلات أخرى...</div>`:'')}
+ }
+ function updateCloudLabels(){
+  const online=navigator.onLine;set('syncNetworkDetail',online?'متصل بالإنترنت':'بدون إنترنت');
+  const badge=document.getElementById('cloudLiveBadge');if(badge){badge.textContent=online?'متصل الآن':'وضع عدم الاتصال';badge.style.background=online?'#dcfce7':'#fef3c7';badge.style.color=online?'#166534':'#92400e'}
+  set('syncDeviceShort',typeof syncDeviceId==='function'?String(syncDeviceId()).slice(0,8)+'…':'—');const last=localStorage.getItem('aboreiban_last_sync_success');set('syncLastSuccess',last?new Date(Number(last)).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'}):'لم تتم بعد');updateLiveLocal()
+ }
+ const originalShowView=window.showView;if(typeof originalShowView==='function')window.showView=function(id){const r=originalShowView.apply(this,arguments);setTimeout(updateDock,30);setTimeout(updateLiveLocal,40);return r};
+ const originalSyncStart=window.syncStart;if(typeof originalSyncStart==='function')window.syncStart=async function(reason){const before=JSON.stringify(pendingSnapshot());const result=await originalSyncStart.apply(this,arguments);if(navigator.onLine){const after=JSON.stringify(pendingSnapshot());if(before!==after||['online','manual','startup'].includes(reason))localStorage.setItem('aboreiban_last_sync_success',String(Date.now()))}updateCloudLabels();return result};
+ window.addEventListener('online',()=>{setTimeout(updateCloudLabels,250);setTimeout(updateLiveLocal,800)});window.addEventListener('offline',()=>{updateCloudLabels();updateLiveLocal()});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){updateCloudLabels();updateLiveLocal()}});
+ setInterval(updateLiveLocal,1000);setInterval(updateCloudLabels,10000);setTimeout(()=>{updateCloudLabels();updateDock()},600);
 })();
 </script>
 
