@@ -1834,7 +1834,7 @@ function smartPersonKey(r){
   const head=smartKeyText(r?.["اسم رب الأسرة"]);
   const dob=smartKeyText(r?.["تاريخ الميلاد"]);
   // Same full name inside the same family is a strong duplicate signal.
-  if(name && fid) return "FAMID:"+fid+"|NAME:"+name;
+  if(name && fid && dob) return "FAMID:"+fid+"|NAME:"+name+"|DOB:"+dob;
   if(name && head && dob) return "HEAD:"+head+"|NAME:"+name+"|DOB:"+dob;
   // Never delete on name alone: people can legitimately share a name.
   return null;
@@ -1929,11 +1929,23 @@ async function syncInitialMerge(){
 async function syncPush(){
   let changes=syncLoadPending(); if(!changes.length)changes=syncRebuildPending(); if(!changes.length)return {accepted:0,conflicts:[],total:0};
   let acceptedIds=new Set(),conflicts=[];
-  for(let i=0;i<changes.length;i+=100){const batch=changes.slice(i,i+100);const r=await syncFetch("/sync/push",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),changes:batch})});(r.accepted||[]).forEach(x=>acceptedIds.add(typeof x==="string"?x:(x.opId||x.recordId)));conflicts=conflicts.concat(r.conflicts||[])}
+  for(let i=0;i<changes.length;i+=100){const batch=changes.slice(i,i+100);const r=await syncFetch("/sync/push",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),changes:batch})});(r.accepted||[]).forEach(x=>acceptedIds.add(typeof x==="string"?x:(x.opId||x.recordId)));
+      // Worker treats an already-seen opId as "skipped" (idempotent retry).
+      // That operation is already committed on D1, so it must count as accepted locally.
+      (r.skipped||[]).forEach(x=>{if(x?.reason==="مكرر"&&x?.opId)acceptedIds.add(x.opId)});
+      conflicts=conflicts.concat(r.conflicts||[])}
   // Recompute from the shadow only after confirmed acceptance; never clear pending optimistically.
   const current=syncBuildChanges();
   if(conflicts.length || acceptedIds.size<changes.length){syncSavePending(current);return {accepted:acceptedIds.size,conflicts,total:changes.length}}
   syncSavePending(current); return {accepted:acceptedIds.size,conflicts,total:changes.length}
+}
+async function syncStart(reason="manual"){
+  if(syncBusy)return {ok:false,busy:true};
+  if(!navigator.onLine)throw Error("لا يوجد اتصال بالإنترنت");
+  await syncOnlineReconcile(reason);
+  const pending=syncLoadPending();
+  if(pending.length) throw Error(`باقي ${pending.length} تعديل بانتظار تأكيد الخادم`);
+  return {ok:true,pending:0};
 }
 async function syncOnlineReconcile(reason="auto"){
   if(syncBusy||!navigator.onLine)return;syncBusy=true;
