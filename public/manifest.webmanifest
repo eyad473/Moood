@@ -1,1 +1,10 @@
-{"name":"إدارة وكشف المخيمات - أبو عريبان","short_name":"أبو عريبان","start_url":"./index.html","display":"standalone","dir":"rtl","lang":"ar","theme_color":"#0f766e","background_color":"#f8fafc","icons":[]}
+{
+  "name": "إدارة مخيم أبو عريبان",
+  "short_name": "مخيم أبو عريبان",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "dir": "rtl",
+  "lang": "ar"
+}
