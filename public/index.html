@@ -1816,6 +1816,79 @@ const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 function syncDeviceId(){let id=localStorage.getItem(SYNC_DEVICE_KEY);if(!id){id=(crypto.randomUUID?crypto.randomUUID():"dev-"+Date.now()+"-"+Math.random().toString(16).slice(2));localStorage.setItem(SYNC_DEVICE_KEY,id)}return id}
+
+
+/* V26 SMART DATA DEDUPLICATION
+   Keeps the modern interface unchanged. Removes only records that are strongly
+   identifiable as the same person, while merging non-empty fields so useful
+   offline-added information is not lost. */
+const SMART_DEDUP_VERSION="v26";
+const SMART_DEDUP_LOG_KEY="aboreiban_smart_dedup_v26";
+function smartKeyText(v){return String(v??"").replace(/[\u0640]/g,"").replace(/[\s\u200c\u200d]+/g," ").trim().toLowerCase();}
+function smartKeyDigits(v){return smartKeyText(v).replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[^0-9]/g,"");}
+function smartPersonKey(r){
+  const pid=smartKeyDigits(r?.["رقم هوية الفرد"]);
+  if(pid) return "ID:"+pid;
+  const fid=smartKeyDigits(r?.["رقم هوية الأسرة"]);
+  const name=smartKeyText(r?.["اسم الفرد"]);
+  const head=smartKeyText(r?.["اسم رب الأسرة"]);
+  const dob=smartKeyText(r?.["تاريخ الميلاد"]);
+  // Same full name inside the same family is a strong duplicate signal.
+  if(name && fid) return "FAMID:"+fid+"|NAME:"+name;
+  if(name && head && dob) return "HEAD:"+head+"|NAME:"+name+"|DOB:"+dob;
+  // Never delete on name alone: people can legitimately share a name.
+  return null;
+}
+function smartMergeRows(a,b){
+  // Start from the later row, then fill every empty field from the other copy.
+  const out=structuredClone(b||a||{});
+  for(const k of COLUMNS){
+    if(k==="#") continue;
+    const av=a?.[k], bv=b?.[k];
+    const aFilled=av!==undefined&&av!==null&&String(av).trim()!=="";
+    const bFilled=bv!==undefined&&bv!==null&&String(bv).trim()!=="";
+    if(!bFilled && aFilled) out[k]=av;
+  }
+  if(a?.__syncId && !out.__syncId) out.__syncId=a.__syncId;
+  return out;
+}
+function smartDeduplicateData(reason="auto"){
+  if(!Array.isArray(data)||data.length<2) return {removed:0,groups:0,kept:data?.length||0};
+  const groups=new Map();
+  data.forEach((r,i)=>{const key=smartPersonKey(r);if(!key)return;if(!groups.has(key))groups.set(key,[]);groups.get(key).push({r,i});});
+  const remove=new Set(), merged=new Map();
+  for(const [key,items] of groups){
+    if(items.length<2) continue;
+    // Keep the last occurrence as the base (usually the latest local copy),
+    // then merge non-empty fields from every earlier copy into it.
+    let base=items[items.length-1].r;
+    for(let j=items.length-2;j>=0;j--) base=smartMergeRows(items[j].r,base);
+    const keepIndex=items[items.length-1].i;
+    merged.set(keepIndex,base);
+    items.slice(0,-1).forEach(x=>remove.add(x.i));
+  }
+  if(!remove.size) return {removed:0,groups:0,kept:data.length};
+  const before=data.length;
+  const next=[];
+  data.forEach((r,i)=>{if(merged.has(i)) next.push(merged.get(i)); else if(!remove.has(i)) next.push(r);});
+  data=next;
+  renumber();
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+  const log={version:SMART_DEDUP_VERSION,at:new Date().toISOString(),reason,before,after:data.length,removed:before-data.length,groups:[...groups.values()].filter(x=>x.length>1).length};
+  localStorage.setItem(SMART_DEDUP_LOG_KEY,JSON.stringify(log));
+  return {removed:before-data.length,groups:log.groups,kept:data.length};
+}
+function runSmartDedup(reason="auto"){
+  try{
+    const result=smartDeduplicateData(reason);
+    if(result.removed){
+      rebuildFilters();renderAll();
+      toast(`تم دمج ${result.removed} سجل مكرر — البيانات الأصلية محفوظة`);
+    }
+    return result;
+  }catch(e){console.warn("Smart dedup failed",e);return {removed:0,groups:0,kept:data.length,error:true};}
+}
+
 function syncRecordId(r,fallbackIndex){if(!r.__syncId){const base=[r["رقم هوية الأسرة"]||"",r["رقم هوية الفرد"]||"",r["اسم الفرد"]||"",fallbackIndex].join("|");let h=2166136261;for(let i=0;i<base.length;i++){h^=base.charCodeAt(i);h=Math.imul(h,16777619)}r.__syncId="r-"+(h>>>0).toString(16)+"-"+fallbackIndex}return r.__syncId}
 function syncNormalizeRows(rows){return (Array.isArray(rows)?rows:[]).map((r,i)=>{if(r&&typeof r==="object")syncRecordId(r,i);return r}).filter(Boolean)}
 function syncComparable(r){const x={};for(const k of COLUMNS)if(k!=="#")x[k]=r?.[k]??"";return JSON.stringify(x)}
@@ -1847,7 +1920,7 @@ async function syncInitialMerge(){
   // Local/current backup always wins for an existing record during the one-time migration.
   const merged=new Map(remoteMap);
   for(const [id,r] of localMap)merged.set(id,structuredClone(r));
-  data=Array.from(merged.values());renumber();syncLocalSave(true);
+  data=Array.from(merged.values());renumber();runSmartDedup("initial-merge");syncLocalSave(true);
   // Shadow is the cloud baseline, so every local-only/local-modified record remains pending.
   syncSaveShadow(Array.from(remoteMap.values()));
   const pending=syncRebuildPending();
@@ -1876,8 +1949,10 @@ async function syncOnlineReconcile(reason="auto"){
       const beforePending=syncRebuildPending();
       const protectedIds=new Set(beforePending.map(c=>c.recordId));
       const remoteChanges=await syncPullApply();
-      if(syncApplyChanges(remoteChanges,{protectIds:protectedIds})){renumber();syncLocalSave(true);rebuildFilters();renderAll()}
+      if(syncApplyChanges(remoteChanges,{protectIds:protectedIds})){renumber();syncLocalSave(true);rebuildFilters();renderAll();}
+      runSmartDedup("after-pull");
       // Local edits/deletes are authoritative until successfully accepted by the server.
+      runSmartDedup("pre-push");
       syncRebuildPending();
       const pushed=await syncPush();
       if(pushed.accepted===pushed.total && pushed.total>0){
@@ -1903,6 +1978,7 @@ function installCloudSync(){
 }
 
 load();
+runSmartDedup("startup");
 initReportColumns();
 renderPersonPicker();
 initV5();
