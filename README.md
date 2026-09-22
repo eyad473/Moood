@@ -1,22 +1,29 @@
-# تطبيق إدارة وكشف المخيمات – أبو عريبان V15
+# moood — Cloud Sync Worker
 
-نسخة محسّنة من تطبيق إدارة وكشف العائلات والأفراد، مخصصة للعمل من خلال GitHub Pages / Cloudflare Pages.
+Cloudflare Worker API for synchronizing the Abu Oreiban camp application across devices using Cloudflare D1.
 
-## ما تم تحسينه
-- واجهة عربية RTL حديثة وحيوية.
-- لوحة قيادة تفاعلية وبطاقات إحصائية قابلة للضغط.
-- بحث العائلات وبطاقة عائلة مرتبة مع عرض أفراد الأسرة.
-- حالات اكتمال البيانات: مكتملة / جزئية / ناقصة.
-- فحص جودة ذكي للبيانات مع فتح السجل المرتبط بالمشكلة.
-- تحسين تجربة الهاتف والشاشات الصغيرة.
-- تحسين الكشوف المصنفة مع المعاينة قبل التصدير.
-- تنسيق Excel حسب نوع العمود وعرضه المناسب.
-- رسائل نجاح/تنبيه واضحة عند الحفظ والتعديل والحذف والبحث.
-- مركز حماية وبيانات يعرض حالة البيانات والنسخ الاحتياطية.
-- الحفاظ على العمل المحلي والبيانات المدمجة والوظائف السابقة.
+## Files
+- `wrangler.toml` — Worker `moood` + D1 binding `DB` → database `mood`.
+- `index.js` — API endpoints for health, pull, push, and first-time bootstrap.
+- `schema.sql` — D1 schema.
 
-## النشر على GitHub / Cloudflare Pages
-ضع الملفات الموجودة في جذر المستودع، وتأكد أن `index.html` موجود في الجذر.
+## Endpoints
+- `GET /` or `GET /health` — health check.
+- `GET /sync/pull?since=0` — fetch changes after a sequence cursor.
+- `POST /sync/push` — upload local changes.
+- `POST /sync/bootstrap` — first-time seed only when the database is empty.
 
-## ملاحظة
-نظام المزامنة السحابي ليس جزءًا من هذه الجولة من التعديلات؛ تم إبقاء نظام المزامنة المحلي/السابق كما هو. لا يتم حذف أو استبدال بيانات التطبيق الموجودة بسبب هذه التعديلات.
+## First deployment
+1. Commit these files to the GitHub repository used by the Worker.
+2. Deploy the Worker from Cloudflare/GitHub.
+3. Open the Worker URL. It should return JSON showing `worker: moood`, `database: mood`, and a record count.
+4. The Worker creates the tables automatically on first request. `schema.sql` is also supplied for explicit D1 migrations.
+
+## Security
+For production use, configure a Worker secret named `SYNC_API_KEY` and have the app send it as:
+`Authorization: Bearer <key>`.
+
+Do not hard-code a permanent API key inside the public HTML. A browser-embedded key is not a true secret.
+
+## Important
+This package provides the cloud API/database layer. The HTML application still needs its local save/load layer connected to these endpoints so that add/edit/delete/import/restore operations enter the sync queue and other devices pull them.
