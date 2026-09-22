@@ -1,4 +1,4 @@
-const CACHE = "abu-oreiban-v20-offline-1";
+const CACHE = "abu-oreiban-v21-offline-1";
 const APP_SHELL = [
   "./",
   "./index.html",

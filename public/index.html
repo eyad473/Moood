@@ -192,11 +192,11 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
 .mobile-bottom-nav{display:none}
 @media(max-width:700px){
   body{padding-bottom:78px!important}
-  .mobile-bottom-nav{position:fixed;z-index:9999;left:0;right:0;bottom:0;display:flex;align-items:stretch;gap:2px;overflow-x:auto;overflow-y:hidden;padding:7px 5px calc(7px + env(safe-area-inset-bottom));background:rgba(255,255,255,.97);border-top:1px solid #dfe3e8;box-shadow:0 -5px 20px rgba(0,0,0,.08);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);scrollbar-width:none}
+  .mobile-bottom-nav{position:fixed;z-index:9999;left:0;right:0;bottom:0;display:flex;align-items:stretch;gap:2px;overflow-x:hidden;overflow-y:hidden;padding:7px 3px calc(7px + env(safe-area-inset-bottom));background:rgba(255,255,255,.97);border-top:1px solid #dfe3e8;box-shadow:0 -5px 20px rgba(0,0,0,.08);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);scrollbar-width:none}
   .mobile-bottom-nav::-webkit-scrollbar{display:none}
-  .mobile-bottom-nav button{flex:0 0 76px;min-width:76px;min-height:58px;border:0;background:transparent;border-radius:12px;color:#64748b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
-  .mobile-bottom-nav button span{font-size:20px;line-height:1}
-  .mobile-bottom-nav button small{font-size:10px;white-space:nowrap}
+  .mobile-bottom-nav button{flex:1 1 0;min-width:0;min-height:58px;border:0;background:transparent;border-radius:12px;color:#64748b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .mobile-bottom-nav button span{font-size:18px;line-height:1}
+  .mobile-bottom-nav button small{font-size:9px;white-space:nowrap}
   .mobile-bottom-nav button.active{background:#eef6ff;color:#1261a0;font-weight:700}
   .mobile-bottom-nav button:active{transform:scale(.97)}
   .top .actions{flex-wrap:wrap}
@@ -281,7 +281,8 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
    <div class="lottie-box"><div id="lottieReports" class="lottie-art"></div><div class="lottie-copy"><h3>الكشوفات المصنفة</h3><p>تصنيف وإخراج الكشوفات بشكل واضح ومنظم.</p></div></div>
    <div class="lottie-box"><div id="lottieProtection" class="lottie-art"></div><div class="lottie-copy"><h3>الحماية والبيانات</h3><p>رمز بصري للحماية وتنظيم الوصول إلى بيانات المخيم.</p></div></div>
   </div>
-  <div id="qualityBanner" class="quality-banner ok">
+  <div id="cloudSyncNotice" class="cloud-sync-notice no-print" role="status">☁️ حالة المزامنة: جاري الفحص...</div>
+   <div id="qualityBanner" class="quality-banner ok">
    <span id="qualityBannerText">جاري فحص جودة البيانات...</span>
    <button class="btn no-print" onclick="openQualityModal()">فحص التفاصيل</button>
   </div>
@@ -631,14 +632,39 @@ const LOCAL_LOTTIES={
   protection:"./assets/lottie/protection.json",
   empty:"./assets/lottie/empty-data.json"
 };
-async function initLottieFile(id,path){try{const el=document.getElementById(id);if(!el||!window.lottie)return;const res=await fetch(path,{cache:"force-cache"});if(!res.ok)throw Error("Lottie "+res.status);const animationData=await res.json();lottie.loadAnimation({container:el,renderer:"svg",loop:true,autoplay:true,animationData});}catch(e){console.warn("Lottie local:",path,e)}}
+function lottieFallback(id,kind){
+  const el=document.getElementById(id); if(!el)return;
+  const configs={
+    abuOreiban:{icon:'M90 25 L150 60 L150 145 L30 145 L30 60 Z M50 145 L50 90 L130 90 L130 145',accent:'M68 120 L112 120 M90 98 L90 142'},
+    dashboard:{icon:'M30 145 L30 65 L70 65 L70 100 L110 100 L110 45 L150 45 L150 145 Z',accent:'M40 125 L60 105 L80 118 L105 80 L130 95 L145 72'},
+    families:{icon:'M55 70 A22 22 0 1 1 55 69 M125 70 A22 22 0 1 1 125 69 M90 58 A25 25 0 1 1 90 57 M30 145 C30 112 52 100 75 100 M150 145 C150 112 128 100 105 100 M55 145 C55 105 125 105 125 145',accent:'M90 110 L90 145'},
+    records:{icon:'M42 25 H138 V155 H42 Z M58 52 H122 M58 78 H122 M58 104 H122 M58 130 H105',accent:'M58 52 H90'},
+    reports:{icon:'M38 30 H142 V150 H38 Z M58 60 H122 M58 88 H122 M58 116 H105',accent:'M55 142 H125'},
+    sync:{icon:'M45 70 A48 48 0 0 1 130 55 M130 55 L130 25 M130 25 L102 38 M135 110 A48 48 0 0 1 50 125 M50 125 L50 155 M50 155 L78 142',accent:'M68 82 H112 M68 100 H112'},
+    protection:{icon:'M90 20 L145 42 V88 C145 120 122 143 90 158 C58 143 35 120 35 88 V42 Z',accent:'M62 88 L82 108 L120 66'},
+    empty:{icon:'M45 45 H135 V135 H45 Z',accent:'M65 75 L115 75 M65 100 L115 100 M78 125 L102 125'}
+  };
+  const c=configs[kind]||configs.dashboard;
+  el.innerHTML=`<svg viewBox="0 0 180 180" role="img" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"><path d="${c.icon}"/><path d="${c.accent}"/></g><circle cx="90" cy="90" r="78" fill="none" stroke="currentColor" stroke-width="2" opacity=".12"/></svg>`;
+  el.classList.add('local-motion-fallback');
+}
+async function initLottieFile(id,path,kind){
+  const el=document.getElementById(id); if(!el)return;
+  lottieFallback(id,kind);
+  try{
+    if(!window.lottie)return;
+    const res=await fetch(path,{cache:'force-cache'}); if(!res.ok)throw Error('Lottie '+res.status);
+    const animationData=await res.json();
+    lottie.loadAnimation({container:el,renderer:'svg',loop:true,autoplay:true,animationData});
+  }catch(e){console.warn('Local animation fallback:',path,e)}
+}
 function initProgramLotties(){
   const jobs=[
-    ["lottieProgram",LOCAL_LOTTIES.abuOreiban],["lottieDashboard",LOCAL_LOTTIES.dashboard],["lottieFamilies",LOCAL_LOTTIES.families],
-    ["lottieRecords",LOCAL_LOTTIES.records],["lottieReports",LOCAL_LOTTIES.reports],["lottieCloud",LOCAL_LOTTIES.sync],
-    ["lottieProtection",LOCAL_LOTTIES.protection],["lottieEmpty",LOCAL_LOTTIES.empty]
+    ['lottieProgram',LOCAL_LOTTIES.abuOreiban,'abuOreiban'],['lottieDashboard',LOCAL_LOTTIES.dashboard,'dashboard'],['lottieFamilies',LOCAL_LOTTIES.families,'families'],
+    ['lottieRecords',LOCAL_LOTTIES.records,'records'],['lottieReports',LOCAL_LOTTIES.reports,'reports'],['lottieCloud',LOCAL_LOTTIES.sync,'sync'],
+    ['lottieProtection',LOCAL_LOTTIES.protection,'protection'],['lottieEmpty',LOCAL_LOTTIES.empty,'empty']
   ];
-  jobs.forEach(([id,path])=>initLottieFile(id,path));
+  jobs.forEach(([id,path,kind])=>initLottieFile(id,path,kind));
 }
 </script>
 <script>
@@ -1969,7 +1995,7 @@ async function syncStart(reason="auto"){
     const h=await syncFetch("/health",{method:"GET"});
     if(!syncInitialized){
       syncLoadShadow();syncLoadPending();
-      const cloudBootKey="aboreiban_cloud_authoritative_v20";
+      const cloudBootKey="aboreiban_cloud_authoritative_v21";
       const cloudBootDone=localStorage.getItem(cloudBootKey)==="1";
       if(Number(h.records||0)===0){
         const n=await syncBootstrap();
@@ -1984,7 +2010,7 @@ async function syncStart(reason="auto"){
         const hasShadow=syncShadow.length>0;
         const firstCloudAuthoritativeBoot=!cloudBootDone;
         if(firstCloudAuthoritativeBoot){
-          try{localStorage.setItem("aboreiban_precloud_v20_backup",JSON.stringify({createdAt:new Date().toISOString(),data:structuredClone(data)}))}catch(e){}
+          try{localStorage.setItem("aboreiban_precloud_v21_backup",JSON.stringify({createdAt:new Date().toISOString(),data:structuredClone(data)}))}catch(e){}
           data=[];
           localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
           syncShadow=[];localStorage.removeItem(SYNC_SHADOW_KEY);
@@ -2018,7 +2044,7 @@ async function syncStart(reason="auto"){
         }
         syncSaveShadow(data);
         syncPending=[];syncSavePending();
-        localStorage.setItem("aboreiban_cloud_authoritative_v20","1");
+        localStorage.setItem("aboreiban_cloud_authoritative_v21","1");
         syncInitialized=true;
         toast(`تمت مزامنة البيانات مع السحابة — ${data.length} سجل / ${familyMap().size} عائلة`);
       }
@@ -2028,7 +2054,7 @@ async function syncStart(reason="auto"){
       await syncPull();
       syncLoadShadow();
       syncQueueReconcile();
-      if(pushed.accepted||before!==JSON.stringify(syncPending)) toast("تمت مزامنة التعديلات مع جميع الأجهزة");
+      if(reason!=="timer" && navigator.onLine) toast(pushed.accepted||before!==JSON.stringify(syncPending)?"تمت مزامنة التعديلات مع السحابة ✓":"تم فحص السحابة والمزامنة محدثة ✓");
     }
   }catch(e){
     console.warn("Cloud sync:",e);
@@ -2456,11 +2482,11 @@ function exportStyledExcel(rows,filename="كشف_أبو_عريبان",sheetName=
     try{
       const h=await syncFetch("/health",{method:"GET"});
       set("syncStatusValue","متصل ✓");set("syncStatusSub",new Date(h.time||Date.now()).toLocaleString('ar-EG'));set("syncCloudRecords",Number(h.records||0).toLocaleString('ar-EG'));set("syncCloudFamilies",familyMap().size.toLocaleString('ar-EG'));set("syncLatestSeq",Number(h.latestSeq||0).toLocaleString('ar-EG'));
-      const changes=syncBuildChanges().length;set("syncPending",String(changes));set("syncLastText",`آخر فحص: ${new Date().toLocaleTimeString('ar-EG')}`);set("dashCloudStatus","متصل ✓");set("dashCloudMeta",`${Number(h.records||0).toLocaleString('ar-EG')} سجل على السحابة`);
+      const changes=syncBuildChanges().length;set("syncPending",String(changes));set("syncLastText",`آخر فحص: ${new Date().toLocaleTimeString('ar-EG')}`);set("dashCloudStatus","متصل ✓");set("dashCloudMeta",`${Number(h.records||0).toLocaleString('ar-EG')} سجل على السحابة`);const sn=document.getElementById("cloudSyncNotice");if(sn)sn.textContent=`☁️ تمت مزامنة السحابة ✓ — ${Number(h.records||0).toLocaleString('ar-EG')} سجل`;
       if(showToast)toast("السحابة متصلة والبيانات متاحة");return h;
-    }catch(e){set("syncStatusValue","غير متصل");set("syncStatusSub","سيتم الاحتفاظ بالبيانات محلياً");set("syncCloudRecords","—");set("syncCloudFamilies",familyMap().size.toLocaleString('ar-EG'));set("syncLatestSeq","—");set("syncPending",String(syncBuildChanges().length));set("dashCloudStatus","غير متصل");set("dashCloudMeta","البيانات المحلية محفوظة");if(showToast)toast("تعذر الاتصال بالسحابة حالياً");return null;}
+    }catch(e){set("syncStatusValue","غير متصل");set("syncStatusSub","سيتم الاحتفاظ بالبيانات محلياً");set("syncCloudRecords","—");set("syncCloudFamilies",familyMap().size.toLocaleString('ar-EG'));set("syncLatestSeq","—");set("syncPending",String(syncBuildChanges().length));set("dashCloudStatus","غير متصل");set("dashCloudMeta","البيانات المحلية محفوظة");const sn=document.getElementById("cloudSyncNotice");if(sn)sn.textContent="☁️ لا يوجد اتصال — البيانات محفوظة محلياً";if(showToast)toast("تعذر الاتصال بالسحابة حالياً");return null;}
   };
-  window.syncCenterNow=async function(){try{await syncStart("manual");await refreshSyncCenter(false);toast("تمت المزامنة وفحص السحابة");}catch(e){await refreshSyncCenter(false);toast("تعذر إتمام المزامنة");}};
+  window.syncCenterNow=async function(){try{await syncStart("manual");await refreshSyncCenter(false);toast("تمت المزامنة مع السحابة ✓");}catch(e){await refreshSyncCenter(false);toast("تعذر إتمام المزامنة");}};
 
   // Extend view behavior for sync center.
   const baseShowView=window.showView;
@@ -2471,8 +2497,8 @@ function exportStyledExcel(rows,filename="كشف_أبو_عريبان",sheetName=
     .dashboard-live-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}
     .live-card{display:flex;align-items:center;gap:11px;padding:14px;border:1px solid var(--border,#e5e7eb);border-radius:15px;background:var(--card,#fff);box-shadow:0 3px 12px rgba(0,0,0,.04)}
     .live-card>div:nth-child(2){flex:1;min-width:0}.live-card span{display:block;font-size:12px;color:var(--muted,#6b7280)}.live-card b{display:block;font-size:20px;margin:2px 0}.live-card small{display:block;color:var(--muted,#6b7280);font-size:11px}.live-icon{font-size:27px}.live-card .btn{white-space:nowrap}
-    .sync-panel{margin-top:14px;padding:15px;border:1px solid var(--border,#e5e7eb);border-radius:15px;background:var(--bg,#f8fafc);display:flex;justify-content:space-between;gap:15px;align-items:center}.sync-panel .actions{display:flex;flex-wrap:wrap;gap:8px}
-    #p_age{background:#f3f4f6;font-weight:700}.lottie-art svg{width:100%;height:100%;overflow:visible}.lottie-box:first-child .lottie-art{width:120px;height:120px;flex-basis:120px}.modal .field small{margin-top:4px;display:block}
+    .cloud-sync-notice{margin:12px 0;padding:10px 14px;border:1px solid #cfe0f5;border-radius:12px;background:#f3f8ff;color:#24527a;font-size:13px;font-weight:700;text-align:center}.sync-panel{margin-top:14px;padding:15px;border:1px solid var(--border,#e5e7eb);border-radius:15px;background:var(--bg,#f8fafc);display:flex;justify-content:space-between;gap:15px;align-items:center}.sync-panel .actions{display:flex;flex-wrap:wrap;gap:8px}
+    #p_age{background:#f3f4f6;font-weight:700}.lottie-art svg{width:100%;height:100%;overflow:visible}.local-motion-fallback{display:grid;place-items:center;color:#2563eb}.local-motion-fallback svg{animation:abuOreibanFloat 2.8s ease-in-out infinite}.local-motion-fallback g{animation:abuOreibanPulse 2.2s ease-in-out infinite;transform-origin:90px 90px}@keyframes abuOreibanFloat{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-5px) scale(1.03)}}@keyframes abuOreibanPulse{0%,100%{opacity:.72}50%{opacity:1}}.lottie-box:first-child .lottie-art{width:120px;height:120px;flex-basis:120px}.modal .field small{margin-top:4px;display:block}
     @media(max-width:900px){.dashboard-live-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sync-cards{grid-template-columns:repeat(2,minmax(0,1fr))!important}.sync-panel{flex-direction:column;align-items:stretch}}
     @media(max-width:600px){.dashboard-live-grid{grid-template-columns:1fr}.live-card{padding:12px}.sync-cards{grid-template-columns:1fr!important}.sync-panel .actions{display:grid;grid-template-columns:1fr}.sync-panel .btn{width:100%}}
   `;document.head.appendChild(style);
