@@ -182,6 +182,7 @@ async function push(request, env) {
     const recordId = cleanString(item.recordId, 200);
     const operation = item.operation === "delete" ? "delete" : "upsert";
     const updatedAt = Number(item.updatedAt);
+    const baseVersion = Number(item.baseVersion || 0);
     const data = operation === "delete" ? null : (item.data ?? {});
 
     if (!opId) {
@@ -225,13 +226,19 @@ async function push(request, env) {
       FROM sync_records WHERE record_id = ?
     `).bind(recordId).first();
 
-    if (current && updatedAt < Number(current.updated_at)) {
+    if (current && baseVersion !== Number(current.version)) {
+      let serverData = null;
+      if (Number(current.deleted) === 0) {
+        const sr = await env.DB.prepare(`SELECT data_json FROM sync_records WHERE record_id = ?`).bind(recordId).first();
+        try { serverData = sr?.data_json ? JSON.parse(sr.data_json) : null; } catch { serverData = null; }
+      }
       conflicts.push({
         opId,
         recordId,
-        reason: "نسخة أقدم من النسخة الموجودة على الخادم",
+        reason: "تعارض إصدار — توجد تعديلات أحدث على الخادم",
         serverUpdatedAt: Number(current.updated_at),
-        serverVersion: Number(current.version)
+        serverVersion: Number(current.version),
+        serverData
       });
       continue;
     }
