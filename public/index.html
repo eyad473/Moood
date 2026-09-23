@@ -329,7 +329,8 @@ html,body{width:100%;max-width:100%;overflow-x:hidden!important}
 .report-group-card input{width:19px;height:19px;accent-color:var(--primary);flex:0 0 auto}
 .report-group-card strong{display:block;font-size:13px}.report-group-card small{display:block;color:var(--muted);font-size:10px;margin-top:3px}
 .report-fields-section{margin-top:12px;padding:13px;border:1px solid var(--line);border-radius:15px;background:var(--bg)}
-.report-fields-title{font-weight:900;font-size:13px;margin-bottom:9px;color:var(--text)}
+.report-fields-title{display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:900;font-size:13px;margin-bottom:9px;color:var(--text)}
+.report-group-tools{display:flex;gap:5px;flex-wrap:wrap}.report-group-tools .btn-sm{padding:5px 8px!important;font-size:10px!important}
 .report-fields-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:7px}
 .report-field-item{display:flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);cursor:pointer;min-width:0;transition:.2s ease}
 .report-field-item:hover{border-color:#93c5fd;background:var(--bg)}.report-field-item input{width:17px;height:17px;accent-color:var(--primary);flex:0 0 auto}.report-field-item span{font-size:11px;font-weight:700;line-height:1.5}
@@ -347,6 +348,21 @@ html,body{width:100%;max-width:100%;overflow-x:hidden!important}
 .report-columns-organized .report-fields-section.family{grid-column:span 12}
 .report-fields-section h4{margin:0 0 9px;font-size:13px}.report-fields-section .report-fields-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
 @media(max-width:800px){.report-columns-organized .report-fields-section.head,.report-columns-organized .report-fields-section.wife{grid-column:span 12}.report-fields-section .report-fields-grid{grid-template-columns:1fr}.report-fields-section-head{align-items:flex-start;flex-direction:column}.report-section-shortcuts{width:100%}.report-section-shortcuts .btn{flex:1}}
+html[data-theme="dark"]{--bg:#0b1120;--card:#111827;--text:#e5e7eb;--muted:#94a3b8;--line:#293548;--shadow:0 10px 30px rgba(0,0,0,.28)}
+html[data-theme="dark"] body{background:var(--bg)!important;color:var(--text)!important}
+html[data-theme="dark"] .top{background:rgba(11,17,32,.96)!important;border-color:#293548!important}
+html[data-theme="dark"] .card,html[data-theme="dark"] .stat,html[data-theme="dark"] .chart-card,html[data-theme="dark"] .report-field-item,html[data-theme="dark"] .report-columns-organized .report-fields-section{background:var(--card)!important;border-color:var(--line)!important;color:var(--text)!important}
+html[data-theme="dark"] .report-fields-guide,html[data-theme="dark"] .report-fields-section{background:#0d1525!important;border-color:var(--line)!important}
+html[data-theme="dark"] .field input,html[data-theme="dark"] .field select,html[data-theme="dark"] .field textarea{background:#0f172a!important;color:var(--text)!important;border-color:#334155!important}
+html[data-theme="dark"] .report-field-item:hover{background:#172033!important}
+html[data-theme="dark"] .report-fields-title,html[data-theme="dark"] .report-fields-section-head strong{color:var(--text)!important}
+html[data-theme="dark"] .report-fields-section-head small,html[data-theme="dark"] .report-fields-section .muted{color:var(--muted)!important}
+html[data-theme="dark"] .btn{background:#111827;color:var(--text);border-color:#334155}
+html[data-theme="dark"] .btn:hover{background:#182235}
+html[data-theme="dark"] .btn.primary{background:#2563eb;color:#fff;border-color:#2563eb}
+html[data-theme="dark"] .table th{background:#172033;color:#cbd5e1}
+html[data-theme="dark"] .table tr:hover td{background:#172033}
+html[data-theme="dark"] .modalbox,html[data-theme="dark"] .modalhead,html[data-theme="dark"] .modalfoot{background:#111827;color:var(--text);border-color:var(--line)}
 html[data-theme="dark"] .report-fields-guide{background:#0d1525;border-color:#293548}
 .theme-toggle{display:flex;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.08);color:#fff;padding:10px 12px;border-radius:13px;font-weight:800;cursor:pointer;transition:all .3s ease;backdrop-filter:blur(10px)}
 .theme-toggle:hover{background:rgba(255,255,255,.14);transform:translateY(-1px)}.theme-toggle-icon{font-size:17px;line-height:1}.theme-toggle-text{font-size:11px;white-space:nowrap}
@@ -613,12 +629,7 @@ html[data-theme="dark"] body{background:#0b1120;color:#e5e7eb}html[data-theme="d
     </div>
     <div class="report-fields-guide no-print">
       <div class="report-fields-section-head">
-        <div><strong>اختيار الحقول</strong><small>كل حقل مستقل ويمكنك تحديد ما تريد طباعته فقط</small></div>
-        <div class="report-section-shortcuts">
-          <button class="btn btn-sm" type="button" onclick="toggleReportGroup('head',true)">تحديد بيانات رب الأسرة</button>
-          <button class="btn btn-sm" type="button" onclick="toggleReportGroup('wife',true)">تحديد بيانات الزوجة</button>
-          <button class="btn btn-sm" type="button" onclick="toggleReportGroup('count',true)">إضافة عدد الأفراد</button>
-        </div>
+        <div><strong>اختيار الحقول للطباعة</strong><small>كل حقل مستقل. اختر فقط المعلومات التي تريد ظهورها في الكشف.</small></div>
       </div>
     </div>
     <div id="reportColumns" class="report-columns-organized"></div>
@@ -1185,6 +1196,7 @@ let classifiedRows = [];
 let classifiedTitle = "كشف مصنف";
 let selectedPeople = new Set();
 let selectedReportColumns = [];
+let reportColumnsInitialized = false;
 
 const REPORT_COLUMNS = [
  ["اسم الفرد","اسم الفرد"],["اسم رب الأسرة","اسم رب الأسرة"],["رقم هوية الأسرة","رقم هوية الأسرة"],
@@ -1232,25 +1244,27 @@ function normalizeGender(g){return ["انثى","أنثى"].includes(g)?"أنثى
 function familyHeadRecord(r){ return (familyMap().get(r["اسم رب الأسرة"])||[])[0] || r; }
 
 function initReportColumns(){
-  if(!selectedReportColumns.length) selectedReportColumns = REPORT_COLUMNS.map(x=>x[0]);
+  if(!reportColumnsInitialized){ selectedReportColumns = REPORT_COLUMNS.map(x=>x[0]); reportColumnsInitialized = true; }
   const box=document.getElementById("reportColumns"); if(!box)return;
   const groups=[
     {title:"الحقول الأساسية", cls:"report-fields-section basic", keys:REPORT_COLUMNS.filter(([k])=>!k.startsWith("رب الأسرة — ")&&!k.startsWith("الزوجة — ")&&k!=="عدد أفراد الأسرة")},
     {title:"بيانات رب الأسرة", cls:"report-fields-section head", keys:["اسم رب الأسرة","رب الأسرة — رقم الهوية","رب الأسرة — رقم الجوال","رب الأسرة — رقم الجوال البديل","رب الأسرة — العنوان","رب الأسرة — داخل/خارج المخيم","رب الأسرة — المحافظة الأصلية","رب الأسرة — حالة المسكن الأصلي","رب الأسرة — نوع السكن الحالي","رب الأسرة — تاريخ الميلاد","رب الأسرة — العمر","رب الأسرة — الجنس","رب الأسرة — الحالة الاجتماعية","رب الأسرة — مرض مزمن","رب الأسرة — نوع المرض","رب الأسرة — إصابة","رب الأسرة — سبب الإصابة","رب الأسرة — تفاصيل الإصابة","رب الأسرة — إعاقة","رب الأسرة — نوع الإعاقة","رب الأسرة — يتيم/منفصل","رب الأسرة — حامل","رب الأسرة — مرضعة","رب الأسرة — ملاحظات"]},
     {title:"بيانات الزوجة", cls:"report-fields-section wife", keys:["الزوجة — الاسم","الزوجة — رقم الهوية","الزوجة — تاريخ الميلاد","الزوجة — العمر","الزوجة — الجنس","الزوجة — الحالة الاجتماعية","الزوجة — مرض مزمن","الزوجة — نوع المرض","الزوجة — إصابة","الزوجة — سبب الإصابة","الزوجة — تفاصيل الإصابة","الزوجة — إعاقة","الزوجة — نوع الإعاقة","الزوجة — يتيم/منفصل","الزوجة — حامل","الزوجة — مرضعة","الزوجة — ملاحظات"]},
     {title:"بيانات الأسرة", cls:"report-fields-section family", keys:["عدد أفراد الأسرة"]}  ];
-  box.innerHTML=groups.filter(g=>g.keys.length).map(g=>`<div class="${g.cls}"><div class="report-fields-title">${esc(g.title)}</div><div class="report-fields-grid">${g.keys.map(([key,label])=>`<label class="report-field-item"><input type="checkbox" class="report-col" value="${esc(key)}" ${selectedReportColumns.includes(key)?"checked":""} onchange="syncReportColumns();syncReportGroupOptions()"><span>${esc(label)}</span></label>`).join("")}</div></div>`).join("");
+  box.innerHTML=groups.filter(g=>g.keys.length).map((g,gi)=>{const groupKey=gi===0?'basic':gi===1?'head':gi===2?'wife':'count';return `<div class="${g.cls}"><div class="report-fields-title"><span>${esc(g.title)}</span><div class="report-group-tools"><button type="button" class="btn btn-sm" onclick="toggleReportGroup('${groupKey}',true)">تحديد الكل</button><button type="button" class="btn btn-sm" onclick="toggleReportGroup('${groupKey}',false)">إلغاء الكل</button></div></div><div class="report-fields-grid">${g.keys.map(key=>{const meta=REPORT_COLUMNS.find(x=>x[0]===key)||[key,key];const label=meta[1];return `<label class="report-field-item"><input type="checkbox" class="report-col" value="${esc(key)}" ${selectedReportColumns.includes(key)?"checked":""} onchange="syncReportColumns();syncReportGroupOptions()"><span>${esc(label)}</span></label>`}).join("")}</div></div>`}).join("");
   syncReportGroupOptions();
 }
 function syncReportColumns(){
   selectedReportColumns=[...document.querySelectorAll(".report-col:checked")].map(x=>x.value);
 }
 const REPORT_GROUPS={
+ basic:REPORT_COLUMNS.map(x=>x[0]).filter(k=>!k.startsWith("رب الأسرة — ")&&!k.startsWith("الزوجة — ")&&k!=="عدد أفراد الأسرة"),
  head:REPORT_COLUMNS.map(x=>x[0]).filter(k=>k.startsWith("رب الأسرة — ")).concat(["اسم رب الأسرة"]),
  wife:REPORT_COLUMNS.map(x=>x[0]).filter(k=>k.startsWith("الزوجة — ")),
  count:["عدد أفراد الأسرة"]
 };
 function toggleReportGroup(group,checked){
+  reportColumnsInitialized=true;
   syncReportColumns();
   const keys=REPORT_GROUPS[group]||[];
   if(checked){
@@ -1266,13 +1280,15 @@ function syncReportGroupOptions(){
   checks.forEach(([id,g])=>{const el=document.getElementById(id); if(!el)return; const keys=REPORT_GROUPS[g]||[]; el.checked=keys.length>0 && keys.every(k=>selectedReportColumns.includes(k));});
 }
 function selectAllReportColumns(){
+  reportColumnsInitialized=true;
   selectedReportColumns=REPORT_COLUMNS.map(x=>x[0]); initReportColumns();
 }
 function selectBasicReportColumns(){
+  reportColumnsInitialized=true;
   selectedReportColumns=["اسم الفرد","اسم رب الأسرة","رقم هوية الأسرة","رقم الجوال","صلة القرابة","الجنس","الحالة الاجتماعية","تاريخ الميلاد","العمر التقريبي"];
   initReportColumns();
 }
-function clearReportColumns(){ selectedReportColumns=[]; initReportColumns(); }
+function clearReportColumns(){ reportColumnsInitialized=true; selectedReportColumns=[]; initReportColumns(); }
 function selectFamilyHeadColumns(){
   selectedReportColumns=["اسم رب الأسرة","رب الأسرة — رقم الهوية","رب الأسرة — رقم الجوال","رب الأسرة — رقم الجوال البديل","رب الأسرة — العنوان","رب الأسرة — داخل/خارج المخيم","رب الأسرة — المحافظة الأصلية","رب الأسرة — حالة المسكن الأصلي","رب الأسرة — نوع السكن الحالي","رب الأسرة — الحالة الاجتماعية","رب الأسرة — تاريخ الميلاد","رب الأسرة — العمر","رب الأسرة — الجنس","رب الأسرة — مرض مزمن","رب الأسرة — نوع المرض","رب الأسرة — إصابة","رب الأسرة — سبب الإصابة","رب الأسرة — تفاصيل الإصابة","رب الأسرة — إعاقة","رب الأسرة — نوع الإعاقة","رب الأسرة — يتيم/منفصل","رب الأسرة — حامل","رب الأسرة — مرضعة","رب الأسرة — ملاحظات","عدد أفراد الأسرة"];
   initReportColumns();
@@ -3006,9 +3022,10 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load',()=>{const input=document.getElementById('distName');if(input){input.addEventListener('input',renderSmart);input.addEventListener('focus',renderSmart)}});
 
   function applyTheme(theme){
-    const root=document.documentElement;
-    root.setAttribute('data-theme',theme);
-    localStorage.setItem('abu_oreiban_theme',theme);
+    theme=theme==='dark'?'dark':'light';
+    document.documentElement.setAttribute('data-theme',theme);
+    document.body.classList.toggle('theme-dark',theme==='dark');
+    try{localStorage.setItem('abu_oreiban_theme',theme)}catch(e){}
     const icon=document.getElementById('themeToggleIcon');
     const text=document.getElementById('themeToggleText');
     if(icon)icon.textContent=theme==='dark'?'☀':'☾';
@@ -3018,7 +3035,10 @@ if ('serviceWorker' in navigator) {
     const current=document.documentElement.getAttribute('data-theme')||'light';
     applyTheme(current==='dark'?'light':'dark');
   }
-  (function(){const saved=localStorage.getItem('abu_oreiban_theme')||'light';applyTheme(saved)})();
+  window.applyTheme=applyTheme; window.toggleTheme=toggleTheme;
+  (function(){let saved='light';try{saved=localStorage.getItem('abu_oreiban_theme')||'light'}catch(e){} applyTheme(saved);
+    window.addEventListener('DOMContentLoaded',()=>applyTheme(document.documentElement.getAttribute('data-theme')||saved));
+  })();
 
   function updateDailyHeader(){
     const now=new Date();
