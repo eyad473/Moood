@@ -1,5 +1,5 @@
-const CACHE = "abu-areiban-v16-offline-1";
-const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest"];
+const CACHE = "abu-areiban-v47-offline-1";
+const APP_SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));

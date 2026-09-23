@@ -1431,6 +1431,8 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
+const APP_RELEASE_VERSION = "47.0";
+const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 function syncDeviceId(){let id=localStorage.getItem(SYNC_DEVICE_KEY);if(!id){id=(crypto.randomUUID?crypto.randomUUID():"dev-"+Date.now()+"-"+Math.random().toString(16).slice(2));localStorage.setItem(SYNC_DEVICE_KEY,id)}return id}
 
@@ -1518,15 +1520,32 @@ function syncLocalSave(silent=true){
   if(!silent){if(navigator.onLine)toast("تم حفظ البيانات محلياً — جاري المزامنة");else toast("تم حفظ البيانات محلياً — بانتظار عودة الإنترنت")}
 }
 function syncBuildChanges(){
-  data=syncNormalizeRows(data); const oldMap=new Map(syncShadow.map(r=>[r.__syncId,r])), newMap=new Map(data.map(r=>[r.__syncId,r])); const changes=[];
-  for(const r of data){const old=oldMap.get(r.__syncId);if(!old||syncComparable(old)!==syncComparable(r))changes.push({opId:crypto.randomUUID(),recordId:r.__syncId,operation:"upsert",updatedAt:Date.now(),data:structuredClone(r)})}
-  for(const old of syncShadow){if(!newMap.has(old.__syncId))changes.push({opId:crypto.randomUUID(),recordId:old.__syncId,operation:"delete",updatedAt:Date.now()})}
-  return changes
+  data=syncNormalizeRows(data);
+  const oldMap=new Map(syncShadow.map(r=>[r.__syncId,r]));
+  const newMap=new Map(data.map(r=>[r.__syncId,r]));
+  const previous=syncLoadPending();
+  const prevMap=new Map(previous.map(c=>[c.recordId+"|"+c.operation,c]));
+  const changes=[];
+  for(const r of data){
+    const old=oldMap.get(r.__syncId);
+    if(!old||syncComparable(old)!==syncComparable(r)){
+      const key=r.__syncId+"|upsert", prev=prevMap.get(key);
+      const samePending=prev && prev.data && syncComparable(prev.data)===syncComparable(r);
+      changes.push({opId:samePending?prev.opId:crypto.randomUUID(),recordId:r.__syncId,operation:"upsert",updatedAt:Date.now(),baseVersion:Number(old?.__syncVersion||0),data:structuredClone(r)});
+    }
+  }
+  for(const old of syncShadow){
+    if(!newMap.has(old.__syncId)){
+      const key=old.__syncId+"|delete",prev=prevMap.get(key);
+      changes.push({opId:prev?.opId||crypto.randomUUID(),recordId:old.__syncId,operation:"delete",updatedAt:Date.now(),baseVersion:Number(old?.__syncVersion||0)});
+    }
+  }
+  return changes;
 }
 function syncRebuildPending(){const c=syncBuildChanges();syncSavePending(c);return c}
 async function syncFetch(path,options={}){const headers={"Content-Type":"application/json","X-Device-Id":syncDeviceId(),...(options.headers||{})};const res=await fetch(SYNC_API_URL+path,{...options,headers,cache:"no-store"});let body=null;try{body=await res.json()}catch(e){throw Error("استجابة غير صالحة من الخادم")};if(!res.ok||body?.ok===false)throw Error(body?.error||("HTTP "+res.status));return body}
-function applyChangeToMap(map,c){if(c.operation==="delete")map.delete(c.recordId);else if(c.operation==="upsert"&&c.data){const x=structuredClone(c.data);x.__syncId=c.recordId;map.set(c.recordId,x)}}
-function syncApplyChanges(changes,{protectIds=null}={}){let changed=false;const byId=new Map(data.map((r,i)=>[r.__syncId,i]));for(const c of changes||[]){if(protectIds?.has(c.recordId))continue;if(c.operation==="delete"){const idx=byId.get(c.recordId);if(idx!==undefined){data.splice(idx,1);changed=true;byId.clear();data.forEach((r,i)=>byId.set(r.__syncId,i))}}else if(c.operation==="upsert"&&c.data){const incoming=structuredClone(c.data);incoming.__syncId=c.recordId;const idx=byId.get(c.recordId);if(idx===undefined){data.push(incoming);byId.set(c.recordId,data.length-1);changed=true}else if(syncComparable(data[idx])!==syncComparable(incoming)){data[idx]=incoming;changed=true}}}return changed}
+function applyChangeToMap(map,c){if(c.operation==="delete")map.delete(c.recordId);else if(c.operation==="upsert"&&c.data){const x=structuredClone(c.data);x.__syncId=c.recordId;x.__syncVersion=Number(c.version||0);map.set(c.recordId,x)}}
+function syncApplyChanges(changes,{protectIds=null}={}){let changed=false;const byId=new Map(data.map((r,i)=>[r.__syncId,i]));for(const c of changes||[]){if(protectIds?.has(c.recordId))continue;if(c.operation==="delete"){const idx=byId.get(c.recordId);if(idx!==undefined){data.splice(idx,1);changed=true;byId.clear();data.forEach((r,i)=>byId.set(r.__syncId,i))}}else if(c.operation==="upsert"&&c.data){const incoming=structuredClone(c.data);incoming.__syncId=c.recordId;incoming.__syncVersion=Number(c.version||0);const idx=byId.get(c.recordId);if(idx===undefined){data.push(incoming);byId.set(c.recordId,data.length-1);changed=true}else if(syncComparable(data[idx])!==syncComparable(incoming)){data[idx]=incoming;changed=true}}}return changed}
 async function syncPullApply(){let cursor=syncCursor,loops=0,all=[];while(loops++<30){const r=await syncFetch(`/sync/pull?since=${encodeURIComponent(cursor)}&limit=500`,{method:"GET"});all=all.concat(r.changes||[]);cursor=Number(r.nextSince||cursor);syncCursor=cursor;localStorage.setItem(SYNC_CURSOR_KEY,String(cursor));if(!r.hasMore)break}return all}
 async function syncInitialMerge(){
   const localBefore=syncNormalizeRows(structuredClone(data));
@@ -1546,15 +1565,40 @@ async function syncInitialMerge(){
 async function syncPush(){
   let changes=syncLoadPending(); if(!changes.length)changes=syncRebuildPending(); if(!changes.length)return {accepted:0,conflicts:[],total:0};
   let acceptedIds=new Set(),conflicts=[];
-  for(let i=0;i<changes.length;i+=100){const batch=changes.slice(i,i+100);const r=await syncFetch("/sync/push",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),changes:batch})});(r.accepted||[]).forEach(x=>acceptedIds.add(typeof x==="string"?x:(x.opId||x.recordId)));
-      // Worker treats an already-seen opId as "skipped" (idempotent retry).
-      // That operation is already committed on D1, so it must count as accepted locally.
-      (r.skipped||[]).forEach(x=>{if(x?.reason==="مكرر"&&x?.opId)acceptedIds.add(x.opId)});
-      conflicts=conflicts.concat(r.conflicts||[])}
-  // Recompute from the shadow only after confirmed acceptance; never clear pending optimistically.
+  for(let i=0;i<changes.length;i+=100){
+    const batch=changes.slice(i,i+100);
+    const r=await syncFetch("/sync/push",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),changes:batch})});
+    (r.accepted||[]).forEach(x=>acceptedIds.add(typeof x==="string"?x:(x.opId||x.recordId)));
+    (r.skipped||[]).forEach(x=>{if(x?.reason==="مكرر"&&x?.opId)acceptedIds.add(x.opId)});
+    conflicts=conflicts.concat(r.conflicts||[]);
+  }
+  // Rebase conflicts safely using the local shadow as the common base.
+  if(conflicts.length){
+    const byId=new Map(data.map(r=>[r.__syncId,r]));
+    const shadowMap=new Map(syncShadow.map(r=>[r.__syncId,r]));
+    for(const cf of conflicts){
+      const pending=changes.find(c=>c.opId===cf.opId); if(!pending||pending.operation!=="upsert"||!cf.serverData)continue;
+      const base=shadowMap.get(cf.recordId)||{}; const local=pending.data||byId.get(cf.recordId)||{}; const remote=cf.serverData||{};
+      const merged=structuredClone(remote); merged.__syncId=cf.recordId; merged.__syncVersion=Number(cf.serverVersion||0);
+      for(const k of COLUMNS){
+        if(k==="#")continue;
+        const b=String(base?.[k]??""), l=String(local?.[k]??""), r=String(remote?.[k]??"");
+        const lc=l!==b, rc=r!==b;
+        if(lc && !rc) merged[k]=local[k];
+        else if(lc && rc && l===r) merged[k]=local[k];
+        else if(lc && rc && l!==r) merged[k]=local[k];
+      }
+      const idx=data.findIndex(r=>r.__syncId===cf.recordId);
+      if(idx>=0)data[idx]=merged;
+      else if(pending.operation!=="delete")data.push(merged);
+      const si=syncShadow.findIndex(r=>r.__syncId===cf.recordId);
+      if(si>=0)syncShadow[si]=structuredClone(merged);
+    }
+    syncSaveShadow(syncShadow); syncLocalSave(true);
+  }
   const current=syncBuildChanges();
-  if(conflicts.length || acceptedIds.size<changes.length){syncSavePending(current);return {accepted:acceptedIds.size,conflicts,total:changes.length}}
-  syncSavePending(current); return {accepted:acceptedIds.size,conflicts,total:changes.length}
+  syncSavePending(current);
+  return {accepted:acceptedIds.size,conflicts,total:changes.length};
 }
 async function syncStart(reason="manual"){
   if(syncBusy)return {ok:false,busy:true};
@@ -1595,6 +1639,17 @@ async function syncOnlineReconcile(reason="auto"){
   }catch(e){console.warn("Cloud sync V24:",e);const n=syncLoadPending().length;if(reason!=="timer")toast(n?`المزامنة غير متاحة الآن — ${n} تعديل محفوظ محلياً`:`البيانات محفوظة محلياً — بانتظار الإنترنت`)}
   finally{syncBusy=false}
 }
+function showProgramUpdateNotice(){
+  const seen=localStorage.getItem(APP_RELEASE_KEY);
+  if(seen===APP_RELEASE_VERSION)return;
+  localStorage.setItem(APP_RELEASE_KEY,APP_RELEASE_VERSION);
+  const old=document.getElementById("programUpdateNotice"); if(old)old.remove();
+  const box=document.createElement("div"); box.id="programUpdateNotice"; box.innerHTML=`<div class="program-update-icon">✓</div><div><strong>تم تحديث البرنامج</strong><p>تم تحديث البرنامج بنجاح، ويجري الآن بدء معالجة ومزامنة البيانات مع السحابة.</p></div>`;
+  const st=document.createElement("style"); st.textContent=`#programUpdateNotice{position:fixed;z-index:99999;left:50%;top:50%;transform:translate(-50%,-50%) scale(.96);width:min(440px,calc(100vw - 32px));display:flex;gap:14px;align-items:flex-start;padding:20px;border-radius:18px;background:#111827;color:#fff;box-shadow:0 20px 60px rgba(0,0,0,.28);font-family:inherit;animation:programNoticeIn .35s ease forwards}#programUpdateNotice .program-update-icon{width:38px;height:38px;flex:0 0 38px;border-radius:50%;display:grid;place-items:center;background:#16a34a;font-weight:800;font-size:20px}#programUpdateNotice strong{display:block;font-size:17px;margin:1px 0 6px}#programUpdateNotice p{margin:0;color:#d1d5db;font-size:13px;line-height:1.8}@keyframes programNoticeIn{to{transform:translate(-50%,-50%) scale(1)}}@media(max-width:520px){#programUpdateNotice{padding:17px}.program-update-icon{width:34px!important;height:34px!important;flex-basis:34px!important}}`;
+  document.head.appendChild(st);document.body.appendChild(box);
+  setTimeout(()=>{box.style.transition="opacity .35s, transform .35s";box.style.opacity="0";box.style.transform="translate(-50%,-50%) scale(.98)";setTimeout(()=>box.remove(),380)},3200);
+}
+
 function installCloudSync(){
   data=syncNormalizeRows(data);syncLoadShadow();syncLoadPending();
   window.saveNow=function(){try{syncLocalSave(false);syncRebuildPending();syncOnlineReconcile("manual")}catch(e){toast("تعذر حفظ البيانات محلياً")}};
@@ -1603,6 +1658,7 @@ function installCloudSync(){
   window.addEventListener("offline",()=>{const n=syncLoadPending().length;if(n)toast(`⚠️ ${n} تعديل محفوظ محلياً — بانتظار عودة الإنترنت`)});
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")syncOnlineReconcile("visible")});
   clearInterval(syncTimer);syncTimer=setInterval(()=>syncOnlineReconcile("timer"),5000);
+  showProgramUpdateNotice();
   setTimeout(()=>syncOnlineReconcile("startup"),700);
 }
 
