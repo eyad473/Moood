@@ -1431,9 +1431,9 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "47.0";
+const APP_RELEASE_VERSION = "48.0";
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
-let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
+let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false, syncNextRetryAt=0;
 function syncDeviceId(){let id=localStorage.getItem(SYNC_DEVICE_KEY);if(!id){id=(crypto.randomUUID?crypto.randomUUID():"dev-"+Date.now()+"-"+Math.random().toString(16).slice(2));localStorage.setItem(SYNC_DEVICE_KEY,id)}return id}
 
 
@@ -1609,7 +1609,9 @@ async function syncStart(reason="manual"){
   return {ok:true,pending:0};
 }
 async function syncOnlineReconcile(reason="auto"){
-  if(syncBusy||!navigator.onLine)return;syncBusy=true;
+  if(syncBusy||!navigator.onLine)return;
+  if(reason==="timer" && Date.now()<syncNextRetryAt)return;
+  syncBusy=true;
   try{
     syncLoadShadow();
     if(!syncInitialized && !syncShadow.length){
@@ -1636,7 +1638,12 @@ async function syncOnlineReconcile(reason="auto"){
         const n=syncLoadPending().length;toast(`⚠️ ${n} تعديل محفوظ على الجهاز — بانتظار اكتمال المزامنة`)
       }
     }
-  }catch(e){console.warn("Cloud sync V24:",e);const n=syncLoadPending().length;if(reason!=="timer")toast(n?`المزامنة غير متاحة الآن — ${n} تعديل محفوظ محلياً`:`البيانات محفوظة محلياً — بانتظار الإنترنت`)}
+  }catch(e){
+    console.warn("Cloud sync V48:",e);
+    syncNextRetryAt=Date.now()+60000;
+    const n=syncLoadPending().length;
+    if(reason!=="timer")toast(n?`المزامنة غير متاحة الآن — ${n} تعديل محفوظ محلياً`:`البيانات محفوظة محلياً — بانتظار الإنترنت`);
+  }
   finally{syncBusy=false}
 }
 function showProgramUpdateNotice(){
@@ -1657,7 +1664,7 @@ function installCloudSync(){
   window.addEventListener("online",()=>syncOnlineReconcile("online"));
   window.addEventListener("offline",()=>{const n=syncLoadPending().length;if(n)toast(`⚠️ ${n} تعديل محفوظ محلياً — بانتظار عودة الإنترنت`)});
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")syncOnlineReconcile("visible")});
-  clearInterval(syncTimer);syncTimer=setInterval(()=>syncOnlineReconcile("timer"),5000);
+  clearInterval(syncTimer);syncTimer=setInterval(()=>syncOnlineReconcile("timer"),30000);
   showProgramUpdateNotice();
   setTimeout(()=>syncOnlineReconcile("startup"),700);
 }
