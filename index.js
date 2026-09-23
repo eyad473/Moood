@@ -44,7 +44,10 @@ function validRecord(item) {
   return Number.isFinite(updatedAt) && updatedAt > 0;
 }
 
+let schemaReady = false;
+
 async function ensureSchema(env) {
+  if (schemaReady) return;
   await env.DB.batch([
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS sync_records (
       record_id TEXT PRIMARY KEY,
@@ -70,9 +73,9 @@ async function ensureSchema(env) {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     )`),
-    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_sync_changes_seq ON sync_changes(seq)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_sync_records_updated ON sync_records(updated_at)`)
   ]);
+  schemaReady = true;
 }
 
 async function health(env) {
@@ -135,16 +138,13 @@ async function pull(request, env) {
   }));
 
   const nextSince = changes.length ? changes[changes.length - 1].seq : since;
-  const maxRow = await env.DB.prepare("SELECT COALESCE(MAX(seq),0) AS seq FROM sync_changes").first();
-  const countRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM sync_records WHERE deleted = 0").first();
 
   return json({
     ok: true,
     since,
-    latestSeq: Number(maxRow?.seq || nextSince || 0),
+    latestSeq: Number(nextSince || 0),
     nextSince,
     hasMore: changes.length === limit,
-    serverActiveRecords: Number(countRow?.count || 0),
     changes
   });
 }
@@ -302,16 +302,11 @@ async function push(request, env) {
     }
   }
 
-  const latest = await env.DB.prepare("SELECT COALESCE(MAX(seq),0) AS seq FROM sync_changes").first();
-  const live = await env.DB.prepare("SELECT COUNT(*) AS count FROM sync_records WHERE deleted = 0").first();
-
   return json({
     ok: true,
     accepted,
     conflicts,
-    skipped,
-    latestSeq: Number(latest?.seq || 0),
-    serverActiveRecords: Number(live?.count || 0)
+    skipped
   });
 }
 
