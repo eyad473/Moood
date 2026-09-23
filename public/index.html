@@ -322,6 +322,37 @@ html,body{width:100%;max-width:100%;overflow-x:hidden!important}
 @keyframes dailyPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.88);opacity:.72}}
 @media(max-width:700px){.daily-header{padding:16px;gap:10px;border-radius:16px}.daily-greeting{font-size:22px}.daily-date{font-size:11px}.daily-clock{font-size:17px}.daily-online{min-width:0;padding:10px 11px}.daily-online strong{font-size:11px}.daily-online small{font-size:9px}}
 </style>
+<style id="v41-polish">
+.report-group-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:4px 0 14px}
+.report-group-card{display:flex;align-items:center;gap:10px;padding:13px 14px;border:1px solid var(--line);border-radius:14px;background:var(--card);cursor:pointer;transition:.25s ease;min-width:0}
+.report-group-card:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(15,23,42,.07)}
+.report-group-card input{width:19px;height:19px;accent-color:var(--primary);flex:0 0 auto}
+.report-group-card strong{display:block;font-size:13px}.report-group-card small{display:block;color:var(--muted);font-size:10px;margin-top:3px}
+.report-fields-section{margin-top:12px;padding:13px;border:1px solid var(--line);border-radius:15px;background:var(--bg)}
+.report-fields-title{font-weight:900;font-size:13px;margin-bottom:9px;color:var(--text)}
+.report-fields-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:7px}
+.report-field-item{display:flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);cursor:pointer;min-width:0;transition:.2s ease}
+.report-field-item:hover{border-color:#93c5fd;background:var(--bg)}.report-field-item input{width:17px;height:17px;accent-color:var(--primary);flex:0 0 auto}.report-field-item span{font-size:11px;font-weight:700;line-height:1.5}
+.daily-header-actions{position:relative;z-index:1;display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}
+
+/* V43 - organized report field selector */
+.report-fields-guide{border:1px solid #e5e7eb;border-radius:14px;background:#f8fafc;padding:10px 12px;margin-bottom:10px}
+.report-fields-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.report-fields-section-head strong{display:block;font-size:14px}.report-fields-section-head small{display:block;color:#64748b;margin-top:3px}
+.report-section-shortcuts{display:flex;gap:6px;flex-wrap:wrap}.btn-sm{padding:7px 10px!important;font-size:11px!important}
+.report-columns-organized{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:10px}
+.report-columns-organized .report-fields-section{grid-column:span 12;border:1px solid #e5e7eb;border-radius:14px;padding:11px;background:#fff}
+.report-columns-organized .report-fields-section.basic{grid-column:span 12}
+.report-columns-organized .report-fields-section.head,.report-columns-organized .report-fields-section.wife{grid-column:span 6}
+.report-columns-organized .report-fields-section.family{grid-column:span 12}
+.report-fields-section h4{margin:0 0 9px;font-size:13px}.report-fields-section .report-fields-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+@media(max-width:800px){.report-columns-organized .report-fields-section.head,.report-columns-organized .report-fields-section.wife{grid-column:span 12}.report-fields-section .report-fields-grid{grid-template-columns:1fr}.report-fields-section-head{align-items:flex-start;flex-direction:column}.report-section-shortcuts{width:100%}.report-section-shortcuts .btn{flex:1}}
+html[data-theme="dark"] .report-fields-guide{background:#0d1525;border-color:#293548}
+.theme-toggle{display:flex;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.08);color:#fff;padding:10px 12px;border-radius:13px;font-weight:800;cursor:pointer;transition:all .3s ease;backdrop-filter:blur(10px)}
+.theme-toggle:hover{background:rgba(255,255,255,.14);transform:translateY(-1px)}.theme-toggle-icon{font-size:17px;line-height:1}.theme-toggle-text{font-size:11px;white-space:nowrap}
+html[data-theme="dark"] body{background:#0b1120;color:#e5e7eb}html[data-theme="dark"] .top{background:rgba(11,17,32,.92);border-color:#253044}html[data-theme="dark"] .btn{background:#111827;color:#e5e7eb;border-color:#2d3a50}html[data-theme="dark"] .btn:hover{background:#182235}html[data-theme="dark"] .btn.primary{background:#2563eb;color:#fff}html[data-theme="dark"] .tab{background:#182235;color:#cbd5e1}html[data-theme="dark"] .tab.active{background:#e5e7eb;color:#111827}html[data-theme="dark"] .card,html[data-theme="dark"] .stat,html[data-theme="dark"] .chart-card,html[data-theme="dark"] .report-group-card,html[data-theme="dark"] .report-field-item{background:#111827;border-color:#293548}html[data-theme="dark"] .report-fields-section{background:#0d1525;border-color:#293548}html[data-theme="dark"] .field input,html[data-theme="dark"] .field select,html[data-theme="dark"] .field textarea{background:#0f172a;color:#e5e7eb;border-color:#334155}html[data-theme="dark"] .table th{background:#172033;color:#cbd5e1}html[data-theme="dark"] .table tr:hover td{background:#172033}html[data-theme="dark"] .report-field-item:hover{background:#172033}html[data-theme="dark"] .family-result-card,html[data-theme="dark"] .family-card{background:#111827;border-color:#293548}html[data-theme="dark"] .family-mini-field,html[data-theme="dark"] .family-info-item{background:#0d1525}html[data-theme="dark"] .daily-header{box-shadow:0 14px 34px rgba(0,0,0,.35)}
+@media(max-width:700px){.report-group-actions{grid-template-columns:1fr}.report-fields-grid{grid-template-columns:1fr}.daily-header{align-items:flex-start;flex-direction:column}.daily-header-actions{width:100%;justify-content:stretch}.daily-header-actions>*{flex:1}.theme-toggle{justify-content:center}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -387,9 +418,15 @@ html,body{width:100%;max-width:100%;overflow-x:hidden!important}
       <div class="daily-date" id="dailyDate">—</div>
       <div class="daily-clock" id="dailyClock">—</div>
     </div>
-    <div class="daily-online" id="dailyOnline" data-state="online">
-      <span class="daily-online-dot" aria-hidden="true"></span>
-      <div><small>حالة الاتصال</small><strong id="dailyOnlineText">متصل بالإنترنت</strong></div>
+    <div class="daily-header-actions">
+      <button class="theme-toggle" id="themeToggle" type="button" onclick="toggleTheme()" aria-label="تبديل الوضع">
+        <span class="theme-toggle-icon" id="themeToggleIcon">☾</span>
+        <span class="theme-toggle-text" id="themeToggleText">الوضع الداكن</span>
+      </button>
+      <div class="daily-online" id="dailyOnline" data-state="online">
+        <span class="daily-online-dot" aria-hidden="true"></span>
+        <div><small>حالة الاتصال</small><strong id="dailyOnlineText">متصل بالإنترنت</strong></div>
+      </div>
     </div>
   </section>
   <div class="grid stats">
@@ -574,12 +611,17 @@ html,body{width:100%;max-width:100%;overflow-x:hidden!important}
       <button class="btn" onclick="selectBasicReportColumns()">الحقول الأساسية</button>
       <button class="btn" onclick="clearReportColumns()">إلغاء الكل</button>
     </div>
-    <div class="report-option-grid no-print">
-      <label class="report-option"><input type="checkbox" id="optAllHead" onchange="toggleReportGroup('head',this.checked)"><span>جميع بيانات رب الأسرة</span><small>اختيار/إلغاء كل حقول رب الأسرة فقط</small></label>
-      <label class="report-option"><input type="checkbox" id="optAllWife" onchange="toggleReportGroup('wife',this.checked)"><span>جميع بيانات الزوجة</span><small>اختيار/إلغاء كل حقول الزوجة فقط</small></label>
-      <label class="report-option"><input type="checkbox" id="optFamilyCount" onchange="toggleReportGroup('count',this.checked)"><span>عدد أفراد الأسرة</span><small>إضافة عدد أفراد الأسرة للكشف</small></label>
+    <div class="report-fields-guide no-print">
+      <div class="report-fields-section-head">
+        <div><strong>اختيار الحقول</strong><small>كل حقل مستقل ويمكنك تحديد ما تريد طباعته فقط</small></div>
+        <div class="report-section-shortcuts">
+          <button class="btn btn-sm" type="button" onclick="toggleReportGroup('head',true)">تحديد بيانات رب الأسرة</button>
+          <button class="btn btn-sm" type="button" onclick="toggleReportGroup('wife',true)">تحديد بيانات الزوجة</button>
+          <button class="btn btn-sm" type="button" onclick="toggleReportGroup('count',true)">إضافة عدد الأفراد</button>
+        </div>
+      </div>
     </div>
-    <div id="reportColumns" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:7px"></div>
+    <div id="reportColumns" class="report-columns-organized"></div>
    </div>
 
    <div class="actions no-print" style="margin-bottom:14px">
@@ -1155,8 +1197,8 @@ const REPORT_COLUMNS = [
  ["إعاقة؟","إعاقة؟"],["نوع الإعاقة","نوع الإعاقة"],["يتيم/منفصل عن ذويه؟","يتيم/منفصل عن ذويه؟"],
  ["حامل؟","حامل؟"],["مرضعة؟","مرضعة؟"],["ملاحظات الفرد","ملاحظات الفرد"],["ملاحظات الأسرة","ملاحظات الأسرة"],
  ["عدد أفراد الأسرة","عدد أفراد الأسرة"],
- ["رب الأسرة — رقم الهوية","رب الأسرة — رقم الهوية"],["رب الأسرة — رقم الجوال","رب الأسرة — رقم الجوال"],["رب الأسرة — رقم الجوال البديل","رب الأسرة — رقم الجوال البديل"],["رب الأسرة — العنوان","رب الأسرة — العنوان"],["رب الأسرة — داخل/خارج المخيم","رب الأسرة — داخل/خارج المخيم"],["رب الأسرة — المحافظة الأصلية","رب الأسرة — المحافظة الأصلية"],["رب الأسرة — حالة المسكن الأصلي","رب الأسرة — حالة المسكن الأصلي"],["رب الأسرة — نوع السكن الحالي","رب الأسرة — نوع السكن الحالي"],["رب الأسرة — الحالة الاجتماعية","رب الأسرة — الحالة الاجتماعية"],["رب الأسرة — تاريخ الميلاد","رب الأسرة — تاريخ الميلاد"],["رب الأسرة — العمر","رب الأسرة — العمر"],["رب الأسرة — الجنس","رب الأسرة — الجنس"],["رب الأسرة — مرض مزمن","رب الأسرة — مرض مزمن"],["رب الأسرة — نوع المرض","رب الأسرة — نوع المرض"],["رب الأسرة — إصابة","رب الأسرة — إصابة"],["رب الأسرة — سبب الإصابة","رب الأسرة — سبب الإصابة"],["رب الأسرة — تفاصيل الإصابة","رب الأسرة — تفاصيل الإصابة"],["رب الأسرة — إعاقة","رب الأسرة — إعاقة"],["رب الأسرة — نوع الإعاقة","رب الأسرة — نوع الإعاقة"],["رب الأسرة — يتيم/منفصل","رب الأسرة — يتيم/منفصل"],["رب الأسرة — حامل","رب الأسرة — حامل"],["رب الأسرة — مرضعة","رب الأسرة — مرضعة"],["رب الأسرة — ملاحظات","رب الأسرة — ملاحظات"],
- ["الزوجة — الاسم","الزوجة — الاسم"],["الزوجة — رقم الهوية","الزوجة — رقم الهوية"],["الزوجة — رقم الجوال","الزوجة — رقم الجوال"],["الزوجة — العمر","الزوجة — العمر"],["الزوجة — تاريخ الميلاد","الزوجة — تاريخ الميلاد"],["الزوجة — الجنس","الزوجة — الجنس"],["الزوجة — الحالة الاجتماعية","الزوجة — الحالة الاجتماعية"],["الزوجة — مرض مزمن","الزوجة — مرض مزمن"],["الزوجة — نوع المرض","الزوجة — نوع المرض"],["الزوجة — إصابة","الزوجة — إصابة"],["الزوجة — سبب الإصابة","الزوجة — سبب الإصابة"],["الزوجة — تفاصيل الإصابة","الزوجة — تفاصيل الإصابة"],["الزوجة — إعاقة","الزوجة — إعاقة"],["الزوجة — نوع الإعاقة","الزوجة — نوع الإعاقة"],["الزوجة — يتيم/منفصل","الزوجة — يتيم/منفصل"],["الزوجة — حامل","الزوجة — حامل"],["الزوجة — مرضعة","الزوجة — مرضعة"],["الزوجة — ملاحظات","الزوجة — ملاحظات"]
+ ["رب الأسرة — رقم الهوية","رقم هوية رب الأسرة"],["رب الأسرة — رقم الجوال","رقم جوال رب الأسرة"],["رب الأسرة — رقم الجوال البديل","رقم الجوال البديل لرب الأسرة"],["رب الأسرة — العنوان","عنوان رب الأسرة"],["رب الأسرة — داخل/خارج المخيم","إقامة رب الأسرة (داخل/خارج المخيم)"],["رب الأسرة — المحافظة الأصلية","المحافظة الأصلية لرب الأسرة"],["رب الأسرة — حالة المسكن الأصلي","حالة المسكن الأصلي لرب الأسرة"],["رب الأسرة — نوع السكن الحالي","نوع السكن الحالي لرب الأسرة"],["رب الأسرة — الحالة الاجتماعية","الحالة الاجتماعية لرب الأسرة"],["رب الأسرة — تاريخ الميلاد","تاريخ ميلاد رب الأسرة"],["رب الأسرة — العمر","عمر رب الأسرة"],["رب الأسرة — الجنس","جنس رب الأسرة"],["رب الأسرة — مرض مزمن","مرض مزمن لرب الأسرة"],["رب الأسرة — نوع المرض","نوع مرض رب الأسرة"],["رب الأسرة — إصابة","إصابة رب الأسرة"],["رب الأسرة — سبب الإصابة","سبب إصابة رب الأسرة"],["رب الأسرة — تفاصيل الإصابة","تفاصيل إصابة رب الأسرة"],["رب الأسرة — إعاقة","إعاقة رب الأسرة"],["رب الأسرة — نوع الإعاقة","نوع إعاقة رب الأسرة"],["رب الأسرة — يتيم/منفصل","حالة اليتم/الانفصال لرب الأسرة"],["رب الأسرة — حامل","حمل رب الأسرة"],["رب الأسرة — مرضعة","رضاعة رب الأسرة"],["رب الأسرة — ملاحظات","ملاحظات رب الأسرة"],
+ ["الزوجة — الاسم","اسم الزوجة"],["الزوجة — رقم الهوية","رقم هوية الزوجة"],["الزوجة — العمر","عمر الزوجة"],["الزوجة — تاريخ الميلاد","تاريخ ميلاد الزوجة"],["الزوجة — الجنس","جنس الزوجة"],["الزوجة — الحالة الاجتماعية","الحالة الاجتماعية للزوجة"],["الزوجة — مرض مزمن","مرض مزمن للزوجة"],["الزوجة — نوع المرض","نوع مرض الزوجة"],["الزوجة — إصابة","إصابة الزوجة"],["الزوجة — سبب الإصابة","سبب إصابة الزوجة"],["الزوجة — تفاصيل الإصابة","تفاصيل إصابة الزوجة"],["الزوجة — إعاقة","إعاقة الزوجة"],["الزوجة — نوع الإعاقة","نوع إعاقة الزوجة"],["الزوجة — يتيم/منفصل","حالة اليتم/الانفصال للزوجة"],["الزوجة — حامل","حمل الزوجة"],["الزوجة — مرضعة","رضاعة الزوجة"],["الزوجة — ملاحظات","ملاحظات الزوجة"]
 ];
 
 function ageOf(r){
@@ -1192,11 +1234,12 @@ function familyHeadRecord(r){ return (familyMap().get(r["اسم رب الأسر�
 function initReportColumns(){
   if(!selectedReportColumns.length) selectedReportColumns = REPORT_COLUMNS.map(x=>x[0]);
   const box=document.getElementById("reportColumns"); if(!box)return;
-  box.innerHTML=REPORT_COLUMNS.map(([key,label])=>`
-    <label style="display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid #e5e7eb;border-radius:9px;background:#fff">
-      <input type="checkbox" class="report-col" value="${esc(key)}" ${selectedReportColumns.includes(key)?"checked":""} onchange="syncReportColumns();syncReportGroupOptions()">
-      <span>${esc(label)}</span>
-    </label>`).join("");
+  const groups=[
+    {title:"الحقول الأساسية", cls:"report-fields-section basic", keys:REPORT_COLUMNS.filter(([k])=>!k.startsWith("رب الأسرة — ")&&!k.startsWith("الزوجة — ")&&k!=="عدد أفراد الأسرة")},
+    {title:"بيانات رب الأسرة", cls:"report-fields-section head", keys:["اسم رب الأسرة","رب الأسرة — رقم الهوية","رب الأسرة — رقم الجوال","رب الأسرة — رقم الجوال البديل","رب الأسرة — العنوان","رب الأسرة — داخل/خارج المخيم","رب الأسرة — المحافظة الأصلية","رب الأسرة — حالة المسكن الأصلي","رب الأسرة — نوع السكن الحالي","رب الأسرة — تاريخ الميلاد","رب الأسرة — العمر","رب الأسرة — الجنس","رب الأسرة — الحالة الاجتماعية","رب الأسرة — مرض مزمن","رب الأسرة — نوع المرض","رب الأسرة — إصابة","رب الأسرة — سبب الإصابة","رب الأسرة — تفاصيل الإصابة","رب الأسرة — إعاقة","رب الأسرة — نوع الإعاقة","رب الأسرة — يتيم/منفصل","رب الأسرة — حامل","رب الأسرة — مرضعة","رب الأسرة — ملاحظات"]},
+    {title:"بيانات الزوجة", cls:"report-fields-section wife", keys:["الزوجة — الاسم","الزوجة — رقم الهوية","الزوجة — تاريخ الميلاد","الزوجة — العمر","الزوجة — الجنس","الزوجة — الحالة الاجتماعية","الزوجة — مرض مزمن","الزوجة — نوع المرض","الزوجة — إصابة","الزوجة — سبب الإصابة","الزوجة — تفاصيل الإصابة","الزوجة — إعاقة","الزوجة — نوع الإعاقة","الزوجة — يتيم/منفصل","الزوجة — حامل","الزوجة — مرضعة","الزوجة — ملاحظات"]},
+    {title:"بيانات الأسرة", cls:"report-fields-section family", keys:["عدد أفراد الأسرة"]}  ];
+  box.innerHTML=groups.filter(g=>g.keys.length).map(g=>`<div class="${g.cls}"><div class="report-fields-title">${esc(g.title)}</div><div class="report-fields-grid">${g.keys.map(([key,label])=>`<label class="report-field-item"><input type="checkbox" class="report-col" value="${esc(key)}" ${selectedReportColumns.includes(key)?"checked":""} onchange="syncReportColumns();syncReportGroupOptions()"><span>${esc(label)}</span></label>`).join("")}</div></div>`).join("");
   syncReportGroupOptions();
 }
 function syncReportColumns(){
@@ -1235,7 +1278,7 @@ function selectFamilyHeadColumns(){
   initReportColumns();
 }
 function selectWifeColumns(){
-  selectedReportColumns=["الزوجة — الاسم","الزوجة — رقم الهوية","الزوجة — رقم الجوال","الزوجة — العمر","الزوجة — تاريخ الميلاد","الزوجة — الجنس","الزوجة — الحالة الاجتماعية","الزوجة — مرض مزمن","الزوجة — نوع المرض","الزوجة — إصابة","الزوجة — سبب الإصابة","الزوجة — تفاصيل الإصابة","الزوجة — إعاقة","الزوجة — نوع الإعاقة","الزوجة — يتيم/منفصل","الزوجة — حامل","الزوجة — مرضعة","الزوجة — ملاحظات"];
+  selectedReportColumns=["الزوجة — الاسم","الزوجة — رقم الهوية","الزوجة — العمر","الزوجة — تاريخ الميلاد","الزوجة — الجنس","الزوجة — الحالة الاجتماعية","الزوجة — مرض مزمن","الزوجة — نوع المرض","الزوجة — إصابة","الزوجة — سبب الإصابة","الزوجة — تفاصيل الإصابة","الزوجة — إعاقة","الزوجة — نوع الإعاقة","الزوجة — يتيم/منفصل","الزوجة — حامل","الزوجة — مرضعة","الزوجة — ملاحظات"];
   initReportColumns();
 }
 function selectFamilySummaryColumns(){
@@ -1251,7 +1294,7 @@ function wifeRecord(r){ return familyPeople(r).find(x=>String(x["صلة القر
 function reportValue(r,c){
   if(c==="عدد أفراد الأسرة") return familyCount(r);
   if(c.startsWith("رب الأسرة — ")){ const h=familyHeadRecord(r); const m={"رب الأسرة — رقم الهوية":"رقم هوية الفرد","رب الأسرة — رقم الجوال":"رقم الجوال","رب الأسرة — رقم الجوال البديل":"رقم جوال بديل","رب الأسرة — العنوان":"العنوان","رب الأسرة — داخل/خارج المخيم":"داخل/خارج المخيم","رب الأسرة — المحافظة الأصلية":"المحافظة الأصلية","رب الأسرة — حالة المسكن الأصلي":"حالة المسكن الأصلي","رب الأسرة — نوع السكن الحالي":"نوع السكن الحالي","رب الأسرة — الحالة الاجتماعية":"الحالة الاجتماعية","رب الأسرة — تاريخ الميلاد":"تاريخ الميلاد","رب الأسرة — 年齢":"العمر التقريبي","رب الأسرة — العمر":"العمر التقريبي","رب الأسرة — الجنس":"الجنس","رب الأسرة — مرض مزمن":"مرض مزمن؟","رب الأسرة — نوع المرض":"نوع المرض","رب الأسرة — إصابة":"إصابة؟","رب الأسرة — سبب الإصابة":"سبب الإصابة","رب الأسرة — تفاصيل الإصابة":"تفاصيل الإصابة","رب الأسرة — إعاقة":"إعاقة؟","رب الأسرة — نوع الإعاقة":"نوع الإعاقة","رب الأسرة — يتيم/منفصل":"يتيم/منفصل عن ذويه؟","رب الأسرة — حامل":"حامل؟","رب الأسرة — مرضعة":"مرضعة؟","رب الأسرة — ملاحظات":"ملاحظات الفرد"}; const k=m[c]; return k==="العمر التقريبي"?(ageOf(h)??h[k]??""):(h?.[k]??""); }
-  if(c.startsWith("الزوجة — ")){ const w=wifeRecord(r); if(!w)return ""; const m={"الزوجة — الاسم":"اسم الفرد","الزوجة — رقم الهوية":"رقم هوية الفرد","الزوجة — رقم الجوال":"رقم الجوال","الزوجة — العمر":"العمر التقريبي","الزوجة — تاريخ الميلاد":"تاريخ الميلاد","الزوجة — الجنس":"الجنس","الزوجة — الحالة الاجتماعية":"الحالة الاجتماعية","الزوجة — مرض مزمن":"مرض مزمن؟","الزوجة — نوع المرض":"نوع المرض","الزوجة — إصابة":"إصابة؟","الزوجة — سبب الإصابة":"سبب الإصابة","الزوجة — تفاصيل الإصابة":"تفاصيل الإصابة","الزوجة — إعاقة":"إعاقة؟","الزوجة — نوع الإعاقة":"نوع الإعاقة","الزوجة — يتيم/منفصل":"يتيم/منفصل عن ذويه؟","الزوجة — حامل":"حامل؟","الزوجة — مرضعة":"مرضعة؟","الزوجة — ملاحظات":"ملاحظات الفرد"}; const k=m[c]; return k==="العمر التقريبي"?(ageOf(w)??w[k]??""):(w[k]??""); }
+  if(c.startsWith("الزوجة — ")){ const w=wifeRecord(r); if(!w)return ""; const m={"الزوجة — الاسم":"اسم الفرد","الزوجة — رقم الهوية":"رقم هوية الفرد","الزوجة — العمر":"العمر التقريبي","الزوجة — تاريخ الميلاد":"تاريخ الميلاد","الزوجة — الجنس":"الجنس","الزوجة — الحالة الاجتماعية":"الحالة الاجتماعية","الزوجة — مرض مزمن":"مرض مزمن؟","الزوجة — نوع المرض":"نوع المرض","الزوجة — إصابة":"إصابة؟","الزوجة — سبب الإصابة":"سبب الإصابة","الزوجة — تفاصيل الإصابة":"تفاصيل الإصابة","الزوجة — إعاقة":"إعاقة؟","الزوجة — نوع الإعاقة":"نوع الإعاقة","الزوجة — يتيم/منفصل":"يتيم/منفصل عن ذويه؟","الزوجة — حامل":"حامل؟","الزوجة — مرضعة":"مرضعة؟","الزوجة — ملاحظات":"ملاحظات الفرد"}; const k=m[c]; return k==="العمر التقريبي"?(ageOf(w)??w[k]??""):(w[k]??""); }
   return c==="العمر التقريبي"?(ageOf(r)??r[c]??""):(r[c]??"");
 }
 
@@ -2961,6 +3004,21 @@ if ('serviceWorker' in navigator) {
   const originalDistTypeChanged=window.renderDistributions;
   document.addEventListener('DOMContentLoaded',()=>{const input=document.getElementById('distName');if(input){input.addEventListener('input',renderSmart);input.addEventListener('focus',renderSmart)}document.addEventListener('click',e=>{const b=document.getElementById('distSmartResults');if(b&&!b.contains(e.target)&&e.target!==input)b.hidden=true})});
   window.addEventListener('load',()=>{const input=document.getElementById('distName');if(input){input.addEventListener('input',renderSmart);input.addEventListener('focus',renderSmart)}});
+
+  function applyTheme(theme){
+    const root=document.documentElement;
+    root.setAttribute('data-theme',theme);
+    localStorage.setItem('abu_oreiban_theme',theme);
+    const icon=document.getElementById('themeToggleIcon');
+    const text=document.getElementById('themeToggleText');
+    if(icon)icon.textContent=theme==='dark'?'☀':'☾';
+    if(text)text.textContent=theme==='dark'?'الوضع الفاتح':'الوضع الداكن';
+  }
+  function toggleTheme(){
+    const current=document.documentElement.getAttribute('data-theme')||'light';
+    applyTheme(current==='dark'?'light':'dark');
+  }
+  (function(){const saved=localStorage.getItem('abu_oreiban_theme')||'light';applyTheme(saved)})();
 
   function updateDailyHeader(){
     const now=new Date();
