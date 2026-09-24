@@ -107,7 +107,7 @@ async function role(request, env) {
   const primary = await getPrimaryDevice(env);
   const ready = (await getMeta(env,"authoritative_snapshot_at")) !== "";
   const count = Number(await getMeta(env,"authoritative_record_count") || 0);
-  return json({ ok:true, deviceId:auth.deviceId, primaryDeviceId:primary || null, isPrimary:!!primary && auth.deviceId===primary, configured:!!primary, authoritativeReady:ready, authoritativeRecordCount:count });
+  return json({ ok:true, deviceId:auth.deviceId, primaryDeviceId:primary || null, isPrimary:!!primary && auth.deviceId===primary, configured:!!primary, authoritativeReady:ready, authoritativeRecordCount:count, authoritativeGeneration:Number(await getMeta(env,"authoritative_generation") || 0) });
 }
 
 async function claimPrimary(request, env) {
@@ -131,7 +131,7 @@ async function health(env) {
     return json({
       ok: true, worker: "moood", database: "mood", binding: "DB",
       records: count, activeRecords: count, latestSeq: seq,
-      authoritativeReady: ready, time: new Date().toISOString()
+      authoritativeReady: ready, authoritativeGeneration:Number(await getMeta(env,"authoritative_generation") || 0), time: new Date().toISOString()
     });
   } catch (e) {
     return json({ ok: false, error: "D1 غير جاهزة", detail: String(e?.message || e) }, 500);
@@ -338,7 +338,14 @@ async function push(request, env) {
 
   const latest = await env.DB.prepare("SELECT seq FROM sync_changes ORDER BY seq DESC LIMIT 1").first();
   await setMeta(env,"latest_seq",Number(latest?.seq||0));
-  return json({ ok:true, accepted, conflicts, skipped, latestSeq:Number(latest?.seq||0) });
+  const changedRecords = accepted.some(x => String(x.recordId || "").startsWith("r-"));
+  let authoritativeGeneration = Number(await getMeta(env,"authoritative_generation") || 0);
+  if (changedRecords) {
+    authoritativeGeneration += 1;
+    await setMeta(env,"authoritative_generation", authoritativeGeneration);
+    await setMeta(env,"authoritative_snapshot_at", now());
+  }
+  return json({ ok:true, accepted, conflicts, skipped, latestSeq:Number(latest?.seq||0), authoritativeGeneration });
 }
 
 async function primaryReconcile(request, env) {
@@ -387,9 +394,34 @@ async function primaryReconcile(request, env) {
   if(statements.length) await env.DB.batch(statements);
   await setMeta(env,"authoritative_snapshot_at",t);
   await setMeta(env,"authoritative_record_count",incoming.size);
+  let authoritativeGeneration = Number(await getMeta(env,"authoritative_generation") || 0) + 1;
+  await setMeta(env,"authoritative_generation",authoritativeGeneration);
   const latest=await env.DB.prepare("SELECT seq FROM sync_changes ORDER BY seq DESC LIMIT 1").first();
   await setMeta(env,"latest_seq",Number(latest?.seq||0));
-  return json({ok:true,authoritativeReady:true,recordCount:incoming.size,changed,deleted,latestSeq:Number(latest?.seq||0)});
+  return json({ok:true,authoritativeReady:true,recordCount:incoming.size,authoritativeGeneration,changed,deleted,latestSeq:Number(latest?.seq||0)});
+}
+
+async function authoritativeSnapshot(request, env) {
+  const auth = requireAuth(request, env);
+  if (!auth.ok) return json({ok:false,error:auth.error},401);
+  await ensureSchema(env);
+  const generation = Number(await getMeta(env,"authoritative_generation") || 0);
+  const ready = (await getMeta(env,"authoritative_snapshot_at")) !== "";
+  if (!ready) return json({ok:false,error:"لم يتم اعتماد بيانات الجهاز الرئيسي بعد",code:"NOT_READY"},409);
+  const url = new URL(request.url);
+  const after = cleanString(url.searchParams.get("after"),200);
+  const limit = Math.min(300, Math.max(1, Number(url.searchParams.get("limit") || 250)));
+  const result = after
+    ? await env.DB.prepare(`SELECT record_id,data_json,updated_at,version FROM sync_records WHERE deleted=0 AND record_id LIKE 'r-%' AND record_id > ? ORDER BY record_id ASC LIMIT ?`).bind(after,limit).all()
+    : await env.DB.prepare(`SELECT record_id,data_json,updated_at,version FROM sync_records WHERE deleted=0 AND record_id LIKE 'r-%' ORDER BY record_id ASC LIMIT ?`).bind(limit).all();
+  const rows = (result.results || []).map(r => ({
+    recordId:String(r.record_id),
+    data:r.data_json ? JSON.parse(r.data_json) : {},
+    updatedAt:Number(r.updated_at),
+    version:Number(r.version)
+  }));
+  const nextAfter = rows.length ? rows[rows.length-1].recordId : after;
+  return json({ok:true,generation,records:rows,nextAfter,hasMore:rows.length===limit,recordCount:Number(await getMeta(env,"authoritative_record_count")||0)});
 }
 
 async function bootstrap(request, env) {
@@ -480,6 +512,7 @@ export default {
       if (url.pathname === "/sync/pull" && request.method === "GET") return await pull(request, env);
       if (url.pathname === "/sync/push" && request.method === "POST") return await push(request, env);
       if (url.pathname === "/sync/primary-reconcile" && request.method === "POST") return await primaryReconcile(request, env);
+      if (url.pathname === "/sync/authoritative" && request.method === "GET") return await authoritativeSnapshot(request, env);
       if (url.pathname === "/sync/bootstrap" && request.method === "POST") return await bootstrap(request, env);
       if (env.ASSETS) return await env.ASSETS.fetch(request);
       return json({ ok: false, error: "واجهة التطبيق غير مفعلة: اربط Static Assets" }, 404);
