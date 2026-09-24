@@ -638,6 +638,10 @@ html[data-theme="dark"] body{background:#0b1120;color:#e5e7eb}html[data-theme="d
 <div class="mini-stat"><span class="muted">آخر رقم مزامنة</span><b id="syncLatestSeq">—</b><small class="muted">سجل التغييرات</small></div>
 <div class="mini-stat"><span class="muted">تعديلات محلية معلقة</span><b id="syncPending">—</b><small class="muted" id="syncLastText">لم يتم الفحص بعد</small></div>
 </div>
+<div class="sync-panel sync-role-panel">
+<div><b>صلاحية الجهاز</b><p class="muted" id="syncRoleText">جاري التحقق من الجهاز الرئيسي...</p></div>
+<div class="actions no-print"><button class="btn primary" id="claimPrimaryBtn" onclick="claimPrimaryDevice()">تعيين هذا الجهاز كجهاز رئيسي</button></div>
+</div>
 <div class="sync-panel">
 <div><b>مزامنة آمنة</b><p class="muted">البيانات الحالية لا تُستبدل عشوائياً. التعديلات تُرسل للسحابة وتُجلب من الأجهزة الأخرى حسب نظام الإصدارات.</p></div>
 <div class="actions no-print"><button class="btn" onclick="syncCenterNow()">فحص السيرفر</button><button class="btn" onclick="syncPull().then(refreshSyncCenter).catch(e=&gt;toast('تعذر جلب التحديثات'))">جلب التحديثات</button><button class="btn" onclick="syncPush().then(refreshSyncCenter).catch(e=&gt;toast('تعذر رفع التعديلات'))">رفع التعديلات</button></div>

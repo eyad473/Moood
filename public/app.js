@@ -186,7 +186,7 @@ function saveFamily(e){
  if(old){
   data.forEach(r=>{if(r["اسم رب الأسرة"]===old)Object.assign(r,vals)});
  }else{
-  const base=emptyRecord();Object.assign(base,vals,{"#":String(data.length+1),"اسم الفرد":h,"صلة القرابة":"رب الأسرة"});data.push(base);
+  const base=emptyRecord();Object.assign(base,vals,{"#":String(data.length+1),"اسم الفرد":h,"صلة القرابة":"رب الأسرة","رقم هوية الفرد":v("f_id")||""});data.push(base);
  }
  autoSave();closeModal("familyModal");rebuildFilters();renderAll();toast(old?"تم تعديل العائلة":"تمت إضافة العائلة");playSaveSound();
 }
@@ -214,7 +214,7 @@ function savePerson(e){
  e.preventDefault();const idx=document.getElementById("p_index").value, r=idx===""?emptyRecord():data[+idx];
  const head=v("p_head").trim(), name=v("p_name").trim();if(!name||!head){alert("اسم الفرد واسم رب الأسرة مطلوبان");return}
  r["اسم الفرد"]=name;r["اسم رب الأسرة"]=head;r["رقم هوية الفرد"]=v("p_id");r["صلة القرابة"]=v("p_rel");r["الجنس"]=v("p_gender");r["الحالة الاجتماعية"]=v("p_marital");r["تاريخ الميلاد"]=v("p_birth");r["العمر التقريبي"]=v("p_age");r["مرض مزمن?"]=r["مرض مزمن؟"]=v("p_chronic");r["نوع المرض"]=v("p_disease");r["إصابة؟"]=v("p_injury");r["سبب الإصابة"]=v("p_injuryreason");r["تفاصيل الإصابة"]=v("p_injurydetails");r["إعاقة؟"]=v("p_disability");r["نوع الإعاقة"]=v("p_disabilitytype");r["يتيم/منفصل عن ذويه?"]=r["يتيم/منفصل عن ذويه؟"]=v("p_orphan");r["حامل؟"]=v("p_preg");r["مرضعة؟"]=v("p_lact");r["ملاحظات الفرد"]=v("p_notes");
- const fm=familyMap().get(head)?.[0];if(fm){["رقم هوية الأسرة","رقم الجوال","رقم جوال بديل","العنوان","داخل/خارج المخيم","حالة اكتمال بيانات الأسرة","المحافظة الأصلية","حالة المسكن الأصلي","نوع السكن الحالي","ملاحظات الأسرة"].forEach(k=>r[k]=fm[k]||"")}
+ const fm=familyMap().get(head)?.[0];if(fm){["رقم هوية الأسرة","رقم الجوال","رقم جوال بديل","العنوان","داخل/خارج المخيم","حالة اكتمال بيانات الأسرة","المحافظة الأصلية","حالة المسكن الأصلي","نوع السكن الحالي","ملاحظات الأسرة"].forEach(k=>{if(filled(fm[k]))r[k]=fm[k]})}
  if(idx===""){r["#"]=String(data.length+1);data.push(r)}
  autoSave();closeModal("personModal");rebuildFilters();renderAll();toast(idx===""?"تمت إضافة الفرد":"تم تعديل الفرد");playSaveSound();
 }
@@ -942,7 +942,7 @@ function familyStatus(rows){
   });
   const familyScore=familyFilled/FAMILY_REQUIRED.length;
   const personScore=personTotal?personFilled/personTotal:0;
-  const score=Math.round((familyScore*.55+personScore*.45)*100);
+  const score=Math.max(0,Math.min(100,Math.round((familyScore*.55+personScore*.45)*100)));
   let status=score>=100?"مكتملة":(score>=50?"جزئية":"غير مكتملة");
   return {status,score,missing,familyFilled,personFilled,personTotal};
 }
@@ -1431,9 +1431,11 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "48.0";
+const APP_RELEASE_VERSION = "49.0";
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
-let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false, syncNextRetryAt=0;
+let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
+let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
+let appReadOnly=true;
 function syncDeviceId(){let id=localStorage.getItem(SYNC_DEVICE_KEY);if(!id){id=(crypto.randomUUID?crypto.randomUUID():"dev-"+Date.now()+"-"+Math.random().toString(16).slice(2));localStorage.setItem(SYNC_DEVICE_KEY,id)}return id}
 
 
@@ -1543,6 +1545,32 @@ function syncBuildChanges(){
   return changes;
 }
 function syncRebuildPending(){const c=syncBuildChanges();syncSavePending(c);return c}
+
+async function fetchSyncRole(){
+  try{
+    const r=await fetch(SYNC_API_URL+"/sync/role",{headers:{"X-Device-Id":syncDeviceId()},cache:"no-store"});
+    const body=await r.json();
+    if(!r.ok||body?.ok===false)throw Error(body?.error||"تعذر معرفة صلاحية الجهاز");
+    syncRole={configured:!!body.configured,isPrimary:!!body.isPrimary,deviceId:body.deviceId||syncDeviceId(),primaryDeviceId:body.primaryDeviceId||""};
+    appReadOnly=!syncRole.isPrimary;
+    document.body.classList.toggle("app-read-only",appReadOnly);
+    const t=document.getElementById("syncRoleText"),b=document.getElementById("claimPrimaryBtn");
+    if(t)t.textContent=syncRole.isPrimary?"هذا هو الجهاز الرئيسي — التعديل والإضافة والحذف والمزامنة مسموحة.":syncRole.configured?"هذا الجهاز للعرض فقط — يستقبل تحديثات الجهاز الرئيسي ولا يسمح بتعديل بيانات المخيم.":"لم يتم تعيين جهاز رئيسي بعد. استخدم زر التعيين من الجهاز الرئيسي فقط.";
+    if(b){b.hidden=syncRole.isPrimary||syncRole.configured;b.textContent=syncRole.configured?"الجهاز الرئيسي محدد":"تعيين هذا الجهاز كجهاز رئيسي";}
+    return syncRole;
+  }catch(e){appReadOnly=true;document.body.classList.add("app-read-only");const t=document.getElementById("syncRoleText");if(t)t.textContent="تعذر التحقق من صلاحية الجهاز — سيبقى الجهاز للعرض فقط لحماية البيانات.";return syncRole;}
+}
+window.claimPrimaryDevice=async function(){
+  try{
+    const r=await syncFetch("/sync/claim-primary",{method:"POST",body:JSON.stringify({})});
+    syncRole={configured:true,isPrimary:true,deviceId:r.deviceId||syncDeviceId(),primaryDeviceId:r.primaryDeviceId||r.deviceId||syncDeviceId()};
+    appReadOnly=false;document.body.classList.remove("app-read-only");
+    toast("تم تعيين هذا الجهاز كالجهاز الرئيسي — التعديلات مسموحة من هنا فقط");
+    await fetchSyncRole();
+  }catch(e){toast(e?.message||"تعذر تعيين الجهاز الرئيسي");await fetchSyncRole();}
+};
+function requirePrimaryForEdit(){if(!appReadOnly)return true;toast("هذا الجهاز للعرض فقط — التعديل مسموح من الجهاز الرئيسي فقط");return false}
+
 async function syncFetch(path,options={}){const headers={"Content-Type":"application/json","X-Device-Id":syncDeviceId(),...(options.headers||{})};const res=await fetch(SYNC_API_URL+path,{...options,headers,cache:"no-store"});let body=null;try{body=await res.json()}catch(e){throw Error("استجابة غير صالحة من الخادم")};if(!res.ok||body?.ok===false)throw Error(body?.error||("HTTP "+res.status));return body}
 function applyChangeToMap(map,c){if(c.operation==="delete")map.delete(c.recordId);else if(c.operation==="upsert"&&c.data){const x=structuredClone(c.data);x.__syncId=c.recordId;x.__syncVersion=Number(c.version||0);map.set(c.recordId,x)}}
 function syncApplyChanges(changes,{protectIds=null}={}){let changed=false;const byId=new Map(data.map((r,i)=>[r.__syncId,i]));for(const c of changes||[]){if(protectIds?.has(c.recordId))continue;if(c.operation==="delete"){const idx=byId.get(c.recordId);if(idx!==undefined){data.splice(idx,1);changed=true;byId.clear();data.forEach((r,i)=>byId.set(r.__syncId,i))}}else if(c.operation==="upsert"&&c.data){const incoming=structuredClone(c.data);incoming.__syncId=c.recordId;incoming.__syncVersion=Number(c.version||0);const idx=byId.get(c.recordId);if(idx===undefined){data.push(incoming);byId.set(c.recordId,data.length-1);changed=true}else if(syncComparable(data[idx])!==syncComparable(incoming)){data[idx]=incoming;changed=true}}}return changed}
@@ -1608,18 +1636,51 @@ async function syncStart(reason="manual"){
   if(pending.length) throw Error(`باقي ${pending.length} تعديل بانتظار تأكيد الخادم`);
   return {ok:true,pending:0};
 }
+
+async function syncAdoptCloudState(){
+  const savedCursor=syncCursor;
+  syncCursor=0;localStorage.setItem(SYNC_CURSOR_KEY,"0");
+  const remoteChanges=await syncPullApply();
+  const remoteMap=new Map();
+  for(const c of remoteChanges)applyChangeToMap(remoteMap,c);
+  if(remoteMap.size){data=Array.from(remoteMap.values());renumber();syncSaveShadow(data);syncSavePending([]);syncLocalSave(true);rebuildFilters();renderAll();}
+  else {syncSavePending([]);}
+  return {count:data.length,changes:remoteChanges.length,previousCursor:savedCursor};
+}
+
 async function syncOnlineReconcile(reason="auto"){
-  if(syncBusy||!navigator.onLine)return;
-  if(reason==="timer" && Date.now()<syncNextRetryAt)return;
-  syncBusy=true;
+  if(syncBusy||!navigator.onLine)return;syncBusy=true;
+  await fetchSyncRole();
   try{
     syncLoadShadow();
     if(!syncInitialized && !syncShadow.length){
-      const h=await syncFetch("/health",{method:"GET"});
-      if(Number(h.records||0)>0){const m=await syncInitialMerge();toast(m.pendingCount?`تم دمج البيانات بأمان — ${m.pendingCount} تعديل بانتظار رفعه للسحابة`:`تمت مطابقة البيانات مع السحابة`)}
-      else{syncSaveShadow([]);syncRebuildPending();}
+      let h=__syncHealthCache;
+      if(!h || (Date.now()-__syncHealthAt)>30000 || showToast){h=await syncFetch("/health",{method:"GET"});__syncHealthCache=h;__syncHealthAt=Date.now();}
+      if(Number(h.records||0)>0){
+        if(syncRole.isPrimary){
+          const m=await syncInitialMerge();
+          toast(m.pendingCount?`تم دمج البيانات بأمان — ${m.pendingCount} تعديل بانتظار رفعه للسحابة`:`تمت مطابقة البيانات مع السحابة`);
+        }else{
+          // Secondary devices never merge their local dataset into the cloud.
+          // They adopt the primary/cloud state so old local mistakes cannot overwrite it.
+          const adopted=await syncAdoptCloudState();
+          toast("تم تحميل النسخة المعتمدة من الجهاز الرئيسي — هذا الجهاز للعرض فقط");
+        }
+      }else{syncSaveShadow([]);syncSavePending([]);}
       syncInitialized=true;
     }else{
+      if(!syncRole.isPrimary){
+        // Read-only devices continuously follow the primary. If any stale local edits exist,
+        // perform a full authoritative re-adoption from the cloud instead of ever uploading them.
+        const stalePending=syncLoadPending();
+        if(stalePending.length){await syncAdoptCloudState();}
+        else{
+          const remoteChanges=await syncPullApply();
+          if(remoteChanges.length){if(syncApplyChanges(remoteChanges)){renumber();syncLocalSave(true);rebuildFilters();renderAll();}}
+          syncSavePending([]);syncSaveShadow(data);
+        }
+        return;
+      }
       // Capture local pending changes before pulling remote changes, then replay them after the pull.
       const beforePending=syncRebuildPending();
       const protectedIds=new Set(beforePending.map(c=>c.recordId));
@@ -1638,12 +1699,7 @@ async function syncOnlineReconcile(reason="auto"){
         const n=syncLoadPending().length;toast(`⚠️ ${n} تعديل محفوظ على الجهاز — بانتظار اكتمال المزامنة`)
       }
     }
-  }catch(e){
-    console.warn("Cloud sync V48:",e);
-    syncNextRetryAt=Date.now()+60000;
-    const n=syncLoadPending().length;
-    if(reason!=="timer")toast(n?`المزامنة غير متاحة الآن — ${n} تعديل محفوظ محلياً`:`البيانات محفوظة محلياً — بانتظار الإنترنت`);
-  }
+  }catch(e){console.warn("Cloud sync V24:",e);const n=syncLoadPending().length;if(reason!=="timer")toast(n?`المزامنة غير متاحة الآن — ${n} تعديل محفوظ محلياً`:`البيانات محفوظة محلياً — بانتظار الإنترنت`)}
   finally{syncBusy=false}
 }
 function showProgramUpdateNotice(){
@@ -1664,7 +1720,7 @@ function installCloudSync(){
   window.addEventListener("online",()=>syncOnlineReconcile("online"));
   window.addEventListener("offline",()=>{const n=syncLoadPending().length;if(n)toast(`⚠️ ${n} تعديل محفوظ محلياً — بانتظار عودة الإنترنت`)});
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")syncOnlineReconcile("visible")});
-  clearInterval(syncTimer);syncTimer=setInterval(()=>syncOnlineReconcile("timer"),30000);
+  clearInterval(syncTimer);syncTimer=setInterval(()=>syncOnlineReconcile("timer"),10000);
   showProgramUpdateNotice();
   setTimeout(()=>syncOnlineReconcile("startup"),700);
 }
@@ -2068,17 +2124,20 @@ function exportStyledExcel(rows,filename="كشف_أبو_عريبان",sheetName=
   window.renderDashboard=function(){if(typeof oldRenderDashboard==="function")oldRenderDashboard();const c=dashboardCounts();for(const [id,vv] of Object.entries({dashChildren:c.children,dashHealthTotal:c.health,dashMissingPeople:c.missing})){const el=document.getElementById(id);if(el)el.textContent=Number(vv).toLocaleString('ar-EG');}refreshSyncCenter(false);};
   window.openSmartReport=function(type){showView("classified");setTimeout(()=>{if(type==="children")setReportPreset("children");else if(type==="missing"){document.getElementById("cr_name").value="كشف البيانات الناقصة";document.getElementById("cr_gender").value="";document.getElementById("cr_minage").value="";document.getElementById("cr_maxage").value="";document.getElementById("cr_special").value="";document.getElementById("cr_rel").value="";selectedReportColumns=["اسم الفرد","اسم رب الأسرة","رقم هوية الفرد","رقم الجوال","تاريخ الميلاد","العمر التقريبي","الجنس","الحالة الاجتماعية"];reportConditions=[{field:"اسم الفرد",op:"empty",value:""},{field:"رقم هوية الفرد",op:"empty",value:""},{field:"تاريخ الميلاد",op:"empty",value:""}];const rm=document.querySelector('input[name="conditionMode"][value="or"]');if(rm)rm.checked=true;initReportColumns();renderConditionRows();runCustomReport();}else{document.getElementById("cr_name").value="كشف الحالات الصحية";document.getElementById("cr_special").value="";selectedReportColumns=["اسم الفرد","اسم رب الأسرة","رقم هوية الفرد","رقم الجوال","الجنس","العمر التقريبي","مرض مزمن؟","إصابة؟","إعاقة؟"];reportConditions=[{field:"مرض مزمن؟",op:"eq",value:"نعم"},{field:"إصابة؟",op:"eq",value:"نعم"},{field:"إعاقة؟",op:"eq",value:"نعم"}];const rh=document.querySelector('input[name="conditionMode"][value="or"]');if(rh)rh.checked=true;initReportColumns();renderConditionRows();runCustomReport();}},50);};
 
-  // Sync center.
+  // Sync center. Health is intentionally throttled so opening/rendering views cannot consume D1 reads.
+  let __syncHealthCache=null,__syncHealthAt=0;
   window.refreshSyncCenter=async function(showToast=true){
+    await fetchSyncRole();
     const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
     try{
-      const h=await syncFetch("/health",{method:"GET"});
+      let h=__syncHealthCache;
+      if(!h || (Date.now()-__syncHealthAt)>30000 || showToast){h=await syncFetch("/health",{method:"GET"});__syncHealthCache=h;__syncHealthAt=Date.now();}
       set("syncStatusValue","متصل ✓");set("syncStatusSub",new Date(h.time||Date.now()).toLocaleString('ar-EG'));set("syncCloudRecords",Number(h.records||0).toLocaleString('ar-EG'));set("syncCloudFamilies",familyMap().size.toLocaleString('ar-EG'));set("syncLatestSeq",Number(h.latestSeq||0).toLocaleString('ar-EG'));
       const changes=syncBuildChanges().length;set("syncPending",String(changes));set("syncLastText",`آخر فحص: ${new Date().toLocaleTimeString('ar-EG')}`);set("dashCloudStatus","متصل ✓");set("dashCloudMeta",`${Number(h.records||0).toLocaleString('ar-EG')} سجل على السحابة`);
       if(showToast)toast("السحابة متصلة والبيانات متاحة");return h;
     }catch(e){set("syncStatusValue","غير متصل");set("syncStatusSub","سيتم الاحتفاظ بالبيانات محلياً");set("syncCloudRecords","—");set("syncCloudFamilies",familyMap().size.toLocaleString('ar-EG'));set("syncLatestSeq","—");set("syncPending",String(syncBuildChanges().length));set("dashCloudStatus","غير متصل");set("dashCloudMeta","البيانات المحلية محفوظة");if(showToast)toast("تعذر الاتصال بالسحابة حالياً");return null;}
   };
-  window.syncCenterNow=async function(){try{await syncStart("manual");await refreshSyncCenter(false);toast("تمت المزامنة وفحص السحابة");}catch(e){await refreshSyncCenter(false);toast("تعذر إتمام المزامنة");}};
+  window.syncCenterNow=async function(){try{await fetchSyncRole();if(!syncRole.isPrimary){await syncPullApply();await fetchSyncRole();toast("تم تحديث الجهاز من السحابة — هذا الجهاز للعرض فقط");await refreshSyncCenter(false);return;}await syncStart("manual");await refreshSyncCenter(false);toast("تمت المزامنة وفحص السحابة");}catch(e){await refreshSyncCenter(false);toast("تعذر إتمام المزامنة");}};
 
   // Extend view behavior for sync center.
   const baseShowView=window.showView;
@@ -2089,7 +2148,7 @@ function exportStyledExcel(rows,filename="كشف_أبو_عريبان",sheetName=
     .dashboard-live-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}
     .live-card{display:flex;align-items:center;gap:11px;padding:14px;border:1px solid var(--border,#e5e7eb);border-radius:15px;background:var(--card,#fff);box-shadow:0 3px 12px rgba(0,0,0,.04)}
     .live-card>div:nth-child(2){flex:1;min-width:0}.live-card span{display:block;font-size:12px;color:var(--muted,#6b7280)}.live-card b{display:block;font-size:20px;margin:2px 0}.live-card small{display:block;color:var(--muted,#6b7280);font-size:11px}.live-icon{font-size:27px}.live-card .btn{white-space:nowrap}
-    .sync-panel{margin-top:14px;padding:15px;border:1px solid var(--border,#e5e7eb);border-radius:15px;background:var(--bg,#f8fafc);display:flex;justify-content:space-between;gap:15px;align-items:center}.sync-panel .actions{display:flex;flex-wrap:wrap;gap:8px}
+    .app-read-only .btn.primary:not([onclick*="showView"]):not([onclick*="refresh"]),.app-read-only .btn.danger,.app-read-only form button[type="submit"]{opacity:.45;cursor:not-allowed}.sync-role-panel{border-color:#cbd5e1;background:linear-gradient(135deg,#f8fafc,#eef2ff)}.sync-panel{margin-top:14px;padding:15px;border:1px solid var(--border,#e5e7eb);border-radius:15px;background:var(--bg,#f8fafc);display:flex;justify-content:space-between;gap:15px;align-items:center}.sync-panel .actions{display:flex;flex-wrap:wrap;gap:8px}
     #p_age{background:#f3f4f6;font-weight:700}.modal .field small{margin-top:4px;display:block}
     @media(max-width:900px){.dashboard-live-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sync-cards{grid-template-columns:repeat(2,minmax(0,1fr))!important}.sync-panel{flex-direction:column;align-items:stretch}}
     @media(max-width:600px){.dashboard-live-grid{grid-template-columns:1fr}.live-card{padding:12px}.sync-cards{grid-template-columns:1fr!important}.sync-panel .actions{display:grid;grid-template-columns:1fr}.sync-panel .btn{width:100%}}
@@ -2314,6 +2373,24 @@ if ('serviceWorker' in navigator) {
     if(online){online.dataset.state=isOnline?'online':'offline';}
     if(onlineText)onlineText.textContent=isOnline?'متصل بالإنترنت':'غير متصل بالإنترنت';
   }
+
+  // Secondary devices are strictly read-only. The Worker enforces this server-side too.
+  const __guardNames=["saveFamily","savePerson","deleteFamily","deletePerson","saveDistribution","deleteDistribution","saveBulkDistribution","restoreBackup","saveNow"];
+  __guardNames.forEach(name=>{
+    const original=window[name]||globalThis[name];
+    if(typeof original!=="function")return;
+    const guarded=function(...args){if(!requirePrimaryForEdit())return;return original.apply(this,args)};
+    window[name]=guarded;
+    try{globalThis[name]=guarded}catch(e){}
+  });
+  document.addEventListener("click",e=>{
+    if(!appReadOnly)return;
+    const el=e.target?.closest?.("button,[onclick],label");if(!el)return;
+    const code=el.getAttribute("onclick")||"";
+    const mut=/saveFamily|savePerson|deleteFamily|deletePerson|saveDistribution|deleteDistribution|saveBulkDistribution|restoreBackup|saveNow|openFamilyModal|openPersonModal|editFamily|editPerson|addMemberToFamily|openDistributionModal|openDistBulkRegisterModal/.test(code);
+    if(mut){e.preventDefault();e.stopImmediatePropagation();requirePrimaryForEdit();}
+  },true);
+
   updateDailyHeader();
   setInterval(updateDailyHeader,1000);
   window.addEventListener('online',updateDailyHeader);
