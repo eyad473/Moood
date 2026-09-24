@@ -1454,7 +1454,39 @@ function displayShowLogin(message=""){const ov=document.getElementById("displayL
 function displayHideLogin(){const ov=document.getElementById("displayLoginOverlay");if(ov)ov.hidden=true}
 function displayWelcome(name){const old=document.getElementById("displayWelcomeBox");if(old)old.remove();const box=document.createElement("div");box.id="displayWelcomeBox";box.className="display-welcome";box.innerHTML=`<div>مرحباً</div><b>${esc(name||"مستخدم جهاز العرض")}</b><small>تم تسجيل الدخول إلى جهاز العرض بنجاح</small>`;document.body.appendChild(box);setTimeout(()=>box.remove(),2600)}
 async function displayLoginSubmit(e){e.preventDefault();const u=document.getElementById("displayLoginUsername").value.trim(),p=document.getElementById("displayLoginPassword").value,err=document.getElementById("displayLoginError");err.textContent="جاري التحقق...";try{const r=await fetch(SYNC_API_URL+"/auth/display-login",{method:"POST",headers:{"Content-Type":"application/json","X-Device-Id":syncDeviceId()},body:JSON.stringify({username:u,password:p,deviceId:syncDeviceId()}),cache:"no-store"});const b=await r.json();if(!r.ok||!b.ok)throw Error(b?.error||"تعذر تسجيل الدخول");displaySessionSave({token:b.token,expiresAt:b.expiresAt,displayName:b.displayName,username:b.username});document.getElementById("displayLoginPassword").value="";displayHideLogin();displayWelcome(b.displayName);await fetchSyncRole(true);await syncOnlineReconcile("manual")}catch(e){err.textContent=e?.message||"تعذر تسجيل الدخول"}}
-async function initDisplayAuth(){try{const r=await fetch(SYNC_API_URL+"/sync/role",{headers:{"X-Device-Id":syncDeviceId(),...displayAuthHeader()},cache:"no-store"});const role=await r.json();if(role?.isPrimary){displayHideLogin();return true}const valid=await displayAuthValidate();if(valid.ok||valid.offline){displayHideLogin();if(valid.ok&&!localStorage.getItem("aboreiban_display_welcome_v52")){localStorage.setItem("aboreiban_display_welcome_v52","1");displayWelcome(valid.displayName)}return true}displayShowLogin(valid.disabled?"تم إيقاف هذا الحساب من الجهاز الرئيسي.":"");return false}catch(e){const valid=await displayAuthValidate();if(valid.ok||valid.offline){displayHideLogin();return true}displayShowLogin("أدخل بيانات حساب جهاز العرض للمتابعة.");return false}}
+async function initDisplayAuth(){
+  try{
+    // Always hydrate the full sync role state. The previous version returned early
+    // for the primary device without setting appReadOnly=false, which made the
+    // "إدارة أجهزة العرض" button appear but refuse to open on the main device.
+    const role=await fetchSyncRole(true);
+    if(role?.isPrimary){
+      appReadOnly=false;
+      document.body.classList.remove("app-read-only");
+      displayHideLogin();
+      return true;
+    }
+    const valid=await displayAuthValidate();
+    if(valid.ok||valid.offline){
+      displayHideLogin();
+      if(valid.ok&&!localStorage.getItem("aboreiban_display_welcome_v52")){
+        localStorage.setItem("aboreiban_display_welcome_v52","1");
+        displayWelcome(valid.displayName);
+      }
+      return true;
+    }
+    displayShowLogin(valid.disabled?"تم إيقاف هذا الحساب من الجهاز الرئيسي.":"");
+    return false;
+  }catch(e){
+    const valid=await displayAuthValidate();
+    if(valid.ok||valid.offline){
+      displayHideLogin();
+      return true;
+    }
+    displayShowLogin("أدخل بيانات حساب جهاز العرض للمتابعة.");
+    return false;
+  }
+}
 function displayAuthLogout(){displaySessionSave(null);displayShowLogin("تم تسجيل الخروج")}
 async function authFetch(path,options={}){const headers={"Content-Type":"application/json","X-Device-Id":syncDeviceId(),...displayAuthHeader(),...(options.headers||{})};const r=await fetch(SYNC_API_URL+path,{...options,headers,cache:"no-store"});let b=null;try{b=await r.json()}catch(e){throw Error("استجابة غير صالحة من الخادم")};if(!r.ok||b?.ok===false)throw Error(b?.error||("HTTP "+r.status));return b}
 window.openDisplayAccountsManager=async function(){if(appReadOnly){toast("إدارة أجهزة العرض متاحة من الجهاز الرئيسي فقط");return}document.getElementById("displayAccountsModal")?.classList.add("show");await renderDisplayAccounts()};
