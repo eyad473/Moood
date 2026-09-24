@@ -1431,14 +1431,14 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "51.0";
+const APP_RELEASE_VERSION = "51.2";
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
 let syncRoleCheckedAt=0;
 const SYNC_ROLE_CACHE_MS=0;
-const PRIMARY_RECONCILE_KEY="aboreiban_primary_reconcile_v51";
-const AUTH_GEN_KEY="aboreiban_authoritative_generation_v51";
+const PRIMARY_RECONCILE_KEY="aboreiban_primary_reconcile_v51_2";
+const AUTH_GEN_KEY="aboreiban_authoritative_generation_v51_2";
 let appReadOnly=true;
 function syncDeviceId(){let id=localStorage.getItem(SYNC_DEVICE_KEY);if(!id){id=(crypto.randomUUID?crypto.randomUUID():"dev-"+Date.now()+"-"+Math.random().toString(16).slice(2));localStorage.setItem(SYNC_DEVICE_KEY,id)}return id}
 
@@ -1688,8 +1688,9 @@ async function syncOnlineReconcile(reason="auto"){
     syncSavePending([]);
     syncInitialized=true;
   }catch(e){
-    console.warn("Cloud sync V51:",e);
-    if(reason!=="timer")toast(`تعذر تحديث السحابة الآن — البيانات المحلية محفوظة`);
+    console.warn("Cloud sync V51.2:",e);
+    if(reason!=="timer")toast(`تعذر تحديث السحابة الآن — ${e?.message||"البيانات المحلية محفوظة"}`);
+    if(reason==="manual") throw e;
   }finally{syncBusy=false}
 }
 function showProgramUpdateNotice(){
@@ -1710,7 +1711,7 @@ function installCloudSync(){
   window.addEventListener("online",()=>syncOnlineReconcile("online"));
   window.addEventListener("offline",()=>{const n=syncLoadPending().length;if(n)toast(`⚠️ ${n} تعديل محفوظ محلياً — بانتظار عودة الإنترنت`)});
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")syncOnlineReconcile("visible")});
-  clearInterval(syncTimer);syncTimer=setInterval(()=>syncOnlineReconcile("timer"),2500);
+  clearInterval(syncTimer);let syncTick=0;syncTimer=setInterval(()=>{syncTick++;if(appReadOnly){syncOnlineReconcile("timer");}else if(syncTick%6===0){syncOnlineReconcile("timer");}},2500);
   showProgramUpdateNotice();
   setTimeout(()=>syncOnlineReconcile("startup"),700);
 }
@@ -2127,7 +2128,7 @@ function exportStyledExcel(rows,filename="كشف_أبو_عريبان",sheetName=
       if(showToast)toast("السحابة متصلة والبيانات متاحة");return h;
     }catch(e){set("syncStatusValue","غير متصل");set("syncStatusSub","سيتم الاحتفاظ بالبيانات محلياً");set("syncCloudRecords","—");set("syncCloudFamilies",familyMap().size.toLocaleString('ar-EG'));set("syncLatestSeq","—");set("syncPending",String(syncBuildChanges().length));set("dashCloudStatus","غير متصل");set("dashCloudMeta","البيانات المحلية محفوظة");if(showToast)toast("تعذر الاتصال بالسحابة حالياً");return null;}
   };
-  window.syncCenterNow=async function(){try{await fetchSyncRole();if(!syncRole.isPrimary){await syncPullApply();await fetchSyncRole();toast("تم تحديث الجهاز من السحابة — هذا الجهاز للعرض فقط");await refreshSyncCenter(false);return;}await syncStart("manual");await refreshSyncCenter(false);toast("تمت المزامنة وفحص السحابة");}catch(e){await refreshSyncCenter(false);toast("تعذر إتمام المزامنة");}};
+  window.syncCenterNow=async function(){try{await fetchSyncRole(true);await syncOnlineReconcile("manual");await refreshSyncCenter(false);toast(syncRole.isPrimary?"تمت المزامنة وفحص السحابة":"تم تحديث الجهاز من السحابة — هذا الجهاز للعرض فقط");}catch(e){await refreshSyncCenter(false);toast(`تعذر إتمام المزامنة: ${e?.message||"خطأ غير معروف"}`);}};
 
   // Extend view behavior for sync center.
   const baseShowView=window.showView;
