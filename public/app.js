@@ -1431,7 +1431,7 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "51.2";
+const APP_RELEASE_VERSION = "51.4";
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
@@ -1439,6 +1439,7 @@ let syncRoleCheckedAt=0;
 const SYNC_ROLE_CACHE_MS=0;
 const PRIMARY_RECONCILE_KEY="aboreiban_primary_reconcile_v51_2";
 const AUTH_GEN_KEY="aboreiban_authoritative_generation_v51_3";
+const AUTH_NOTICE_GEN_KEY="aboreiban_authoritative_notice_generation_v51_4";
 let appReadOnly=true;
 function syncDeviceId(){let id=localStorage.getItem(SYNC_DEVICE_KEY);if(!id){id=(crypto.randomUUID?crypto.randomUUID():"dev-"+Date.now()+"-"+Math.random().toString(16).slice(2));localStorage.setItem(SYNC_DEVICE_KEY,id)}return id}
 
@@ -1537,7 +1538,7 @@ function syncBuildChanges(){
     if(!old||syncComparable(old)!==syncComparable(r)){
       const key=r.__syncId+"|upsert", prev=prevMap.get(key);
       const samePending=prev && prev.data && syncComparable(prev.data)===syncComparable(r);
-      changes.push({opId:samePending?prev.opId:crypto.randomUUID(),recordId:r.__syncId,operation:"upsert",updatedAt:Date.now(),baseVersion:Number(old?.__syncVersion||0),data:structuredClone(r)});
+      changes.push({opId:samePending?prev.opId:crypto.randomUUID(),recordId:r.__syncId,operation:"upsert",updatedAt:(samePending?Number(prev.updatedAt||Date.now()):Date.now()),baseVersion:Number(old?.__syncVersion||0),data:structuredClone(r)});
     }
   }
   for(const old of syncShadow){
@@ -1597,17 +1598,32 @@ async function syncInitialMerge(){
   return await syncAdoptAuthoritativeSnapshot(true);
 }
 async function syncPush(){
-  let changes=syncLoadPending(); if(!changes.length)changes=syncRebuildPending(); if(!changes.length)return {accepted:0,conflicts:[],total:0};
+  let changes=syncLoadPending();
+  if(!changes.length)changes=syncRebuildPending();
+  if(!changes.length)return {accepted:0,total:0,conflicts:[]};
   let accepted=0, conflicts=[];
-  for(let i=0;i<changes.length;i+=100){
-    const batch=changes.slice(i,i+100);
-    const r=await syncFetch("/sync/push",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),changes:batch})});
-    const okIds=new Set((r.accepted||[]).map(x=>typeof x==="string"?x:x.opId));
-    accepted+=okIds.size; conflicts.push(...(r.conflicts||[]));
-    if(okIds.size){
-      const cur=syncLoadPending().filter(c=>!okIds.has(c.opId));
-      syncSavePending(cur);
+  for(let attempt=0;attempt<2 && changes.length;attempt++){
+    conflicts=[];
+    for(let i=0;i<changes.length;i+=100){
+      const batch=changes.slice(i,i+100);
+      const r=await syncFetch("/sync/push",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),changes:batch})});
+      const okIds=new Set((r.accepted||[]).map(x=>typeof x==="string"?x:x.opId));
+      accepted+=okIds.size;
+      conflicts.push(...(r.conflicts||[]));
+      if(okIds.size){
+        const cur=syncLoadPending().filter(c=>!okIds.has(c.opId));
+        syncSavePending(cur);
+      }
     }
+    if(!conflicts.length)break;
+    const byOp=new Map(conflicts.map(c=>[c.opId,c]));
+    const current=syncLoadPending();
+    for(const c of current){
+      const conflict=byOp.get(c.opId);
+      if(conflict && Number.isFinite(Number(conflict.serverVersion))) c.baseVersion=Number(conflict.serverVersion);
+    }
+    syncSavePending(current);
+    changes=current;
   }
   const current=syncBuildChanges();
   syncSavePending(current);
@@ -1632,6 +1648,7 @@ async function syncAdoptAuthoritativeSnapshot(force=false){
   const next=snap.records.map((x,i)=>{const r=structuredClone(x.data||{});r.__syncId=x.recordId;r.__syncVersion=Number(x.version||0);r["#"]=String(i+1);return r;});
   data=next;
   renumber();
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
   syncSaveShadow(data);
   syncSavePending([]);
   localStorage.setItem(AUTH_GEN_KEY,String(snap.generation));
@@ -1683,12 +1700,18 @@ async function syncOnlineReconcile(reason="auto"){
     if(!syncInitialized || serverGen!==seen){
       const h=await syncFetch("/health",{method:"GET"});__syncHealthCache=h;__syncHealthAt=Date.now();
       const snap=await syncAdoptAuthoritativeSnapshot(true);
-      if(snap.changed)toast(`تم تحديث جهاز العرض تلقائياً — ${snap.count} سجل`);
+      if(snap.changed){
+        const lastNotice=Number(localStorage.getItem(AUTH_NOTICE_GEN_KEY)||0);
+        if(snap.generation!==lastNotice){
+          localStorage.setItem(AUTH_NOTICE_GEN_KEY,String(snap.generation));
+          toast(`تم تحديث جهاز العرض تلقائياً — ${snap.count} سجل`);
+        }
+      }
     }
     syncSavePending([]);
     syncInitialized=true;
   }catch(e){
-    console.warn("Cloud sync V51.2:",e);
+    console.warn("Cloud sync V51.4:",e);
     if(reason!=="timer")toast(`تعذر تحديث السحابة الآن — ${e?.message||"البيانات المحلية محفوظة"}`);
     if(reason==="manual") throw e;
   }finally{syncBusy=false}
