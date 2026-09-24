@@ -76,58 +76,20 @@ async function ensureSchema(env) {
 }
 
 
-async function getMeta(env, key, fallback = "0") {
-  const row = await env.DB.prepare(
-    "SELECT value FROM sync_meta WHERE key = ? LIMIT 1"
-  ).bind(key).first();
-  return row?.value ?? fallback;
-}
-
-async function setMeta(env, key, value) {
-  await env.DB.prepare(`
-    INSERT INTO sync_meta(key,value)
-    VALUES(?,?)
-    ON CONFLICT(key) DO UPDATE SET value=excluded.value
-  `).bind(key, String(value)).run();
-}
-
-async function ensureSyncMeta(env) {
-  await ensureSchema(env);
-  const rows = await env.DB.prepare(`
-    SELECT key,value FROM sync_meta
-    WHERE key IN ('records_count','active_records_count','latest_seq')
-  `).all();
-  const found = new Set((rows.results || []).map(r => String(r.key)));
-  const statements = [];
-  if (!found.has('latest_seq')) {
-    statements.push(env.DB.prepare(`
-      INSERT OR IGNORE INTO sync_meta(key,value)
-      SELECT 'latest_seq', CAST(COALESCE(MAX(seq),0) AS TEXT)
-      FROM sync_changes
-    `));
-  }
-  if (!found.has('records_count')) {
-    statements.push(env.DB.prepare(`
-      INSERT OR IGNORE INTO sync_meta(key,value)
-      SELECT 'records_count', CAST(COUNT(*) AS TEXT)
-      FROM sync_records
-    `));
-  }
-  if (!found.has('active_records_count')) {
-    statements.push(env.DB.prepare(`
-      INSERT OR IGNORE INTO sync_meta(key,value)
-      SELECT 'active_records_count', CAST(COUNT(*) AS TEXT)
-      FROM sync_records WHERE deleted = 0
-    `));
-  }
-  if (statements.length) await env.DB.batch(statements);
-}
-
-
 async function getPrimaryDevice(env) {
   await ensureSchema(env);
   const row = await env.DB.prepare("SELECT value FROM sync_meta WHERE key = 'primary_device_id'").first();
   return cleanString(row?.value || "", 120);
+}
+
+async function getMeta(env, key) {
+  await ensureSchema(env);
+  const row = await env.DB.prepare("SELECT value FROM sync_meta WHERE key = ?").bind(key).first();
+  return cleanString(row?.value || "", 500);
+}
+
+async function setMeta(env, key, value) {
+  await env.DB.prepare("INSERT INTO sync_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(key, String(value ?? "")).run();
 }
 
 async function requirePrimaryDevice(request, env) {
@@ -143,7 +105,9 @@ async function role(request, env) {
   const auth = requireAuth(request, env);
   if (!auth.ok) return json({ ok:false, error:auth.error }, 401);
   const primary = await getPrimaryDevice(env);
-  return json({ ok:true, deviceId:auth.deviceId, primaryDeviceId:primary || null, isPrimary:!!primary && auth.deviceId===primary, configured:!!primary });
+  const ready = (await getMeta(env,"authoritative_snapshot_at")) !== "";
+  const count = Number(await getMeta(env,"authoritative_record_count") || 0);
+  return json({ ok:true, deviceId:auth.deviceId, primaryDeviceId:primary || null, isPrimary:!!primary && auth.deviceId===primary, configured:!!primary, authoritativeReady:ready, authoritativeRecordCount:count });
 }
 
 async function claimPrimary(request, env) {
@@ -154,27 +118,20 @@ async function claimPrimary(request, env) {
   const current = await getPrimaryDevice(env);
   if (current && current !== auth.deviceId) return json({ ok:false, error:"يوجد جهاز رئيسي محدد بالفعل", primaryDeviceId:current }, 409);
   await env.DB.prepare("INSERT INTO sync_meta(key,value) VALUES('primary_device_id',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(auth.deviceId).run();
-  return json({ ok:true, deviceId:auth.deviceId, primaryDeviceId:auth.deviceId, isPrimary:true });
+  const ready = (await getMeta(env,"authoritative_snapshot_at")) !== "";
+  return json({ ok:true, deviceId:auth.deviceId, primaryDeviceId:auth.deviceId, isPrimary:true, authoritativeReady:ready });
 }
 
 async function health(env) {
   try {
-    await ensureSyncMeta(env);
-    const rows = await env.DB.prepare(`
-      SELECT key,value FROM sync_meta
-      WHERE key IN ('records_count','active_records_count','latest_seq')
-    `).all();
-    const meta = Object.fromEntries((rows.results || []).map(r => [String(r.key), Number(r.value || 0)]));
+    await ensureSchema(env);
+    const count = Number(await getMeta(env,"authoritative_record_count") || 0);
+    const seq = Number(await getMeta(env,"latest_seq") || 0);
+    const ready = (await getMeta(env,"authoritative_snapshot_at")) !== "";
     return json({
-      ok: true,
-      worker: "moood",
-      database: "mood",
-      binding: "DB",
-      records: meta.records_count || 0,
-      activeRecords: meta.active_records_count || 0,
-      latestSeq: meta.latest_seq || 0,
-      time: new Date().toISOString(),
-      syncVersion: "V49.1"
+      ok: true, worker: "moood", database: "mood", binding: "DB",
+      records: count, activeRecords: count, latestSeq: seq,
+      authoritativeReady: ready, time: new Date().toISOString()
     });
   } catch (e) {
     return json({ ok: false, error: "D1 غير جاهزة", detail: String(e?.message || e) }, 500);
@@ -185,7 +142,7 @@ async function pull(request, env) {
   const auth = requireAuth(request, env);
   if (!auth.ok) return json({ ok: false, error: auth.error }, 401);
 
-  await ensureSyncMeta(env);
+  await ensureSchema(env);
   const url = new URL(request.url);
   const since = Math.max(0, Number(url.searchParams.get("since") || 0));
   const limit = Math.min(1000, Math.max(1, Number(url.searchParams.get("limit") || 500)));
@@ -220,15 +177,9 @@ async function pull(request, env) {
   }));
 
   const nextSince = changes.length ? changes[changes.length - 1].seq : since;
-  const latestSeq = Number(await getMeta(env, "latest_seq", String(nextSince || 0)));
-
   return json({
-    ok: true,
-    since,
-    latestSeq: Math.max(latestSeq, nextSince || 0),
-    nextSince,
-    hasMore: changes.length === limit,
-    changes
+    ok: true, since, latestSeq: Number(nextSince || 0), nextSince,
+    hasMore: changes.length === limit, changes
   });
 }
 
@@ -236,7 +187,7 @@ async function push(request, env) {
   const auth = await requirePrimaryDevice(request, env);
   if (!auth.ok) return json({ ok: false, error: auth.error, code: auth.code || "AUTH" }, auth.code === "READ_ONLY" ? 403 : 409);
 
-  await ensureSyncMeta(env);
+  await ensureSchema(env);
   let body;
   try {
     body = await request.json();
@@ -254,8 +205,6 @@ async function push(request, env) {
   const conflicts = [];
   const skipped = [];
   const statements = [];
-  let totalDelta = 0;
-  let activeDelta = 0;
 
   for (const item of incoming) {
     if (!validRecord(item)) {
@@ -331,13 +280,6 @@ async function push(request, env) {
     const nextVersion = current ? Number(current.version) + 1 : 1;
     const createdAt = now();
     const dataJson = operation === "delete" ? null : JSON.stringify(data);
-    const nextDeleted = operation === "delete" ? 1 : 0;
-    if (!current) {
-      totalDelta += 1;
-      if (nextDeleted === 0) activeDelta += 1;
-    } else if (Number(current.deleted) !== nextDeleted) {
-      activeDelta += nextDeleted ? -1 : 1;
-    }
 
     statements.push(
       env.DB.prepare(`
@@ -394,34 +336,69 @@ async function push(request, env) {
     }
   }
 
-  const latest = await env.DB.prepare(`SELECT seq FROM sync_changes ORDER BY seq DESC LIMIT 1`).first();
-  const oldTotal = Number(await getMeta(env, "records_count", "0"));
-  const oldActive = Number(await getMeta(env, "active_records_count", "0"));
-  const latestSeq = Number(latest?.seq || await getMeta(env, "latest_seq", "0"));
-  await env.DB.batch([
-    env.DB.prepare(`INSERT INTO sync_meta(key,value) VALUES("latest_seq",?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).bind(latestSeq),
-    env.DB.prepare(`INSERT INTO sync_meta(key,value) VALUES("records_count",?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).bind(Math.max(0, oldTotal + totalDelta)),
-    env.DB.prepare(`INSERT INTO sync_meta(key,value) VALUES("active_records_count",?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).bind(Math.max(0, oldActive + activeDelta))
-  ]);
+  const latest = await env.DB.prepare("SELECT seq FROM sync_changes ORDER BY seq DESC LIMIT 1").first();
+  await setMeta(env,"latest_seq",Number(latest?.seq||0));
+  return json({ ok:true, accepted, conflicts, skipped, latestSeq:Number(latest?.seq||0) });
+}
 
-  return json({
-    ok: true,
-    accepted,
-    conflicts,
-    skipped,
-    latestSeq,
-    serverActiveRecords: Math.max(0, oldActive + activeDelta),
-    syncVersion: "V49.1"
-  });
+async function primaryReconcile(request, env) {
+  const auth = await requirePrimaryDevice(request, env);
+  if (!auth.ok) return json({ok:false,error:auth.error,code:auth.code||"AUTH"}, auth.code==="READ_ONLY"?403:409);
+  await ensureSchema(env);
+  let body; try { body=await request.json(); } catch { return json({ok:false,error:"JSON غير صالح"},400); }
+  const records=Array.isArray(body.records)?body.records:[];
+  if(!records.length) return json({ok:false,error:"لا توجد سجلات لاعتمادها"},400);
+  if(records.length>2000) return json({ok:false,error:"عدد السجلات كبير"},413);
+
+  // Read the current authoritative record IDs once. This endpoint is run once after deployment,
+  // not on every 2.5-second sync cycle. Distributions (dist:*) are never touched.
+  const current=await env.DB.prepare("SELECT record_id,data_json,version,deleted FROM sync_records WHERE record_id LIKE 'r-%'").all();
+  const existing=new Map((current.results||[]).map(r=>[String(r.record_id),r]));
+  const incoming=new Map();
+  for(const item of records){
+    const id=cleanString(item.recordId,200);
+    if(!id || !id.startsWith("r-")) continue;
+    incoming.set(id,item.data||{});
+  }
+  const statements=[]; const t=now(); let changed=0,deleted=0;
+  for(const [id,data] of incoming){
+    const old=existing.get(id);
+    const dataJson=JSON.stringify(data);
+    if(old && Number(old.deleted)===0 && old.data_json===dataJson) continue;
+    const nextVersion=old?Number(old.version||0)+1:1;
+    const opId=crypto.randomUUID();
+    statements.push(
+      env.DB.prepare(`INSERT INTO sync_records(record_id,data_json,updated_at,version,deleted,updated_by,created_at) VALUES(?,?,?,?,0,?,?) ON CONFLICT(record_id) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at,version=excluded.version,deleted=0,updated_by=excluded.updated_by`).bind(id,dataJson,t,nextVersion,auth.deviceId,t),
+      env.DB.prepare(`INSERT INTO sync_changes(op_id,record_id,operation,data_json,updated_at,version,device_id,created_at) VALUES(?,?,?,?,?,?,?,?)`).bind(opId,id,"upsert",dataJson,t,nextVersion,auth.deviceId,t)
+    );
+    changed++;
+    if(statements.length>=100){await env.DB.batch(statements.splice(0,100));}
+  }
+  for(const [id,old] of existing){
+    if(incoming.has(id) || Number(old.deleted)===1) continue;
+    const nextVersion=Number(old.version||0)+1; const opId=crypto.randomUUID();
+    statements.push(
+      env.DB.prepare(`UPDATE sync_records SET data_json='{}',updated_at=?,version=?,deleted=1,updated_by=? WHERE record_id=?`).bind(t,nextVersion,auth.deviceId,id),
+      env.DB.prepare(`INSERT INTO sync_changes(op_id,record_id,operation,data_json,updated_at,version,device_id,created_at) VALUES(?,?,?,?,?,?,?,?)`).bind(opId,id,"delete",null,t,nextVersion,auth.deviceId,t)
+    );
+    deleted++;
+    if(statements.length>=100){await env.DB.batch(statements.splice(0,100));}
+  }
+  if(statements.length) await env.DB.batch(statements);
+  await setMeta(env,"authoritative_snapshot_at",t);
+  await setMeta(env,"authoritative_record_count",incoming.size);
+  const latest=await env.DB.prepare("SELECT seq FROM sync_changes ORDER BY seq DESC LIMIT 1").first();
+  await setMeta(env,"latest_seq",Number(latest?.seq||0));
+  return json({ok:true,authoritativeReady:true,recordCount:incoming.size,changed,deleted,latestSeq:Number(latest?.seq||0)});
 }
 
 async function bootstrap(request, env) {
   const auth = await requirePrimaryDevice(request, env);
   if (!auth.ok) return json({ ok: false, error: auth.error, code: auth.code || "AUTH" }, auth.code === "READ_ONLY" ? 403 : 409);
 
-  await ensureSyncMeta(env);
-  const count = Number(await getMeta(env, "records_count", "0"));
-  if (count > 0) {
+  await ensureSchema(env);
+  const count = await env.DB.prepare("SELECT COUNT(*) AS count FROM sync_records").first();
+  if (Number(count?.count || 0) > 0) {
     return json({ ok: false, error: "قاعدة البيانات تحتوي بيانات بالفعل؛ لم يتم استبدالها" }, 409);
   }
 
@@ -473,14 +450,13 @@ async function bootstrap(request, env) {
     }
   }
 
-  const latest = await env.DB.prepare(`SELECT seq FROM sync_changes ORDER BY seq DESC LIMIT 1`).first();
-  const latestSeq = Number(latest?.seq || 0);
-  await env.DB.batch([
-    env.DB.prepare(`INSERT INTO sync_meta(key,value) VALUES("records_count",?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).bind(inserted),
-    env.DB.prepare(`INSERT INTO sync_meta(key,value) VALUES("active_records_count",?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).bind(inserted),
-    env.DB.prepare(`INSERT INTO sync_meta(key,value) VALUES("latest_seq",?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).bind(latestSeq)
-  ]);
-  return json({ ok: true, inserted, ignored, latestSeq, syncVersion: "V49.1" });
+  const latest = await env.DB.prepare("SELECT COALESCE(MAX(seq),0) AS seq FROM sync_changes").first();
+  return json({
+    ok: true,
+    inserted,
+    ignored,
+    latestSeq: Number(latest?.seq || 0)
+  });
 }
 
 export default {
@@ -503,11 +479,12 @@ export default {
       if (url.pathname === "/sync/claim-primary" && request.method === "POST") return await claimPrimary(request, env);
       if (url.pathname === "/sync/pull" && request.method === "GET") return await pull(request, env);
       if (url.pathname === "/sync/push" && request.method === "POST") return await push(request, env);
+      if (url.pathname === "/sync/primary-reconcile" && request.method === "POST") return await primaryReconcile(request, env);
       if (url.pathname === "/sync/bootstrap" && request.method === "POST") return await bootstrap(request, env);
       if (env.ASSETS) return await env.ASSETS.fetch(request);
       return json({ ok: false, error: "واجهة التطبيق غير مفعلة: اربط Static Assets" }, 404);
     } catch (e) {
-      return json({ ok: false, error: "خطأ داخلي", detail: String(e?.message || e), syncVersion: "V49.1" }, 500);
+      return json({ ok: false, error: "خطأ داخلي", detail: String(e?.message || e) }, 500);
     }
   }
 };
