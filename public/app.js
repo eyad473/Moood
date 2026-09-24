@@ -1431,12 +1431,13 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "49.1";
+const APP_RELEASE_VERSION = "50.0";
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
-let syncRoleFetchedAt=0;
+let syncRoleCheckedAt=0;
 const SYNC_ROLE_CACHE_MS=15000;
+const PRIMARY_RECONCILE_KEY="aboreiban_primary_reconcile_v50";
 let appReadOnly=true;
 function syncDeviceId(){let id=localStorage.getItem(SYNC_DEVICE_KEY);if(!id){id=(crypto.randomUUID?crypto.randomUUID():"dev-"+Date.now()+"-"+Math.random().toString(16).slice(2));localStorage.setItem(SYNC_DEVICE_KEY,id)}return id}
 
@@ -1549,25 +1550,36 @@ function syncBuildChanges(){
 function syncRebuildPending(){const c=syncBuildChanges();syncSavePending(c);return c}
 
 async function fetchSyncRole(force=false){
-  if(!force && syncRoleFetchedAt && (Date.now()-syncRoleFetchedAt)<SYNC_ROLE_CACHE_MS){return syncRole;}
+  const nowTs=Date.now();
+  if(!force && syncRoleCheckedAt && (nowTs-syncRoleCheckedAt)<SYNC_ROLE_CACHE_MS) return syncRole;
   try{
     const r=await fetch(SYNC_API_URL+"/sync/role",{headers:{"X-Device-Id":syncDeviceId()},cache:"no-store"});
     const body=await r.json();
     if(!r.ok||body?.ok===false)throw Error(body?.error||"تعذر معرفة صلاحية الجهاز");
-    syncRole={configured:!!body.configured,isPrimary:!!body.isPrimary,deviceId:body.deviceId||syncDeviceId(),primaryDeviceId:body.primaryDeviceId||""};
-    syncRoleFetchedAt=Date.now();
+    syncRole={configured:!!body.configured,isPrimary:!!body.isPrimary,deviceId:body.deviceId||syncDeviceId(),primaryDeviceId:body.primaryDeviceId||"",authoritativeReady:!!body.authoritativeReady};
+    syncRoleCheckedAt=nowTs;
     appReadOnly=!syncRole.isPrimary;
     document.body.classList.toggle("app-read-only",appReadOnly);
     const t=document.getElementById("syncRoleText"),b=document.getElementById("claimPrimaryBtn");
-    if(t)t.textContent=syncRole.isPrimary?"هذا هو الجهاز الرئيسي — التعديل والإضافة والحذف والمزامنة مسموحة.":syncRole.configured?"هذا الجهاز للعرض فقط — يستقبل تحديثات الجهاز الرئيسي ولا يسمح بتعديل بيانات المخيم.":"لم يتم تعيين جهاز رئيسي بعد. استخدم زر التعيين من الجهاز الرئيسي فقط.";
+    if(t)t.textContent=syncRole.isPrimary?"هذا هو الجهاز الرئيسي — التعديل والإضافة والحذف والمزامنة مسموحة.":syncRole.configured?"هذا الجهاز للعرض فقط — يستقبل تحديثات الجهاز الرئيسي ولا يسمح بتعديل بيانات المخيم.":"لم يتم تعيين جهاز رئيسي بعد. لا تقم بتعيين هذا الجهاز إلا إذا كان هو الجهاز الرئيسي الفعلي.";
     if(b){b.hidden=syncRole.isPrimary||syncRole.configured;b.textContent=syncRole.configured?"الجهاز الرئيسي محدد":"تعيين هذا الجهاز كجهاز رئيسي";}
     return syncRole;
-  }catch(e){appReadOnly=true;document.body.classList.add("app-read-only");const t=document.getElementById("syncRoleText");if(t)t.textContent="تعذر التحقق من صلاحية الجهاز — سيبقى الجهاز للعرض فقط لحماية البيانات.";return syncRole;}
+  }catch(e){
+    syncRoleCheckedAt=0;
+    appReadOnly=true;
+    document.body.classList.add("app-read-only");
+    const t=document.getElementById("syncRoleText");
+    if(t)t.textContent="تعذر الاتصال بخادم صلاحية الجهاز — الجهاز مقفول للعرض حتى يتم التحقق.";
+    const b=document.getElementById("claimPrimaryBtn");
+    if(b)b.hidden=true;
+    return syncRole;
+  }
 }
+
 window.claimPrimaryDevice=async function(){
   try{
     const r=await syncFetch("/sync/claim-primary",{method:"POST",body:JSON.stringify({})});
-    syncRole={configured:true,isPrimary:true,deviceId:r.deviceId||syncDeviceId(),primaryDeviceId:r.primaryDeviceId||r.deviceId||syncDeviceId()};
+    syncRole={configured:true,isPrimary:true,deviceId:r.deviceId||syncDeviceId(),primaryDeviceId:r.primaryDeviceId||r.deviceId||syncDeviceId(),authoritativeReady:!!r.authoritativeReady};
     appReadOnly=false;document.body.classList.remove("app-read-only");
     toast("تم تعيين هذا الجهاز كالجهاز الرئيسي — التعديلات مسموحة من هنا فقط");
     await fetchSyncRole();
@@ -1652,6 +1664,19 @@ async function syncAdoptCloudState(){
   return {count:data.length,changes:remoteChanges.length,previousCursor:savedCursor};
 }
 
+async function syncPrimaryReconcileOnce(){
+  if(!syncRole.isPrimary)return {ok:false,skipped:true};
+  if(localStorage.getItem(PRIMARY_RECONCILE_KEY)==="done")return {ok:true,skipped:true};
+  data=syncNormalizeRows(data);
+  const records=data.map((r,i)=>({recordId:syncRecordId(r,i),data:r}));
+  const r=await syncFetch("/sync/primary-reconcile",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),records})});
+  if(!r?.ok)throw Error(r?.error||"تعذر اعتماد بيانات الجهاز الرئيسي");
+  localStorage.setItem(PRIMARY_RECONCILE_KEY,"done");
+  syncCursor=0;localStorage.setItem(SYNC_CURSOR_KEY,"0");
+  syncLoadShadow();
+  return r;
+}
+
 async function syncOnlineReconcile(reason="auto"){
   if(syncBusy||!navigator.onLine)return;syncBusy=true;
   await fetchSyncRole();
@@ -1660,23 +1685,32 @@ async function syncOnlineReconcile(reason="auto"){
     if(!syncInitialized && !syncShadow.length){
       let h=__syncHealthCache;
       if(!h || (Date.now()-__syncHealthAt)>30000 || showToast){h=await syncFetch("/health",{method:"GET"});__syncHealthCache=h;__syncHealthAt=Date.now();}
-      if(Number(h.records||0)>0){
-        if(syncRole.isPrimary){
+      if(syncRole.isPrimary){
+        const rec=await syncPrimaryReconcileOnce();
+        if(rec?.ok){
+          syncLoadShadow();
+          syncSavePending([]);
           const m=await syncInitialMerge();
-          toast(m.pendingCount?`تم دمج البيانات بأمان — ${m.pendingCount} تعديل بانتظار رفعه للسحابة`:`تمت مطابقة البيانات مع السحابة`);
-        }else{
-          // Secondary devices never merge their local dataset into the cloud.
-          // They adopt the primary/cloud state so old local mistakes cannot overwrite it.
-          const adopted=await syncAdoptCloudState();
-          toast("تم تحميل النسخة المعتمدة من الجهاز الرئيسي — هذا الجهاز للعرض فقط");
+          toast("تم اعتماد بيانات الجهاز الرئيسي وحذف السجلات القديمة من السحابة دون المساس بالتوزيعات");
         }
-      }else{syncSaveShadow([]);syncSavePending([]);}
+      }else if(h.authoritativeReady){
+        // Secondary devices never merge their local dataset into the cloud.
+        // They adopt only the authoritative snapshot prepared by the primary device.
+        await syncAdoptCloudState();
+        toast("تم تحميل النسخة المعتمدة من الجهاز الرئيسي — هذا الجهاز للعرض فقط");
+      }else{
+        syncSavePending([]);
+        toast("بانتظار اعتماد النسخة الحالية من الجهاز الرئيسي…");
+      }
       syncInitialized=true;
     }else{
       if(!syncRole.isPrimary){
-        // Read-only devices continuously follow the primary. If any stale local edits exist,
-        // perform a full authoritative re-adoption from the cloud instead of ever uploading them.
+        // Read-only devices continuously follow the primary and NEVER push local changes.
         const stalePending=syncLoadPending();
+        if(!syncRole.authoritativeReady){
+          syncSavePending([]);
+          return;
+        }
         if(stalePending.length){await syncAdoptCloudState();}
         else{
           const remoteChanges=await syncPullApply();
