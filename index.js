@@ -44,6 +44,18 @@ function validRecord(item) {
   return Number.isFinite(updatedAt) && updatedAt > 0;
 }
 
+
+async function hashText(text){const bytes=new TextEncoder().encode(String(text||""));const digest=await crypto.subtle.digest("SHA-256",bytes);return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,"0")).join("")}
+function randomToken(){return crypto.randomUUID()+"-"+crypto.randomUUID()}
+async function ensureAuthSchema(env){await ensureSchema(env);await env.DB.batch([env.DB.prepare(`CREATE TABLE IF NOT EXISTS display_accounts (id INTEGER PRIMARY KEY AUTOINCREMENT,full_name TEXT NOT NULL,username TEXT NOT NULL UNIQUE,password_salt TEXT NOT NULL,password_hash TEXT NOT NULL,enabled INTEGER NOT NULL DEFAULT 1,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,last_login_at INTEGER,session_hash TEXT,session_expires_at INTEGER)`),env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_display_accounts_enabled ON display_accounts(enabled)`),env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_display_accounts_session ON display_accounts(session_hash)`)])}
+async function displaySession(request,env){await ensureAuthSchema(env);const auth=request.headers.get("Authorization")||"";const token=auth.startsWith("Bearer ")?auth.slice(7):"";if(!token)return {ok:false,error:"تسجيل الدخول مطلوب",code:"DISPLAY_AUTH_REQUIRED"};const sh=await hashText(token);const row=await env.DB.prepare(`SELECT id,full_name,username,enabled,session_expires_at FROM display_accounts WHERE session_hash=? LIMIT 1`).bind(sh).first();if(!row)return {ok:false,error:"جلسة الدخول غير صالحة",code:"DISPLAY_AUTH_REQUIRED"};if(Number(row.enabled)!==1)return {ok:false,error:"تم إيقاف حساب جهاز العرض من الجهاز الرئيسي",code:"DISPLAY_DISABLED"};if(Number(row.session_expires_at||0)<now())return {ok:false,error:"انتهت جلسة الدخول، سجّل الدخول من جديد",code:"DISPLAY_AUTH_REQUIRED"};return {ok:true,accountId:Number(row.id),fullName:cleanString(row.full_name,200),username:cleanString(row.username,120)}}
+async function requireDisplayOrPrimary(request,env){const p=await requirePrimaryDevice(request,env);if(p.ok)return {...p,role:"primary"};const d=await displaySession(request,env);if(d.ok)return {...d,role:"display"};return {ok:false,error:d.error,code:d.code||p.code||"AUTH"}}
+async function displayLogin(request,env){await ensureAuthSchema(env);let body;try{body=await request.json()}catch{return json({ok:false,error:"بيانات الدخول غير صالحة"},400)}const username=cleanString(body.username,120).toLowerCase(),password=String(body.password||"");if(!username||password.length<6)return json({ok:false,error:"اسم المستخدم وكلمة المرور مطلوبان"},400);const row=await env.DB.prepare(`SELECT id,full_name,username,password_salt,password_hash,enabled FROM display_accounts WHERE username=? LIMIT 1`).bind(username).first();if(!row)return json({ok:false,error:"اسم المستخدم أو كلمة المرور غير صحيحة",code:"BAD_LOGIN"},401);if(Number(row.enabled)!==1)return json({ok:false,error:"تم إيقاف حساب جهاز العرض من الجهاز الرئيسي",code:"DISPLAY_DISABLED"},403);const check=await hashText(String(row.password_salt)+password);if(check!==String(row.password_hash))return json({ok:false,error:"اسم المستخدم أو كلمة المرور غير صحيحة",code:"BAD_LOGIN"},401);const token=randomToken(),sessionHash=await hashText(token),expires=now()+1000*60*60*24*30;await env.DB.prepare(`UPDATE display_accounts SET session_hash=?,session_expires_at=?,last_login_at=?,updated_at=? WHERE id=?`).bind(sessionHash,expires,now(),now(),Number(row.id)).run();return json({ok:true,token,expiresAt:expires,displayName:cleanString(row.full_name,200),username:cleanString(row.username,120)})}
+async function displayValidate(request,env){const d=await displaySession(request,env);if(!d.ok)return json({ok:false,error:d.error,code:d.code},d.code==="DISPLAY_DISABLED"?403:401);return json({ok:true,displayName:d.fullName,username:d.username})}
+async function listDisplayAccounts(request,env){const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);await ensureAuthSchema(env);const rows=await env.DB.prepare(`SELECT id,full_name,username,enabled,created_at,updated_at,last_login_at FROM display_accounts ORDER BY id DESC`).all();return json({ok:true,accounts:(rows.results||[]).map(r=>({id:Number(r.id),fullName:r.full_name,username:r.username,enabled:Number(r.enabled)===1,createdAt:Number(r.created_at),updatedAt:Number(r.updated_at),lastLoginAt:r.last_login_at?Number(r.last_login_at):null}))})}
+async function createDisplayAccount(request,env){const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);await ensureAuthSchema(env);let body;try{body=await request.json()}catch{return json({ok:false,error:"JSON غير صالح"},400)}const fullName=cleanString(body.fullName,200),username=cleanString(body.username,120).toLowerCase(),password=String(body.password||"");if(fullName.length<3||username.length<3||password.length<6)return json({ok:false,error:"أدخل الاسم الرباعي واسم مستخدم من 3 أحرف على الأقل وكلمة مرور من 6 أحرف على الأقل"},400);if(!/^[a-zA-Z0-9._-]+$/.test(username))return json({ok:false,error:"اسم المستخدم يجب أن يحتوي على أحرف إنجليزية وأرقام و . _ - فقط"},400);const exists=await env.DB.prepare(`SELECT id FROM display_accounts WHERE username=? LIMIT 1`).bind(username).first();if(exists)return json({ok:false,error:"اسم المستخدم مستخدم بالفعل",code:"USERNAME_EXISTS"},409);const salt=randomToken(),ph=await hashText(salt+password),t=now();const res=await env.DB.prepare(`INSERT INTO display_accounts(full_name,username,password_salt,password_hash,enabled,created_at,updated_at) VALUES(?,?,?,?,1,?,?)`).bind(fullName,username,salt,ph,t,t).run();return json({ok:true,id:Number(res.meta?.last_row_id||0),fullName,username})}
+async function setDisplayAccount(request,env){const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);await ensureAuthSchema(env);let body;try{body=await request.json()}catch{return json({ok:false,error:"JSON غير صالح"},400)}const id=Number(body.id||0);if(!id)return json({ok:false,error:"معرّف الحساب مفقود"},400);const exists=await env.DB.prepare(`SELECT id FROM display_accounts WHERE id=?`).bind(id).first();if(!exists)return json({ok:false,error:"حساب جهاز العرض غير موجود"},404);const enabled=body.enabled===true,password=String(body.password||"");if(password){if(password.length<6)return json({ok:false,error:"كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل"},400);const salt=randomToken(),ph=await hashText(salt+password);await env.DB.prepare(`UPDATE display_accounts SET enabled=?,password_salt=?,password_hash=?,session_hash=NULL,session_expires_at=NULL,updated_at=? WHERE id=?`).bind(enabled?1:0,salt,ph,now(),id).run()}else{if(enabled)await env.DB.prepare(`UPDATE display_accounts SET enabled=1,updated_at=? WHERE id=?`).bind(now(),id).run();else await env.DB.prepare(`UPDATE display_accounts SET enabled=0,session_hash=NULL,session_expires_at=NULL,updated_at=? WHERE id=?`).bind(now(),id).run()}return json({ok:true})}
+
 async function ensureSchema(env) {
   await env.DB.batch([
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS sync_records (
@@ -102,12 +114,11 @@ async function requirePrimaryDevice(request, env) {
 }
 
 async function role(request, env) {
-  const auth = requireAuth(request, env);
-  if (!auth.ok) return json({ ok:false, error:auth.error }, 401);
-  const primary = await getPrimaryDevice(env);
-  const ready = (await getMeta(env,"authoritative_snapshot_at")) !== "";
-  const count = Number(await getMeta(env,"authoritative_record_count") || 0);
-  return json({ ok:true, deviceId:auth.deviceId, primaryDeviceId:primary || null, isPrimary:!!primary && auth.deviceId===primary, configured:!!primary, authoritativeReady:ready, authoritativeRecordCount:count, authoritativeGeneration:Number(await getMeta(env,"authoritative_generation") || 0) });
+  const auth=requireAuth(request,env); if(!auth.ok)return json({ok:false,error:auth.error},401);
+  const primary=await getPrimaryDevice(env); const ready=(await getMeta(env,"authoritative_snapshot_at"))!==""; const count=Number(await getMeta(env,"authoritative_record_count")||0); const generation=Number(await getMeta(env,"authoritative_generation")||0); const isPrimary=!!primary&&auth.deviceId===primary;
+  const display=await displaySession(request,env);
+  if(!isPrimary && !display.ok) return json({ok:true,deviceId:auth.deviceId,primaryDeviceId:primary||null,isPrimary:false,configured:!!primary,authoritativeReady:ready,authoritativeRecordCount:count,authoritativeGeneration:generation,displayAuthenticated:false,displayAuthRequired:true},200);
+  return json({ok:true,deviceId:auth.deviceId,primaryDeviceId:primary||null,isPrimary,configured:!!primary,authoritativeReady:ready,authoritativeRecordCount:count,authoritativeGeneration:generation,displayAuthenticated:!!display.ok,displayAuthRequired:false,displayName:display.ok?display.fullName:"",displayUsername:display.ok?display.username:""});
 }
 
 async function claimPrimary(request, env) {
@@ -139,8 +150,8 @@ async function health(env) {
 }
 
 async function pull(request, env) {
-  const auth = requireAuth(request, env);
-  if (!auth.ok) return json({ ok: false, error: auth.error }, 401);
+  const auth = await requireDisplayOrPrimary(request, env);
+  if (!auth.ok) return json({ ok:false,error:auth.error,code:auth.code },auth.code==="DISPLAY_DISABLED"?403:401);
 
   await ensureSchema(env);
   const url = new URL(request.url);
@@ -408,8 +419,8 @@ async function primaryReconcile(request, env) {
 }
 
 async function authoritativeSnapshot(request, env) {
-  const auth = requireAuth(request, env);
-  if (!auth.ok) return json({ok:false,error:auth.error},401);
+  const auth = await requireDisplayOrPrimary(request, env);
+  if (!auth.ok) return json({ok:false,error:auth.error,code:auth.code},auth.code==="DISPLAY_DISABLED"?403:401);
   await ensureSchema(env);
   const generation = Number(await getMeta(env,"authoritative_generation") || 0);
   const ready = (await getMeta(env,"authoritative_snapshot_at")) !== "";
@@ -513,6 +524,11 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.pathname === "/health") return await health(env);
+      if (url.pathname === "/auth/display-login" && request.method === "POST") return await displayLogin(request, env);
+      if (url.pathname === "/auth/display-validate" && request.method === "GET") return await displayValidate(request, env);
+      if (url.pathname === "/auth/display-accounts" && request.method === "GET") return await listDisplayAccounts(request, env);
+      if (url.pathname === "/auth/display-accounts" && request.method === "POST") return await createDisplayAccount(request, env);
+      if (url.pathname === "/auth/display-account" && request.method === "POST") return await setDisplayAccount(request, env);
       if (url.pathname === "/sync/role" && request.method === "GET") return await role(request, env);
       if (url.pathname === "/sync/claim-primary" && request.method === "POST") return await claimPrimary(request, env);
       if (url.pathname === "/sync/pull" && request.method === "GET") return await pull(request, env);
