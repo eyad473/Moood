@@ -1437,11 +1437,14 @@ let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
 let syncRoleCheckedAt=0;
 const SYNC_ROLE_CACHE_MS=10000;
 const PRIMARY_RECONCILE_KEY="aboreiban_primary_reconcile_v52";
-const AUTH_GEN_KEY="aboreiban_authoritative_generation_v51_5";
-const AUTH_NOTICE_GEN_KEY="aboreiban_authoritative_notice_generation_v51_5";
-const AUTH_SNAPSHOT_CACHE_KEY="aboreiban_authoritative_snapshot_cache_v51_5";
-const SYNC_ROLE_CACHE_KEY="aboreiban_sync_role_cache_v51_5";
+const AUTH_GEN_KEY="aboreiban_authoritative_generation_v52_2";
+const AUTH_NOTICE_GEN_KEY="aboreiban_authoritative_notice_generation_v52_2";
+const AUTH_SNAPSHOT_CACHE_KEY="aboreiban_authoritative_snapshot_cache_v52_2";
+const SYNC_ROLE_CACHE_KEY="aboreiban_sync_role_cache_v52_2";
 let appReadOnly=true;
+
+function displayAuthLock(){document.body.classList.add("display-auth-locked");}
+function displayAuthUnlock(){document.body.classList.remove("display-auth-locked");}
 
 /* V52 SECURE DISPLAY AUTHENTICATION */
 const DISPLAY_SESSION_KEY="aboreiban_display_session_v52";
@@ -1450,11 +1453,12 @@ function displaySessionLoad(){try{displaySessionInfo=JSON.parse(localStorage.get
 function displaySessionSave(x){displaySessionInfo=x||null;if(x)localStorage.setItem(DISPLAY_SESSION_KEY,JSON.stringify(x));else localStorage.removeItem(DISPLAY_SESSION_KEY)}
 function displayAuthHeader(){const s=displaySessionLoad();return s?.token?{"Authorization":"Bearer "+s.token}:{} }
 async function displayAuthValidate(){const s=displaySessionLoad();if(!s?.token)return {ok:false};try{const r=await fetch(SYNC_API_URL+"/auth/display-validate",{headers:{...displayAuthHeader(),"X-Device-Id":syncDeviceId()},cache:"no-store"});const b=await r.json();if(!r.ok||!b.ok){if(r.status===403)displaySessionSave(null);return {ok:false,disabled:r.status===403,error:b?.error||"انتهت جلسة الدخول"}}displaySessionInfo={...s,displayName:b.displayName,username:b.username};displaySessionSave(displaySessionInfo);return {ok:true,displayName:b.displayName,username:b.username}}catch(e){return {ok:!!s.token,offline:true,displayName:s.displayName,username:s.username}}}
-function displayShowLogin(message=""){const ov=document.getElementById("displayLoginOverlay");if(!ov)return;ov.hidden=false;const er=document.getElementById("displayLoginError");if(er)er.textContent=message;setTimeout(()=>document.getElementById("displayLoginUsername")?.focus(),80)}
-function displayHideLogin(){const ov=document.getElementById("displayLoginOverlay");if(ov)ov.hidden=true}
+function displayShowLogin(message=""){displayAuthLock();const ov=document.getElementById("displayLoginOverlay");if(!ov)return;ov.hidden=false;const er=document.getElementById("displayLoginError");if(er)er.textContent=message;setTimeout(()=>document.getElementById("displayLoginUsername")?.focus(),80)}
+function displayHideLogin(){const ov=document.getElementById("displayLoginOverlay");if(ov)ov.hidden=true;displayAuthUnlock()}
 function displayWelcome(name){const old=document.getElementById("displayWelcomeBox");if(old)old.remove();const box=document.createElement("div");box.id="displayWelcomeBox";box.className="display-welcome";box.innerHTML=`<div>مرحباً</div><b>${esc(name||"مستخدم جهاز العرض")}</b><small>تم تسجيل الدخول إلى جهاز العرض بنجاح</small>`;document.body.appendChild(box);setTimeout(()=>box.remove(),2600)}
-async function displayLoginSubmit(e){e.preventDefault();const u=document.getElementById("displayLoginUsername").value.trim(),p=document.getElementById("displayLoginPassword").value,err=document.getElementById("displayLoginError");err.textContent="جاري التحقق...";try{const r=await fetch(SYNC_API_URL+"/auth/display-login",{method:"POST",headers:{"Content-Type":"application/json","X-Device-Id":syncDeviceId()},body:JSON.stringify({username:u,password:p,deviceId:syncDeviceId()}),cache:"no-store"});const b=await r.json();if(!r.ok||!b.ok)throw Error(b?.error||"تعذر تسجيل الدخول");displaySessionSave({token:b.token,expiresAt:b.expiresAt,displayName:b.displayName,username:b.username});document.getElementById("displayLoginPassword").value="";displayHideLogin();displayWelcome(b.displayName);await fetchSyncRole(true);await syncOnlineReconcile("manual")}catch(e){err.textContent=e?.message||"تعذر تسجيل الدخول"}}
+async function displayLoginSubmit(e){e.preventDefault();const u=document.getElementById("displayLoginUsername").value.trim(),p=document.getElementById("displayLoginPassword").value,err=document.getElementById("displayLoginError");err.textContent="جاري التحقق...";try{const r=await fetch(SYNC_API_URL+"/auth/display-login",{method:"POST",headers:{"Content-Type":"application/json","X-Device-Id":syncDeviceId()},body:JSON.stringify({username:u,password:p,deviceId:syncDeviceId()}),cache:"no-store"});const b=await r.json();if(!r.ok||!b.ok)throw Error(b?.error||"تعذر تسجيل الدخول");displaySessionSave({token:b.token,expiresAt:b.expiresAt,displayName:b.displayName,username:b.username});document.getElementById("displayLoginPassword").value="";await fetchSyncRole(true);displayHideLogin();displayWelcome(b.displayName);try{await syncOnlineReconcile("manual")}catch(syncErr){toast("تم تسجيل الدخول، وتعذر تحديث البيانات الآن — سيتم استخدام آخر بيانات محفوظة")} }catch(e){err.textContent=e?.message||"تعذر تسجيل الدخول"}}
 async function initDisplayAuth(){
+  displayAuthLock();
   try{
     // Always hydrate the full sync role state. The previous version returned early
     // for the primary device without setting appReadOnly=false, which made the
