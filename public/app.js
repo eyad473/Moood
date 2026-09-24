@@ -1438,7 +1438,7 @@ let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
 let syncRoleCheckedAt=0;
 const SYNC_ROLE_CACHE_MS=0;
 const PRIMARY_RECONCILE_KEY="aboreiban_primary_reconcile_v51_2";
-const AUTH_GEN_KEY="aboreiban_authoritative_generation_v51_2";
+const AUTH_GEN_KEY="aboreiban_authoritative_generation_v51_3";
 let appReadOnly=true;
 function syncDeviceId(){let id=localStorage.getItem(SYNC_DEVICE_KEY);if(!id){id=(crypto.randomUUID?crypto.randomUUID():"dev-"+Date.now()+"-"+Math.random().toString(16).slice(2));localStorage.setItem(SYNC_DEVICE_KEY,id)}return id}
 
