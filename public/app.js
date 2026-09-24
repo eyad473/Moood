@@ -1438,8 +1438,10 @@ let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
 let syncRoleCheckedAt=0;
 const SYNC_ROLE_CACHE_MS=0;
 const PRIMARY_RECONCILE_KEY="aboreiban_primary_reconcile_v51_2";
-const AUTH_GEN_KEY="aboreiban_authoritative_generation_v51_3";
-const AUTH_NOTICE_GEN_KEY="aboreiban_authoritative_notice_generation_v51_4";
+const AUTH_GEN_KEY="aboreiban_authoritative_generation_v51_5";
+const AUTH_NOTICE_GEN_KEY="aboreiban_authoritative_notice_generation_v51_5";
+const AUTH_SNAPSHOT_CACHE_KEY="aboreiban_authoritative_snapshot_cache_v51_5";
+const SYNC_ROLE_CACHE_KEY="aboreiban_sync_role_cache_v51_5";
 let appReadOnly=true;
 function syncDeviceId(){let id=localStorage.getItem(SYNC_DEVICE_KEY);if(!id){id=(crypto.randomUUID?crypto.randomUUID():"dev-"+Date.now()+"-"+Math.random().toString(16).slice(2));localStorage.setItem(SYNC_DEVICE_KEY,id)}return id}
 
@@ -1544,7 +1546,7 @@ function syncBuildChanges(){
   for(const old of syncShadow){
     if(!newMap.has(old.__syncId)){
       const key=old.__syncId+"|delete",prev=prevMap.get(key);
-      changes.push({opId:prev?.opId||crypto.randomUUID(),recordId:old.__syncId,operation:"delete",updatedAt:Date.now(),baseVersion:Number(old?.__syncVersion||0)});
+      changes.push({opId:prev?.opId||crypto.randomUUID(),recordId:old.__syncId,operation:"delete",updatedAt:Number(prev?.updatedAt||Date.now()),baseVersion:Number(old?.__syncVersion||0)});
     }
   }
   return changes;
@@ -1558,7 +1560,8 @@ async function fetchSyncRole(force=false){
     const r=await fetch(SYNC_API_URL+"/sync/role",{headers:{"X-Device-Id":syncDeviceId()},cache:"no-store"});
     const body=await r.json();
     if(!r.ok||body?.ok===false)throw Error(body?.error||"تعذر معرفة صلاحية الجهاز");
-    syncRole={configured:!!body.configured,isPrimary:!!body.isPrimary,deviceId:body.deviceId||syncDeviceId(),primaryDeviceId:body.primaryDeviceId||"",authoritativeReady:!!body.authoritativeReady};
+    syncRole={configured:!!body.configured,isPrimary:!!body.isPrimary,deviceId:body.deviceId||syncDeviceId(),primaryDeviceId:body.primaryDeviceId||"",authoritativeReady:!!body.authoritativeReady,authoritativeGeneration:Number(body.authoritativeGeneration||0)};
+    try{localStorage.setItem(SYNC_ROLE_CACHE_KEY,JSON.stringify(syncRole))}catch(e){}
     syncRoleCheckedAt=nowTs;
     appReadOnly=!syncRole.isPrimary;
     document.body.classList.toggle("app-read-only",appReadOnly);
@@ -1568,6 +1571,15 @@ async function fetchSyncRole(force=false){
     return syncRole;
   }catch(e){
     syncRoleCheckedAt=0;
+    try{
+      const cached=JSON.parse(localStorage.getItem(SYNC_ROLE_CACHE_KEY)||"null");
+      if(cached&&cached.configured){
+        syncRole=cached;
+        appReadOnly=!cached.isPrimary;
+        document.body.classList.toggle("app-read-only",appReadOnly);
+        return syncRole;
+      }
+    }catch(_e){}
     appReadOnly=true;
     document.body.classList.add("app-read-only");
     const t=document.getElementById("syncRoleText");
@@ -1598,36 +1610,42 @@ async function syncInitialMerge(){
   return await syncAdoptAuthoritativeSnapshot(true);
 }
 async function syncPush(){
-  let changes=syncLoadPending();
-  if(!changes.length)changes=syncRebuildPending();
-  if(!changes.length)return {accepted:0,total:0,conflicts:[]};
+  let pending=syncLoadPending();
+  if(!pending.length)pending=syncRebuildPending();
+  const originalTotal=pending.length;
+  if(!pending.length)return {accepted:0,total:0,remaining:0,conflicts:[]};
   let accepted=0, conflicts=[];
-  for(let attempt=0;attempt<2 && changes.length;attempt++){
+  for(let attempt=0;attempt<3 && pending.length;attempt++){
     conflicts=[];
-    for(let i=0;i<changes.length;i+=100){
-      const batch=changes.slice(i,i+100);
+    for(let i=0;i<pending.length;i+=100){
+      const batch=pending.slice(i,i+100);
       const r=await syncFetch("/sync/push",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),changes:batch})});
       const okIds=new Set((r.accepted||[]).map(x=>typeof x==="string"?x:x.opId));
       accepted+=okIds.size;
       conflicts.push(...(r.conflicts||[]));
       if(okIds.size){
-        const cur=syncLoadPending().filter(c=>!okIds.has(c.opId));
-        syncSavePending(cur);
+        pending=pending.filter(c=>!okIds.has(c.opId));
+        syncSavePending(pending);
       }
     }
     if(!conflicts.length)break;
     const byOp=new Map(conflicts.map(c=>[c.opId,c]));
-    const current=syncLoadPending();
-    for(const c of current){
+    pending=pending.map(c=>{
       const conflict=byOp.get(c.opId);
-      if(conflict && Number.isFinite(Number(conflict.serverVersion))) c.baseVersion=Number(conflict.serverVersion);
-    }
-    syncSavePending(current);
-    changes=current;
+      if(conflict&&Number.isFinite(Number(conflict.serverVersion))){
+        return {...c,baseVersion:Number(conflict.serverVersion)};
+      }
+      return c;
+    });
+    syncSavePending(pending);
   }
-  const current=syncBuildChanges();
-  syncSavePending(current);
-  return {accepted,total:changes.length,conflicts};
+  // Never rebuild the queue from an old shadow after accepted operations: that used to
+  // recreate already-accepted changes and leave the main device showing false pending edits.
+  if(!pending.length){
+    syncSaveShadow(data);
+    syncSavePending([]);
+  }
+  return {accepted,total:originalTotal,remaining:pending.length,conflicts};
 }
 async function syncFetchAuthoritativeSnapshot(){
   let after="", all=[], generation=0, loops=0;
@@ -1646,6 +1664,10 @@ async function syncAdoptAuthoritativeSnapshot(force=false){
   const snap=await syncFetchAuthoritativeSnapshot();
   if(!force && snap.generation<=currentGen)return {changed:false,generation:snap.generation,count:data.length};
   const next=snap.records.map((x,i)=>{const r=structuredClone(x.data||{});r.__syncId=x.recordId;r.__syncVersion=Number(x.version||0);r["#"]=String(i+1);return r;});
+  // Persist the complete authoritative snapshot BEFORE replacing the live UI data.
+  // This is the offline source of truth for display devices.
+  const cache={generation:Number(snap.generation||0),records:structuredClone(next),savedAt:Date.now()};
+  localStorage.setItem(AUTH_SNAPSHOT_CACHE_KEY,JSON.stringify(cache));
   data=next;
   renumber();
   localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
@@ -1656,6 +1678,18 @@ async function syncAdoptAuthoritativeSnapshot(force=false){
   syncCursor=Number(__syncHealthCache?.latestSeq||0);
   rebuildFilters();renderAll();
   return {changed:true,generation:snap.generation,count:data.length};
+}
+function syncLoadOfflineAuthoritativeCache(){
+  try{
+    const raw=localStorage.getItem(AUTH_SNAPSHOT_CACHE_KEY); if(!raw)return false;
+    const cache=JSON.parse(raw); if(!cache||!Array.isArray(cache.records)||!cache.records.length)return false;
+    data=syncNormalizeRows(structuredClone(cache.records));
+    renumber();
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+    localStorage.setItem(AUTH_GEN_KEY,String(Number(cache.generation||0)));
+    rebuildFilters();renderAll();
+    return true;
+  }catch(e){return false}
 }
 async function syncAdoptCloudState(){return await syncAdoptAuthoritativeSnapshot(true)}
 async function syncPrimaryReconcileOnce(){
@@ -1686,7 +1720,7 @@ async function syncOnlineReconcile(reason="auto"){
       }
       syncLoadShadow();syncRebuildPending();
       const pushed=await syncPush();
-      if(pushed.total>0 && pushed.accepted===pushed.total){
+      if(pushed.total>0 && pushed.remaining===0){
         const h=await syncFetch("/health",{method:"GET"});__syncHealthCache=h;__syncHealthAt=Date.now();
         syncSaveShadow(data);syncSavePending([]);localStorage.setItem(AUTH_GEN_KEY,String(Number(h.authoritativeGeneration||localStorage.getItem(AUTH_GEN_KEY)||0)));
       }
@@ -1729,6 +1763,8 @@ function showProgramUpdateNotice(){
 
 function installCloudSync(){
   data=syncNormalizeRows(data);syncLoadShadow();syncLoadPending();
+  if(!navigator.onLine){ syncLoadOfflineAuthoritativeCache(); }
+
   window.saveNow=function(){try{syncLocalSave(false);syncRebuildPending();syncOnlineReconcile("manual")}catch(e){toast("تعذر حفظ البيانات محلياً")}};
   window.autoSave=function(){try{syncLocalSave(true);syncRebuildPending();clearTimeout(window.__syncSaveTimer);window.__syncSaveTimer=setTimeout(()=>syncOnlineReconcile("auto"),350)}catch(e){toast("تعذر الحفظ المحلي: مساحة التخزين ممتلئة")}};
   window.addEventListener("online",()=>syncOnlineReconcile("online"));
