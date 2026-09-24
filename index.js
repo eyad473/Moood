@@ -44,10 +44,7 @@ function validRecord(item) {
   return Number.isFinite(updatedAt) && updatedAt > 0;
 }
 
-let schemaReady = false;
-
 async function ensureSchema(env) {
-  if (schemaReady) return;
   await env.DB.batch([
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS sync_records (
       record_id TEXT PRIMARY KEY,
@@ -73,9 +70,43 @@ async function ensureSchema(env) {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     )`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_sync_changes_seq ON sync_changes(seq)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_sync_records_updated ON sync_records(updated_at)`)
   ]);
-  schemaReady = true;
+}
+
+
+async function getPrimaryDevice(env) {
+  await ensureSchema(env);
+  const row = await env.DB.prepare("SELECT value FROM sync_meta WHERE key = 'primary_device_id'").first();
+  return cleanString(row?.value || "", 120);
+}
+
+async function requirePrimaryDevice(request, env) {
+  const auth = requireAuth(request, env);
+  if (!auth.ok) return auth;
+  const primary = await getPrimaryDevice(env);
+  if (!primary) return { ok: false, error: "لم يتم تعيين جهاز رئيسي بعد", code: "NO_PRIMARY" };
+  if (auth.deviceId !== primary) return { ok: false, error: "هذا الجهاز للعرض فقط؛ التعديل مسموح من الجهاز الرئيسي فقط", code: "READ_ONLY" };
+  return { ok: true, deviceId: auth.deviceId, primaryDeviceId: primary };
+}
+
+async function role(request, env) {
+  const auth = requireAuth(request, env);
+  if (!auth.ok) return json({ ok:false, error:auth.error }, 401);
+  const primary = await getPrimaryDevice(env);
+  return json({ ok:true, deviceId:auth.deviceId, primaryDeviceId:primary || null, isPrimary:!!primary && auth.deviceId===primary, configured:!!primary });
+}
+
+async function claimPrimary(request, env) {
+  const auth = requireAuth(request, env);
+  if (!auth.ok) return json({ ok:false, error:auth.error }, 401);
+  if (!auth.deviceId) return json({ ok:false, error:"معرّف الجهاز مفقود" }, 400);
+  await ensureSchema(env);
+  const current = await getPrimaryDevice(env);
+  if (current && current !== auth.deviceId) return json({ ok:false, error:"يوجد جهاز رئيسي محدد بالفعل", primaryDeviceId:current }, 409);
+  await env.DB.prepare("INSERT INTO sync_meta(key,value) VALUES('primary_device_id',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(auth.deviceId).run();
+  return json({ ok:true, deviceId:auth.deviceId, primaryDeviceId:auth.deviceId, isPrimary:true });
 }
 
 async function health(env) {
@@ -138,20 +169,23 @@ async function pull(request, env) {
   }));
 
   const nextSince = changes.length ? changes[changes.length - 1].seq : since;
+  const maxRow = await env.DB.prepare("SELECT COALESCE(MAX(seq),0) AS seq FROM sync_changes").first();
+  const countRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM sync_records WHERE deleted = 0").first();
 
   return json({
     ok: true,
     since,
-    latestSeq: Number(nextSince || 0),
+    latestSeq: Number(maxRow?.seq || nextSince || 0),
     nextSince,
     hasMore: changes.length === limit,
+    serverActiveRecords: Number(countRow?.count || 0),
     changes
   });
 }
 
 async function push(request, env) {
-  const auth = requireAuth(request, env);
-  if (!auth.ok) return json({ ok: false, error: auth.error }, 401);
+  const auth = await requirePrimaryDevice(request, env);
+  if (!auth.ok) return json({ ok: false, error: auth.error, code: auth.code || "AUTH" }, auth.code === "READ_ONLY" ? 403 : 409);
 
   await ensureSchema(env);
   let body;
@@ -302,17 +336,22 @@ async function push(request, env) {
     }
   }
 
+  const latest = await env.DB.prepare("SELECT COALESCE(MAX(seq),0) AS seq FROM sync_changes").first();
+  const live = await env.DB.prepare("SELECT COUNT(*) AS count FROM sync_records WHERE deleted = 0").first();
+
   return json({
     ok: true,
     accepted,
     conflicts,
-    skipped
+    skipped,
+    latestSeq: Number(latest?.seq || 0),
+    serverActiveRecords: Number(live?.count || 0)
   });
 }
 
 async function bootstrap(request, env) {
-  const auth = requireAuth(request, env);
-  if (!auth.ok) return json({ ok: false, error: auth.error }, 401);
+  const auth = await requirePrimaryDevice(request, env);
+  if (!auth.ok) return json({ ok: false, error: auth.error, code: auth.code || "AUTH" }, auth.code === "READ_ONLY" ? 403 : 409);
 
   await ensureSchema(env);
   const count = await env.DB.prepare("SELECT COUNT(*) AS count FROM sync_records").first();
@@ -393,6 +432,8 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.pathname === "/health") return await health(env);
+      if (url.pathname === "/sync/role" && request.method === "GET") return await role(request, env);
+      if (url.pathname === "/sync/claim-primary" && request.method === "POST") return await claimPrimary(request, env);
       if (url.pathname === "/sync/pull" && request.method === "GET") return await pull(request, env);
       if (url.pathname === "/sync/push" && request.method === "POST") return await push(request, env);
       if (url.pathname === "/sync/bootstrap" && request.method === "POST") return await bootstrap(request, env);
