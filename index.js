@@ -394,8 +394,14 @@ async function primaryReconcile(request, env) {
   if(statements.length) await env.DB.batch(statements);
   await setMeta(env,"authoritative_snapshot_at",t);
   await setMeta(env,"authoritative_record_count",incoming.size);
-  let authoritativeGeneration = Number(await getMeta(env,"authoritative_generation") || 0) + 1;
-  await setMeta(env,"authoritative_generation",authoritativeGeneration);
+  // Advance the authoritative generation only when the primary data actually changed.
+  // This prevents display devices from re-downloading the full snapshot and showing
+  // a repeated "تم تحديث جهاز العرض تلقائياً" notification on every polling cycle.
+  let authoritativeGeneration = Number(await getMeta(env,"authoritative_generation") || 0);
+  if(changed || deleted){
+    authoritativeGeneration += 1;
+    await setMeta(env,"authoritative_generation",authoritativeGeneration);
+  }
   const latest=await env.DB.prepare("SELECT seq FROM sync_changes ORDER BY seq DESC LIMIT 1").first();
   await setMeta(env,"latest_seq",Number(latest?.seq||0));
   return json({ok:true,authoritativeReady:true,recordCount:incoming.size,authoritativeGeneration,changed,deleted,latestSeq:Number(latest?.seq||0)});
