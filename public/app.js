@@ -1431,10 +1431,12 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "49.0";
+const APP_RELEASE_VERSION = "49.1";
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
+let syncRoleFetchedAt=0;
+const SYNC_ROLE_CACHE_MS=15000;
 let appReadOnly=true;
 function syncDeviceId(){let id=localStorage.getItem(SYNC_DEVICE_KEY);if(!id){id=(crypto.randomUUID?crypto.randomUUID():"dev-"+Date.now()+"-"+Math.random().toString(16).slice(2));localStorage.setItem(SYNC_DEVICE_KEY,id)}return id}
 
@@ -1546,12 +1548,14 @@ function syncBuildChanges(){
 }
 function syncRebuildPending(){const c=syncBuildChanges();syncSavePending(c);return c}
 
-async function fetchSyncRole(){
+async function fetchSyncRole(force=false){
+  if(!force && syncRoleFetchedAt && (Date.now()-syncRoleFetchedAt)<SYNC_ROLE_CACHE_MS){return syncRole;}
   try{
     const r=await fetch(SYNC_API_URL+"/sync/role",{headers:{"X-Device-Id":syncDeviceId()},cache:"no-store"});
     const body=await r.json();
     if(!r.ok||body?.ok===false)throw Error(body?.error||"تعذر معرفة صلاحية الجهاز");
     syncRole={configured:!!body.configured,isPrimary:!!body.isPrimary,deviceId:body.deviceId||syncDeviceId(),primaryDeviceId:body.primaryDeviceId||""};
+    syncRoleFetchedAt=Date.now();
     appReadOnly=!syncRole.isPrimary;
     document.body.classList.toggle("app-read-only",appReadOnly);
     const t=document.getElementById("syncRoleText"),b=document.getElementById("claimPrimaryBtn");
@@ -1720,7 +1724,7 @@ function installCloudSync(){
   window.addEventListener("online",()=>syncOnlineReconcile("online"));
   window.addEventListener("offline",()=>{const n=syncLoadPending().length;if(n)toast(`⚠️ ${n} تعديل محفوظ محلياً — بانتظار عودة الإنترنت`)});
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")syncOnlineReconcile("visible")});
-  clearInterval(syncTimer);syncTimer=setInterval(()=>syncOnlineReconcile("timer"),10000);
+  clearInterval(syncTimer);syncTimer=setInterval(()=>syncOnlineReconcile("timer"),2500);
   showProgramUpdateNotice();
   setTimeout(()=>syncOnlineReconcile("startup"),700);
 }
