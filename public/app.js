@@ -1469,7 +1469,37 @@ async function displayAuthValidate(){
     return {ok:true,offline:true,displayName:s.displayName,username:s.username,permissions:s.permissions||displayPermissions};
   }
 }
-function displayShowLogin(message=""){displayAuthLock();const ov=document.getElementById("displayLoginOverlay");if(!ov)return;ov.hidden=false;const er=document.getElementById("displayLoginError");if(er)er.textContent=message;setTimeout(()=>{const active=document.activeElement;const overlay=document.getElementById("displayLoginOverlay");const user=document.getElementById("displayLoginUsername");if(!user||overlay?.hidden)return;if(active&&active!==document.body&&active!==overlay&&active.closest?.("#displayLoginForm"))return;user.focus()},80)}
+let displayLoginUserInteracted=false;
+function displayShowLogin(message=""){
+  displayAuthLock();
+  const ov=document.getElementById("displayLoginOverlay");
+  if(!ov)return;
+  ov.hidden=false;
+  const er=document.getElementById("displayLoginError");
+  if(er)er.textContent=message;
+  // Do not steal focus from either login field. The old delayed focus could
+  // fire after the user tapped the password field on slower mobile devices.
+  displayLoginUserInteracted=false;
+}
+function initDisplayLoginFocusGuard(){
+  const form=document.getElementById("displayLoginForm");
+  const user=document.getElementById("displayLoginUsername");
+  const pass=document.getElementById("displayLoginPassword");
+  if(!form||!user||!pass||form.dataset.focusGuardReady==="1")return;
+  form.dataset.focusGuardReady="1";
+  const mark=()=>{displayLoginUserInteracted=true;};
+  [user,pass].forEach(input=>{
+    input.addEventListener("pointerdown",mark,{passive:true});
+    input.addEventListener("touchstart",mark,{passive:true});
+    input.addEventListener("focus",mark);
+  });
+  user.addEventListener("keydown",e=>{
+    if(e.key==="Enter"){
+      e.preventDefault();
+      pass.focus();
+    }
+  });
+}
 function displayHideLogin(){const ov=document.getElementById("displayLoginOverlay");if(ov)ov.hidden=true;displayAuthUnlock()}
 function displayWelcome(name){const old=document.getElementById("displayWelcomeBox");if(old)old.remove();const box=document.createElement("div");box.id="displayWelcomeBox";box.className="display-welcome";box.innerHTML=`<div>مرحباً</div><b>${esc(name||"مستخدم جهاز العرض")}</b><small>تم تسجيل الدخول إلى جهاز العرض بنجاح</small>`;document.body.appendChild(box);setTimeout(()=>box.remove(),2600)}
 function applyDisplayPermissions(){if(appReadOnly!==true)return;const p=displayPermissions||{};const map={families:['families','familySearch'],people:['people','records'],search:['search','familySearch'],reports:['reports','classified'],distributions:['distributions','distributions']};const tabs=[...document.querySelectorAll('.tab[data-view]')];for(const t of tabs){const v=t.dataset.view;let allowed=true;if(v==='dashboard')allowed=p.dashboard!==false;else if(v==='families')allowed=p.families!==false;else if(v==='familySearch')allowed=p.search!==false&&p.families!==false;else if(v==='records')allowed=p.people!==false;else if(v==='classified')allowed=p.reports!==false;else if(v==='distributions')allowed=p.distributions!==false;else if(v==='syncCenter'||v==='settings')allowed=false;t.style.display=allowed?'':'none'}for(const [perm,views] of Object.entries(map)){if(p[perm]===false){for(const v of views){document.querySelectorAll(`[data-view="${v}"]`).forEach(el=>el.style.display='none')}}}if(p.dashboard===false){try{showView('familySearch')}catch(e){}}} 
@@ -1512,7 +1542,15 @@ window.saveDisplayPermissions=async function(id){const m=document.getElementById
 window.toggleDisplayEmergency=async function(id,name,locked){const action=locked?'إلغاء قفل الطوارئ':'قفل الجهاز فوراً';if(!confirm(`هل تريد ${action} لـ ${name}؟`))return;try{await authFetch('/auth/display-emergency-lock',{method:'POST',body:JSON.stringify({id,locked:!locked})});toast(locked?'تم إلغاء قفل الجهاز':'تم قفل جهاز العرض فوراً');await renderDisplayAccounts()}catch(e){toast(e.message||'تعذر تنفيذ الأمر')}};
 window.showDisplayActivity=async function(id,name){try{const r=await authFetch(`/auth/display-activity?accountId=${id}&limit=40`,{method:'GET'});const fmt=t=>new Date(t).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'});const rows=(r.items||[]).map(x=>`<div style="padding:9px 0;border-bottom:1px solid #eee"><b>${esc(x.action)}</b><small style="display:block;color:#667085">${esc(fmt(x.createdAt))} · ${esc(x.details||'')}</small></div>`).join('');const wrap=document.createElement('div');wrap.className='modal show';wrap.id='activityTempModal';wrap.innerHTML=`<div class="modalbox" style="max-width:620px"><div class="modalhead"><b>سجل نشاط — ${esc(name)}</b><button class="btn" onclick="document.getElementById('activityTempModal')?.remove()">إغلاق</button></div><div class="modalbody"><div class="familybox">${rows||'<div class="empty">لا يوجد نشاط مسجل.</div>'}</div></div></div>`;document.body.appendChild(wrap)}catch(e){toast(e.message||'تعذر تحميل سجل النشاط')}};
 
-document.addEventListener("DOMContentLoaded",()=>document.getElementById("displayLoginForm")?.addEventListener("submit",displayLoginSubmit));
+function initDisplayLoginUI(){
+  const form=document.getElementById("displayLoginForm");
+  if(!form||form.dataset.uiReady==="1")return;
+  form.dataset.uiReady="1";
+  form.addEventListener("submit",displayLoginSubmit);
+  initDisplayLoginFocusGuard();
+}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initDisplayLoginUI,{once:true});
+else initDisplayLoginUI();
 function syncDeviceId(){let id=localStorage.getItem(SYNC_DEVICE_KEY);if(!id){id=(crypto.randomUUID?crypto.randomUUID():"dev-"+Date.now()+"-"+Math.random().toString(16).slice(2));localStorage.setItem(SYNC_DEVICE_KEY,id)}return id}
 
 
