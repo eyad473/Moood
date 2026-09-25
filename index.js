@@ -80,11 +80,12 @@ async function displayLogin(request,env){
   let body;try{body=await request.json()}catch{return json({ok:false,error:"بيانات الدخول غير صالحة"},400)}
   const username=cleanString(body.username,120).toLowerCase(),password=String(body.password||"");
   if(!username||password.length<6)return json({ok:false,error:"اسم المستخدم وكلمة المرور مطلوبان"},400);
-  const row=await env.DB.prepare(`SELECT id,full_name,username,password_salt,password_hash,enabled,failed_attempts,locked_until FROM display_accounts WHERE username=? LIMIT 1`).bind(username).first();
+  const row=await env.DB.prepare(`SELECT id,full_name,username,password_salt,password_hash,enabled,failed_attempts,locked_until,permissions_json,emergency_locked FROM display_accounts WHERE username=? LIMIT 1`).bind(username).first();
   if(!row)return json({ok:false,error:"اسم المستخدم أو كلمة المرور غير صحيحة",code:"BAD_LOGIN"},401);
   const locked=Number(row.locked_until||0)>now();
   if(locked){const sec=Math.max(1,Math.ceil((Number(row.locked_until)-now())/1000));return json({ok:false,error:`تم إيقاف محاولات الدخول مؤقتًا — حاول بعد ${sec} ثانية`,code:"LOGIN_LOCKED",retryAfter:sec},429)}
   if(Number(row.enabled)!==1)return json({ok:false,error:"تم إيقاف حساب جهاز العرض من الجهاز الرئيسي",code:"DISPLAY_DISABLED"},403);
+  if(Number(row.emergency_locked)===1)return json({ok:false,error:"تم قفل جهاز العرض مؤقتاً من الجهاز الرئيسي",code:"DISPLAY_EMERGENCY_LOCK"},403);
   const check=await hashText(String(row.password_salt)+password);
   if(check!==String(row.password_hash)){
     const attempts=Number(row.failed_attempts||0)+1;
@@ -95,7 +96,8 @@ async function displayLogin(request,env){
   }
   const token=randomToken(),sessionHash=await hashText(token),expires=now()+1000*60*60*24*30;
   await env.DB.prepare(`UPDATE display_accounts SET session_hash=?,session_expires_at=?,last_login_at=?,last_seen_at=?,failed_attempts=0,locked_until=NULL,updated_at=? WHERE id=?`).bind(sessionHash,expires,now(),now(),now(),Number(row.id)).run();
-  return json({ok:true,token,expiresAt:expires,displayName:cleanString(row.full_name,200),username:cleanString(row.username,120)});
+  await logDisplayActivity(env,Number(row.id),cleanString(row.username,120),"تسجيل دخول","تم تسجيل الدخول بنجاح",request.headers.get("X-Device-Id")||"");
+  return json({ok:true,token,expiresAt:expires,displayName:cleanString(row.full_name,200),username:cleanString(row.username,120),permissions:parseDisplayPermissions(row.permissions_json)});
 }
 async function displayValidate(request,env){const d=await displaySession(request,env);if(!d.ok)return json({ok:false,error:d.error,code:d.code},d.code==="DISPLAY_DISABLED"?403:401);return json({ok:true,displayName:d.fullName,username:d.username,permissions:d.permissions,expiresAt:d.expiresAt})}
 async function listDisplayAccounts(request,env){const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);await ensureAuthSchema(env);const rows=await env.DB.prepare(`SELECT id,full_name,username,enabled,emergency_locked,permissions_json,created_at,updated_at,last_login_at,last_seen_at,session_expires_at FROM display_accounts ORDER BY id DESC`).all();return json({ok:true,accounts:(rows.results||[]).map(r=>({id:Number(r.id),fullName:r.full_name,username:r.username,enabled:Number(r.enabled)===1,emergencyLocked:Number(r.emergency_locked)===1,permissions:parseDisplayPermissions(r.permissions_json),sessionExpiresAt:r.session_expires_at?Number(r.session_expires_at):null,createdAt:Number(r.created_at),updatedAt:Number(r.updated_at),lastLoginAt:r.last_login_at?Number(r.last_login_at):null,lastSeenAt:r.last_seen_at?Number(r.last_seen_at):null}))})}
@@ -168,7 +170,23 @@ async function role(request, env) {
   const primary=await getPrimaryDevice(env); const ready=(await getMeta(env,"authoritative_snapshot_at"))!==""; const count=Number(await getMeta(env,"authoritative_record_count")||0); const generation=Number(await getMeta(env,"authoritative_generation")||0); const isPrimary=!!primary&&auth.deviceId===primary;
   const display=await displaySession(request,env);
   if(!isPrimary && !display.ok) return json({ok:true,deviceId:auth.deviceId,primaryDeviceId:primary||null,isPrimary:false,configured:!!primary,authoritativeReady:ready,authoritativeRecordCount:count,authoritativeGeneration:generation,displayAuthenticated:false,displayAuthRequired:true},200);
-  return json({ok:true,deviceId:auth.deviceId,primaryDeviceId:primary||null,isPrimary,configured:!!primary,authoritativeReady:ready,authoritativeRecordCount:count,authoritativeGeneration:generation,displayAuthenticated:!!display.ok,displayAuthRequired:false,displayName:display.ok?display.fullName:"",displayUsername:display.ok?display.username:""});
+  return json({ok:true,deviceId:auth.deviceId,primaryDeviceId:primary||null,isPrimary,configured:!!primary,authoritativeReady:ready,authoritativeRecordCount:count,authoritativeGeneration:generation,displayAuthenticated:!!display.ok,displayAuthRequired:false,displayName:display.ok?display.fullName:"",displayUsername:display.ok?display.username:"",displayPermissions:display.ok?display.permissions:null,displaySessionExpiresAt:display.ok?display.expiresAt:null});
+}
+
+async function syncPulse(request, env) {
+  const auth = requireAuth(request, env);
+  if (!auth.ok) return json({ok:false,error:auth.error,code:"AUTH"},401);
+  const primary = await getPrimaryDevice(env);
+  const isPrimary = !!primary && auth.deviceId === primary;
+  let display = null;
+  if (!isPrimary) {
+    display = await displaySession(request, env);
+    if (!display.ok) return json({ok:false,error:display.error,code:display.code||"DISPLAY_AUTH_REQUIRED",displayAuthRequired:true}, display.code === "DISPLAY_DISABLED" || display.code === "DISPLAY_EMERGENCY_LOCK" ? 403 : 401);
+  }
+  const ready = (await getMeta(env,"authoritative_snapshot_at")) !== "";
+  const generation = Number(await getMeta(env,"authoritative_generation") || 0);
+  const count = Number(await getMeta(env,"authoritative_record_count") || 0);
+  return json({ok:true,isPrimary,authoritativeReady:ready,authoritativeGeneration:generation,authoritativeRecordCount:count,displayAuthenticated:!!display?.ok,displayPermissions:display?.permissions||null,displaySessionExpiresAt:display?.expiresAt||null,serverTime:now()});
 }
 
 async function claimPrimary(request, env) {
@@ -209,6 +227,9 @@ async function pull(request, env) {
   const limit = Math.min(1000, Math.max(1, Number(url.searchParams.get("limit") || 500)));
 
   const scope = cleanString(url.searchParams.get("scope"), 40);
+  if(scope === "distributions" && auth.role === "display" && auth.permissions?.distributions === false){
+    return json({ok:false,error:"هذه الوظيفة غير متاحة لهذا الحساب",code:"DISPLAY_PERMISSION_DENIED"},403);
+  }
   const prefix = scope === "distributions" ? "dist:%" : scope === "records" ? "r-%" : null;
   const result = prefix
     ? await env.DB.prepare(`
@@ -230,7 +251,7 @@ async function pull(request, env) {
     seq: Number(r.seq),
     recordId: r.record_id,
     operation: r.operation,
-    data: r.data_json ? JSON.parse(r.data_json) : null,
+    data: r.data_json ? (auth.role === "display" ? redactDisplayData(JSON.parse(r.data_json), auth.permissions) : JSON.parse(r.data_json)) : null,
     updatedAt: Number(r.updated_at),
     version: Number(r.version),
     deviceId: r.device_id,
@@ -584,6 +605,7 @@ export default {
       if (url.pathname === "/auth/display-emergency-lock" && request.method === "POST") return await setDisplayEmergencyLock(request, env);
       if (url.pathname === "/auth/display-activity" && request.method === "GET") return await listDisplayActivity(request, env);
       if (url.pathname === "/sync/role" && request.method === "GET") return await role(request, env);
+      if (url.pathname === "/sync/pulse" && request.method === "GET") return await syncPulse(request, env);
       if (url.pathname === "/sync/claim-primary" && request.method === "POST") return await claimPrimary(request, env);
       if (url.pathname === "/sync/pull" && request.method === "GET") return await pull(request, env);
       if (url.pathname === "/sync/push" && request.method === "POST") return await push(request, env);
