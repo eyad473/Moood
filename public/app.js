@@ -1430,7 +1430,7 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "53.2";
+const APP_RELEASE_VERSION = "53.4";
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
@@ -1453,45 +1453,50 @@ let displayPermissions={dashboard:true,families:true,people:true,search:true,rep
 function displaySessionLoad(){try{displaySessionInfo=JSON.parse(localStorage.getItem(DISPLAY_SESSION_KEY)||"null")}catch(e){displaySessionInfo=null}return displaySessionInfo}
 function displaySessionSave(x){displaySessionInfo=x||null;if(x)localStorage.setItem(DISPLAY_SESSION_KEY,JSON.stringify(x));else localStorage.removeItem(DISPLAY_SESSION_KEY)}
 function displayAuthHeader(){const s=displaySessionLoad();return s?.token?{"Authorization":"Bearer "+s.token}:{} }
-async function displayAuthValidate(){const s=displaySessionLoad();if(!s?.token)return {ok:false};try{const r=await fetch(SYNC_API_URL+"/auth/display-validate",{headers:{...displayAuthHeader(),"X-Device-Id":syncDeviceId()},cache:"no-store"});const b=await r.json();if(!r.ok||!b.ok){if(r.status===403)displaySessionSave(null);return {ok:false,disabled:r.status===403,error:b?.error||"انتهت جلسة الدخول"}}displaySessionInfo={...s,displayName:b.displayName,username:b.username,permissions:b.permissions||displayPermissions,expiresAt:b.expiresAt||s.expiresAt};displayPermissions=displaySessionInfo.permissions||displayPermissions;displaySessionSave(displaySessionInfo);applyDisplayPermissions();return {ok:true,displayName:b.displayName,username:b.username,permissions:displayPermissions}}catch(e){return {ok:!!s.token,offline:true,displayName:s.displayName,username:s.username}}}
+async function displayAuthValidate(){
+  const s=displaySessionLoad();
+  if(!s?.token)return {ok:false};
+  if(Number(s.expiresAt||0) && Number(s.expiresAt)<=Date.now()){displaySessionSave(null);return {ok:false,expired:true};}
+  try{
+    const r=await fetch(SYNC_API_URL+"/auth/display-validate",{headers:{...displayAuthHeader(),"X-Device-Id":syncDeviceId()},cache:"no-store"});
+    const b=await r.json();
+    if(!r.ok||!b.ok){if(r.status===403)displaySessionSave(null);return {ok:false,disabled:r.status===403,error:b?.error||"انتهت جلسة الدخول"};}
+    displaySessionInfo={...s,displayName:b.displayName,username:b.username,permissions:b.permissions||displayPermissions,expiresAt:b.expiresAt||s.expiresAt};
+    displayPermissions=displaySessionInfo.permissions||displayPermissions;displaySessionSave(displaySessionInfo);applyDisplayPermissions();
+    return {ok:true,displayName:b.displayName,username:b.username,permissions:displayPermissions};
+  }catch(e){
+    if(Number(s.expiresAt||0) && Number(s.expiresAt)<=Date.now()){displaySessionSave(null);return {ok:false,expired:true};}
+    return {ok:true,offline:true,displayName:s.displayName,username:s.username,permissions:s.permissions||displayPermissions};
+  }
+}
 function displayShowLogin(message=""){displayAuthLock();const ov=document.getElementById("displayLoginOverlay");if(!ov)return;ov.hidden=false;const er=document.getElementById("displayLoginError");if(er)er.textContent=message;setTimeout(()=>document.getElementById("displayLoginUsername")?.focus(),80)}
 function displayHideLogin(){const ov=document.getElementById("displayLoginOverlay");if(ov)ov.hidden=true;displayAuthUnlock()}
 function displayWelcome(name){const old=document.getElementById("displayWelcomeBox");if(old)old.remove();const box=document.createElement("div");box.id="displayWelcomeBox";box.className="display-welcome";box.innerHTML=`<div>مرحباً</div><b>${esc(name||"مستخدم جهاز العرض")}</b><small>تم تسجيل الدخول إلى جهاز العرض بنجاح</small>`;document.body.appendChild(box);setTimeout(()=>box.remove(),2600)}
 function applyDisplayPermissions(){if(appReadOnly!==true)return;const p=displayPermissions||{};const map={families:['families','familySearch'],people:['people','records'],search:['search','familySearch'],reports:['reports','classified'],distributions:['distributions','distributions']};const tabs=[...document.querySelectorAll('.tab[data-view]')];for(const t of tabs){const v=t.dataset.view;let allowed=true;if(v==='dashboard')allowed=p.dashboard!==false;else if(v==='families')allowed=p.families!==false;else if(v==='familySearch')allowed=p.search!==false&&p.families!==false;else if(v==='records')allowed=p.people!==false;else if(v==='classified')allowed=p.reports!==false;else if(v==='distributions')allowed=p.distributions!==false;else if(v==='syncCenter'||v==='settings')allowed=false;t.style.display=allowed?'':'none'}for(const [perm,views] of Object.entries(map)){if(p[perm]===false){for(const v of views){document.querySelectorAll(`[data-view="${v}"]`).forEach(el=>el.style.display='none')}}}if(p.dashboard===false){try{showView('familySearch')}catch(e){}}} 
-async function displayLoginSubmit(e){e.preventDefault();const u=document.getElementById("displayLoginUsername").value.trim(),p=document.getElementById("displayLoginPassword").value,err=document.getElementById("displayLoginError");err.textContent="جاري التحقق...";try{const r=await fetch(SYNC_API_URL+"/auth/display-login",{method:"POST",headers:{"Content-Type":"application/json","X-Device-Id":syncDeviceId()},body:JSON.stringify({username:u,password:p,deviceId:syncDeviceId()}),cache:"no-store"});const b=await r.json();if(!r.ok||!b.ok)throw Error(b?.error||"تعذر تسجيل الدخول");displaySessionSave({token:b.token,expiresAt:b.expiresAt,displayName:b.displayName,username:b.username,permissions:b.permissions||displayPermissions});displayPermissions=b.permissions||displayPermissions;applyDisplayPermissions();document.getElementById("displayLoginPassword").value="";await fetchSyncRole(true);displayHideLogin();displayWelcome(b.displayName);try{await syncOnlineReconcile("manual")}catch(syncErr){toast("تم تسجيل الدخول، وتعذر تحديث البيانات الآن — سيتم استخدام آخر بيانات محفوظة")} }catch(e){err.textContent=e?.message||"تعذر تسجيل الدخول"}}
-async function initDisplayAuth(){
-  displayAuthLock();
+async function displayLoginSubmit(e){
+  e.preventDefault();
+  const u=document.getElementById("displayLoginUsername")?.value.trim()||"";
+  const p=document.getElementById("displayLoginPassword")?.value||"";
+  if(!u||!p){loginUiError("أدخل اسم المستخدم وكلمة المرور للمتابعة.");return}
+  loginUiError(""); loginUiLoading(true);
   try{
-    // Always hydrate the full sync role state. The previous version returned early
-    // for the primary device without setting appReadOnly=false, which made the
-    // "إدارة أجهزة العرض" button appear but refuse to open on the main device.
-    const role=await fetchSyncRole(true);
-    if(role?.isPrimary){
-      appReadOnly=false;
-      document.body.classList.remove("app-read-only");
-      displayHideLogin();
-      return true;
-    }
-    const valid=await displayAuthValidate();
-    if(valid.ok||valid.offline){
-      displayHideLogin();
-      if(valid.ok&&!localStorage.getItem("aboreiban_display_welcome_v52")){
-        localStorage.setItem("aboreiban_display_welcome_v52","1");
-        displayWelcome(valid.displayName);
-      }
-      return true;
-    }
-    displayShowLogin(valid.disabled?"تم إيقاف هذا الحساب من الجهاز الرئيسي.":"");
-    return false;
+    const r=await fetch(SYNC_API_URL+"/auth/display-login",{method:"POST",headers:{"Content-Type":"application/json","X-Device-Id":syncDeviceId()},body:JSON.stringify({username:u,password:p,deviceId:syncDeviceId()}),cache:"no-store"});
+    let b=null; try{b=await r.json()}catch(_){}
+    if(!r.ok||!b?.ok){const er=new Error(b?.error||"تعذر تسجيل الدخول");er.status=r.status;throw er}
+    displaySessionSave({token:b.token,expiresAt:b.expiresAt,displayName:b.displayName,username:b.username,permissions:b.permissions||displayPermissions});
+    displayPermissions=b.permissions||displayPermissions;
+    document.getElementById("displayLoginPassword").value="";
+    await fetchSyncRole(true);
+    displayHideLogin();
+    startProtectedApp();
+    applyDisplayPermissions();
+    displayWelcome(b.displayName);
+    try{await syncOnlineReconcile("manual")}catch(syncErr){toast("تم تسجيل الدخول، وتعذر تحديث البيانات الآن — سيتم استخدام آخر بيانات محفوظة")}
   }catch(e){
-    const valid=await displayAuthValidate();
-    if(valid.ok||valid.offline){
-      displayHideLogin();
-      return true;
-    }
-    displayShowLogin("أدخل بيانات حساب جهاز العرض للمتابعة.");
-    return false;
-  }
+    document.getElementById("displayLoginPassword").value="";
+    loginUiError(translateLoginError(e));
+    document.getElementById("displayLoginPassword")?.focus();
+  }finally{loginUiLoading(false)}
 }
 function displayAuthLogout(){displaySessionSave(null);displayShowLogin("تم تسجيل الخروج")}
 async function authFetch(path,options={}){const headers={"Content-Type":"application/json","X-Device-Id":syncDeviceId(),...displayAuthHeader(),...(options.headers||{})};const r=await fetch(SYNC_API_URL+path,{...options,headers,cache:"no-store"});let b=null;try{b=await r.json()}catch(e){throw Error("استجابة غير صالحة من الخادم")};if(!r.ok||b?.ok===false)throw Error(b?.error||("HTTP "+r.status));return b}
@@ -1841,13 +1846,36 @@ function installCloudSync(){
   setTimeout(()=>syncOnlineReconcile("startup"),700);
 }
 
-load();
-runSmartDedup("startup");
+async function initDisplayAuth(){
+  displayAuthLock();
+  updateDisplayLoginConnection();
+  try{
+    const role=await fetchSyncRole(true);
+    if(role?.isPrimary){
+      appReadOnly=false;
+      document.body.classList.remove("app-read-only");
+      displayHideLogin();
+      startProtectedApp();
+      return true;
+    }
+    const valid=await displayAuthValidate();
+    if(valid.ok){
+      displayHideLogin();
+      startProtectedApp();
+      applyDisplayPermissions();
+      return true;
+    }
+    displayShowLogin(valid.disabled?"هذا الحساب غير مفعل، يرجى التواصل مع إدارة النظام.":(valid.offline?"لا يوجد اتصال بالإنترنت. سيتم استخدام آخر جلسة محلية آمنة فقط إذا كانت ما زالت صالحة.":""));
+    return false;
+  }catch(e){
+    const valid=await displayAuthValidate();
+    if(valid.ok){displayHideLogin();startProtectedApp();applyDisplayPermissions();return true}
+    displayShowLogin(navigator.onLine?"":"لا يوجد اتصال بالإنترنت. سيتم استخدام آخر جلسة محلية آمنة فقط إذا كانت ما زالت صالحة.");
+    return false;
+  }
+}
+
 setTimeout(()=>initDisplayAuth(),120);
-initReportColumns();
-renderPersonPicker();
-initV5();
-installCloudSync();
 
 function styleExcelWorksheet(ws, options={}){
   if(!ws || !ws["!ref"]) return ws;
@@ -2513,3 +2541,49 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('online',updateDailyHeader);
   window.addEventListener('offline',updateDailyHeader);
 })();
+
+/* V53.3.1.1_LOGIN_UX_START */
+let protectedAppStarted=false;
+function startProtectedApp(){
+  if(protectedAppStarted)return;
+  protectedAppStarted=true;
+  load();
+  runSmartDedup("startup");
+  initReportColumns();
+  renderPersonPicker();
+  initV5();
+  installCloudSync();
+}
+function loginUiError(message){
+  const er=document.getElementById("displayLoginError"); if(!er)return;
+  er.textContent=message||""; er.classList.toggle("show",!!message);
+}
+function loginUiLoading(on){
+  const b=document.getElementById("displayLoginSubmit"),t=b?.querySelector(".display-login-submit-text"); if(!b)return;
+  b.disabled=!!on; b.classList.toggle("loading",!!on); if(t)t.textContent=on?"جارٍ التحقق...":"تسجيل الدخول";
+}
+function updateDisplayLoginConnection(){
+  const box=document.getElementById("displayLoginStatus"); if(!box)return;
+  const online=navigator.onLine; box.classList.toggle("online",online); box.classList.toggle("offline",!online);
+  const t=box.querySelector(".display-login-status-text"); if(t)t.textContent=online?"متصل بالإنترنت":"غير متصل بالإنترنت";
+}
+function translateLoginError(e){
+  const raw=String(e?.message||"").toLowerCase();
+  if(!navigator.onLine||raw.includes("failed to fetch")||raw.includes("network"))return "لا يوجد اتصال بالإنترنت.";
+  if(raw.includes("disabled")||raw.includes("موقوف")||raw.includes("غير مفعل"))return "هذا الحساب غير مفعل، يرجى التواصل مع إدارة النظام.";
+  if(raw.includes("too many")||raw.includes("محاولات"))return "تم إيقاف محاولات الدخول مؤقتًا. حاول مرة أخرى لاحقًا.";
+  if(e?.status===401||raw.includes("401")||raw.includes("invalid")||raw.includes("incorrect"))return "اسم المستخدم أو كلمة المرور غير صحيحة";
+  return "تعذر تسجيل الدخول الآن. حاول مرة أخرى.";
+}
+function setLoginPasswordVisibility(){
+  const input=document.getElementById("displayLoginPassword"),btn=document.getElementById("displayLoginPasswordToggle"); if(!input||!btn)return;
+  const show=input.type==="password"; input.type=show?"text":"password";
+  btn.setAttribute("aria-label",show?"إخفاء كلمة المرور":"إظهار كلمة المرور"); btn.setAttribute("aria-pressed",String(show));
+}
+window.addEventListener("online",updateDisplayLoginConnection);
+window.addEventListener("offline",updateDisplayLoginConnection);
+document.addEventListener("DOMContentLoaded",()=>{
+  updateDisplayLoginConnection();
+  document.getElementById("displayLoginPasswordToggle")?.addEventListener("click",setLoginPasswordVisibility);
+});
+/* V53.3.1.1_LOGIN_UX_END */
