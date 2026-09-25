@@ -1,4 +1,4 @@
-const CACHE = "abu-areiban-v52_1-5-offline-1";
+const CACHE = "abu-areiban-v53_1-5-offline-1";
 const APP_SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
