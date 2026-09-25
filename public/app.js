@@ -1420,7 +1420,22 @@ function renderDistributions(){const q=distNorm(document.getElementById("distQ")
 function exportDistributionsCSV(){const rows=[["التاريخ","نوع المستفيد","اسم المستفيد","رقم هوية الفرد","رقم هوية الأسرة","رب الأسرة","نوع التوزيع","الكمية","الوحدة","المرجع","بواسطة","ملاحظات"],...distributions.map(x=>[x.date,x.beneficiaryType,x.beneficiaryName,x.personId,x.familyId,x.familyName,x.type,x.quantity,x.unit,x.reference,x.distributedBy,x.notes])];const csv="\uFEFF"+rows.map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(",")).join("\n");const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="توزيعات_مخيم_أبو_عريبان.csv";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
 function distBuildChanges(){const old=new Map(distShadow.map(x=>[x.id,x])),now=new Map(distributions.map(x=>[x.id,x])),out=[];for(const r of distributions){const o=old.get(r.id);if(!o||JSON.stringify(o)!==JSON.stringify(r))out.push({opId:crypto.randomUUID(),recordId:r.id,operation:"upsert",updatedAt:r.updatedAt||Date.now(),data:r})}for(const o of distShadow)if(!now.has(o.id))out.push({opId:crypto.randomUUID(),recordId:o.id,operation:"delete",updatedAt:Date.now()});return out}
 function distSavePending(c){localStorage.setItem(DIST_PENDING_KEY,JSON.stringify(c||[]))}function distLoadPending(){try{return JSON.parse(localStorage.getItem(DIST_PENDING_KEY)||"[]")}catch(e){return[]}}
-async function distSync(){if(distBusy||!navigator.onLine)return;distBusy=true;try{let pending=distLoadPending();if(!pending.length){pending=distBuildChanges();distSavePending(pending)}if(pending.length){const r=await syncFetch("/sync/push",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),changes:pending})});const accepted=new Set([...(r.accepted||[]).map(x=>typeof x==="string"?x:x.opId),...(r.skipped||[]).filter(x=>x.reason==="مكرر").map(x=>x.opId)]);if(accepted.size>=pending.length){distShadow=structuredClone(distributions);localStorage.setItem(DIST_SHADOW_KEY,JSON.stringify(distShadow));distSavePending([])}else{distSavePending(distBuildChanges())}}const pr=await syncFetch(`/sync/pull?scope=distributions&since=${distCursor}&limit=500`,{method:"GET"});for(const c of pr.changes||[]){if(c.recordId?.startsWith("dist:")){if(c.operation==="delete")distributions=distributions.filter(x=>x.id!==c.recordId);else if(c.data){const i=distributions.findIndex(x=>x.id===c.recordId);if(i<0)distributions.push(c.data);else distributions[i]=c.data}}}distCursor=Number(pr.nextSince||distCursor);localStorage.setItem(DIST_CURSOR_KEY,String(distCursor));distSave();renderDistributions();document.getElementById("distSyncState").textContent="تمت المزامنة"}catch(e){document.getElementById("distSyncState").textContent="بانتظار الاتصال"}finally{distBusy=false}}
+async function distSync(){if(distBusy||!navigator.onLine)return;distBusy=true;try{
+  // Display devices are read-only: they must never upload local distribution changes.
+  if(!appReadOnly){
+    let pending=distLoadPending();
+    if(!pending.length){pending=distBuildChanges();distSavePending(pending)}
+    if(pending.length){
+      const r=await syncFetch("/sync/push",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),changes:pending})});
+      const accepted=new Set([...(r.accepted||[]).map(x=>typeof x==="string"?x:x.opId)]);
+      if(accepted.size>=pending.length){distShadow=structuredClone(distributions);localStorage.setItem(DIST_SHADOW_KEY,JSON.stringify(distShadow));distSavePending([])}
+    }
+  }
+  const pr=await syncFetch(`/sync/pull?scope=distributions&since=${distCursor}&limit=500`,{method:"GET"});
+  for(const c of pr.changes||[]){if(c.recordId?.startsWith("dist:")){if(c.operation==="delete")distributions=distributions.filter(x=>x.id!==c.recordId);else if(c.data){const i=distributions.findIndex(x=>x.id===c.recordId);if(i<0)distributions.push(c.data);else distributions[i]=c.data}}}
+  distCursor=Number(pr.nextSince||distCursor);localStorage.setItem(DIST_CURSOR_KEY,String(distCursor));distSave();renderDistributions();
+  const st=document.getElementById("distSyncState");if(st)st.textContent="تمت المزامنة"
+}catch(e){const st=document.getElementById("distSyncState");if(st)st.textContent="بانتظار الاتصال"}finally{distBusy=false}}
 function distSyncSoon(){distSavePending(distBuildChanges());if(navigator.onLine)setTimeout(distSync,250);}
 function distInit(){try{distLoad();distShadow=JSON.parse(localStorage.getItem(DIST_SHADOW_KEY)||"[]");if(!Array.isArray(distShadow))distShadow=[]}catch(e){distShadow=[]}renderDistributions();window.addEventListener("online",()=>setTimeout(distSync,400));setTimeout(()=>{if(navigator.onLine)distSync()},1200)}
 
@@ -1430,12 +1445,13 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "53.4";
+const APP_RELEASE_VERSION = "53.5";
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
 let syncRoleCheckedAt=0;
-const SYNC_ROLE_CACHE_MS=10000;
+const SYNC_ROLE_CACHE_MS=30000;
+const DISPLAY_PERMS_CACHE_KEY="aboreiban_display_permissions_v53_5";
 const PRIMARY_RECONCILE_KEY="aboreiban_primary_reconcile_v52";
 const AUTH_GEN_KEY="aboreiban_authoritative_generation_v52_2";
 const AUTH_NOTICE_GEN_KEY="aboreiban_authoritative_notice_generation_v52_2";
@@ -1460,7 +1476,7 @@ async function displayAuthValidate(){
   try{
     const r=await fetch(SYNC_API_URL+"/auth/display-validate",{headers:{...displayAuthHeader(),"X-Device-Id":syncDeviceId()},cache:"no-store"});
     const b=await r.json();
-    if(!r.ok||!b.ok){if(r.status===403)displaySessionSave(null);return {ok:false,disabled:r.status===403,error:b?.error||"انتهت جلسة الدخول"};}
+    if(!r.ok||!b.ok){if(r.status===403)displaySessionSave(null);return {ok:false,disabled:r.status===403,emergency:b?.code==="DISPLAY_EMERGENCY_LOCK",error:b?.error||"انتهت جلسة الدخول"};}
     displaySessionInfo={...s,displayName:b.displayName,username:b.username,permissions:b.permissions||displayPermissions,expiresAt:b.expiresAt||s.expiresAt};
     displayPermissions=displaySessionInfo.permissions||displayPermissions;displaySessionSave(displaySessionInfo);applyDisplayPermissions();
     return {ok:true,displayName:b.displayName,username:b.username,permissions:displayPermissions};
@@ -1669,7 +1685,8 @@ async function fetchSyncRole(force=false){
     const body=await r.json();
     if(!r.ok||body?.ok===false)throw Error(body?.error||"تعذر معرفة صلاحية الجهاز");
     if(!body.isPrimary && body.displayAuthRequired && !body.displayAuthenticated){displayShowLogin("تسجيل الدخول مطلوب للوصول إلى بيانات جهاز العرض.");throw Error("تسجيل الدخول مطلوب");}
-    syncRole={configured:!!body.configured,isPrimary:!!body.isPrimary,deviceId:body.deviceId||syncDeviceId(),primaryDeviceId:body.primaryDeviceId||"",authoritativeReady:!!body.authoritativeReady,authoritativeGeneration:Number(body.authoritativeGeneration||0)};
+    syncRole={configured:!!body.configured,isPrimary:!!body.isPrimary,deviceId:body.deviceId||syncDeviceId(),primaryDeviceId:body.primaryDeviceId||"",authoritativeReady:!!body.authoritativeReady,authoritativeGeneration:Number(body.authoritativeGeneration||0),displayPermissions:body.displayPermissions||null,displaySessionExpiresAt:Number(body.displaySessionExpiresAt||0)};
+    if(body.displayPermissions){displayPermissions=body.displayPermissions;try{localStorage.setItem(DISPLAY_PERMS_CACHE_KEY,JSON.stringify(displayPermissions))}catch(e){}}
     try{localStorage.setItem(SYNC_ROLE_CACHE_KEY,JSON.stringify(syncRole))}catch(e){}
     syncRoleCheckedAt=nowTs;
     appReadOnly=!syncRole.isPrimary;
@@ -1710,7 +1727,7 @@ window.claimPrimaryDevice=async function(){
 };
 function requirePrimaryForEdit(){if(!appReadOnly)return true;toast("هذا الجهاز للعرض فقط — التعديل مسموح من الجهاز الرئيسي فقط");return false}
 
-async function syncFetch(path,options={}){const headers={"Content-Type":"application/json","X-Device-Id":syncDeviceId(),...displayAuthHeader(),...(options.headers||{})};const res=await fetch(SYNC_API_URL+path,{...options,headers,cache:"no-store"});let body=null;try{body=await res.json()}catch(e){throw Error("استجابة غير صالحة من الخادم")};if(!res.ok||body?.ok===false)throw Error(body?.error||("HTTP "+res.status));return body}
+async function syncFetch(path,options={}){const headers={"Content-Type":"application/json","X-Device-Id":syncDeviceId(),...displayAuthHeader(),...(options.headers||{})};const res=await fetch(SYNC_API_URL+path,{...options,headers,cache:"no-store"});let body=null;try{body=await res.json()}catch(e){const er=Error("استجابة غير صالحة من الخادم");er.status=res.status;throw er}if(!res.ok||body?.ok===false){const er=Error(body?.error||("HTTP "+res.status));er.status=res.status;er.code=body?.code||"";throw er}return body}
 function applyChangeToMap(map,c){if(c.operation==="delete")map.delete(c.recordId);else if(c.operation==="upsert"&&c.data){const x=structuredClone(c.data);x.__syncId=c.recordId;x.__syncVersion=Number(c.version||0);map.set(c.recordId,x)}}
 function syncApplyChanges(changes,{protectIds=null}={}){let changed=false;const byId=new Map(data.map((r,i)=>[r.__syncId,i]));for(const c of changes||[]){if(protectIds?.has(c.recordId))continue;if(c.operation==="delete"){const idx=byId.get(c.recordId);if(idx!==undefined){data.splice(idx,1);changed=true;byId.clear();data.forEach((r,i)=>byId.set(r.__syncId,i))}}else if(c.operation==="upsert"&&c.data){const incoming=structuredClone(c.data);incoming.__syncId=c.recordId;incoming.__syncVersion=Number(c.version||0);const idx=byId.get(c.recordId);if(idx===undefined){data.push(incoming);byId.set(c.recordId,data.length-1);changed=true}else if(syncComparable(data[idx])!==syncComparable(incoming)){data[idx]=incoming;changed=true}}}return changed}
 async function syncPullApply(){let cursor=syncCursor,loops=0,all=[];while(loops++<30){const r=await syncFetch(`/sync/pull?since=${encodeURIComponent(cursor)}&limit=500`,{method:"GET"});all=all.concat(r.changes||[]);cursor=Number(r.nextSince||cursor);syncCursor=cursor;localStorage.setItem(SYNC_CURSOR_KEY,String(cursor));if(!r.hasMore)break}return all}
@@ -1836,12 +1853,33 @@ async function syncOnlineReconcile(reason="auto"){
       syncInitialized=true;
       return;
     }
-    // Secondary/display: never push. It follows only the server's authoritative snapshot.
-    if(!syncRole.authoritativeReady){syncSavePending([]);return;}
+    // Secondary/display: never push. A lightweight pulse checks the authoritative generation
+    // every cycle so display devices can follow the primary device without repeatedly reading
+    // the full role payload. Full data is downloaded only when the generation changes.
+    let pulse;
+    try{
+      pulse=await syncFetch("/sync/pulse",{method:"GET"});
+    }catch(e){
+      if(e?.code?.startsWith("DISPLAY_")||e?.status===401||e?.status===403||/تسجيل الدخول|قفل جهاز العرض|غير مفعل|جلسة/.test(String(e?.message||""))){
+        displaySessionSave(null);
+        displayShowLogin(String(e.message||"تسجيل الدخول مطلوب"));
+        return;
+      }
+      throw e;
+    }
+    syncRole.authoritativeReady=!!pulse.authoritativeReady;
+    syncRole.authoritativeGeneration=Number(pulse.authoritativeGeneration||0);
+    const incomingPerms=pulse.displayPermissions||displayPermissions;
+    let permissionsChanged=false;
+    try{permissionsChanged=JSON.stringify(incomingPerms)!==localStorage.getItem(DISPLAY_PERMS_CACHE_KEY)}catch(e){}
+    syncRole.displayPermissions=incomingPerms;
+    displayPermissions=incomingPerms;
+    try{localStorage.setItem(DISPLAY_PERMS_CACHE_KEY,JSON.stringify(displayPermissions))}catch(e){}
+    applyDisplayPermissions();
     const seen=Number(localStorage.getItem(AUTH_GEN_KEY)||0);
-    const serverGen=Number(syncRole.authoritativeGeneration||0);
-    if(!syncInitialized || serverGen!==seen){
-      const h=await syncFetch("/health",{method:"GET"});__syncHealthCache=h;__syncHealthAt=Date.now();
+    const serverGen=Number(pulse.authoritativeGeneration||0);
+    if(!pulse.authoritativeReady){syncSavePending([]);return;}
+    if(!syncInitialized || serverGen!==seen || permissionsChanged){
       const snap=await syncAdoptAuthoritativeSnapshot(true);
       if(snap.changed){
         const lastNotice=Number(localStorage.getItem(AUTH_NOTICE_GEN_KEY)||0);
@@ -1903,12 +1941,12 @@ async function initDisplayAuth(){
       applyDisplayPermissions();
       return true;
     }
-    displayShowLogin(valid.disabled?"هذا الحساب غير مفعل، يرجى التواصل مع إدارة النظام.":(valid.offline?"لا يوجد اتصال بالإنترنت. سيتم استخدام آخر جلسة محلية آمنة فقط إذا كانت ما زالت صالحة.":""));
+    displayShowLogin(valid.disabled?(valid.emergency?"تم قفل جهاز العرض مؤقتاً من الجهاز الرئيسي.":"هذا الحساب غير مفعل، يرجى التواصل مع إدارة النظام."):(valid.offline?"لا يوجد اتصال بالإنترنت. سيتم استخدام آخر جلسة محلية آمنة فقط إذا كانت ما زالت صالحة.":""));
     return false;
   }catch(e){
     const valid=await displayAuthValidate();
     if(valid.ok){displayHideLogin();startProtectedApp();applyDisplayPermissions();return true}
-    displayShowLogin(navigator.onLine?"":"لا يوجد اتصال بالإنترنت. سيتم استخدام آخر جلسة محلية آمنة فقط إذا كانت ما زالت صالحة.");
+    displayShowLogin(navigator.onLine?"تعذر التحقق من جلسة جهاز العرض. سجّل الدخول مرة أخرى.":"لا يوجد اتصال بالإنترنت. سيتم استخدام آخر جلسة محلية آمنة فقط إذا كانت ما زالت صالحة.");
     return false;
   }
 }
