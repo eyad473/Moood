@@ -74,6 +74,7 @@ function load(){
     data=saved?JSON.parse(saved):[];
   }catch(e){bootUsingEmbeddedSeed=false;data=[]}
   data = Array.isArray(data)?data:[];
+  ensureFamilyHeadRecords(true);
   rebuildFilters(); renderAll();
 }
 function saveNow(){
@@ -99,6 +100,45 @@ function familyMap(){
  const m=new Map();
  data.forEach(r=>{const h=r["اسم رب الأسرة"]||"غير محدد";if(!m.has(h))m.set(h,[]);m.get(h).push(r)});
  return m;
+}
+
+/* إصلاح تلقائي لملف رب الأسرة: إذا كانت الأسرة موجودة ببياناتها لكن سجل رب الأسرة الفردي مفقود،
+   ننشئ له سجلاً من البيانات المعروفة فقط، ونُبقي الحقول الشخصية غير المعروفة فارغة بدل اختراع بيانات. */
+function ensureFamilyHeadRecords(persist=true){
+ const fm=familyMap();
+ let added=0,updated=0;
+ const familyKeys=["رقم هوية الأسرة","رقم الجوال","رقم جوال بديل","العنوان","داخل/خارج المخيم","حالة اكتمال بيانات الأسرة","المحافظة الأصلية","حالة المسكن الأصلي","نوع السكن الحالي","ملاحظات الأسرة"];
+ fm.forEach((rows,head)=>{
+   if(!filled(head) || head==="غير محدد") return;
+   const headRow=rows.find(r=>norm(r["صلة القرابة"])==="رب الأسرة");
+   const base=rows.find(r=>filled(r["اسم رب الأسرة"])) || rows[0];
+   if(!base) return;
+   if(headRow){
+     let changed=false;
+     familyKeys.forEach(k=>{
+       if(!filled(headRow[k]) && filled(base[k])){ headRow[k]=base[k]; changed=true; }
+     });
+     if(!filled(headRow["اسم الفرد"])) { headRow["اسم الفرد"]=head; changed=true; }
+     if(!filled(headRow["رقم هوية الفرد"]) && filled(base["رقم هوية الأسرة"])) { headRow["رقم هوية الفرد"]=base["رقم هوية الأسرة"]; changed=true; }
+     if(changed) updated++;
+     return;
+   }
+   const rec=emptyRecord();
+   familyKeys.forEach(k=>{ if(filled(base[k])) rec[k]=base[k]; });
+   rec["#"]=String(data.length+1);
+   rec["اسم رب الأسرة"]=head;
+   rec["اسم الفرد"]=head;
+   rec["صلة القرابة"]="رب الأسرة";
+   // في بنية التطبيق الحالية رقم هوية الأسرة هو هوية رب الأسرة عند إنشاء سجل الأسرة.
+   if(!filled(rec["رقم هوية الفرد"]) && filled(rec["رقم هوية الأسرة"])) rec["رقم هوية الفرد"]=rec["رقم هوية الأسرة"];
+   data.push(rec);
+   added++;
+ });
+ if((added||updated) && persist){
+   renumber();
+   autoSave();
+ }
+ return {added,updated};
 }
 function rebuildFilters(){
  const rel=[...new Set(data.map(x=>x["صلة القرابة"]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ar'));
@@ -1123,6 +1163,9 @@ function openQualityFamilyByIndex(idx){
   else toast("لا يمكن فتح الأسرة لأن اسم رب الأسرة غير موجود في السجل");
 }
 function openQualityModal(){
+  ensureFamilyHeadRecords(true);
+  rebuildFilters();
+  renderAll();
   qualityIssues=qualityScan();
   const errors=qualityIssues.filter(x=>x.type==="error").length, warnings=qualityIssues.filter(x=>x.type==="warning").length;
   document.getElementById("qualitySummary").innerHTML=`<b>نتيجة الفحص:</b> ${errors} خطأ و${warnings} تنبيه. تم فحص بيانات الأسرة وكل فرد والتعارضات والتكرارات غير الطبيعية. <b>تكرار رقم الجوال مسموح</b> ولا يُحسب خطأ.`;
@@ -1398,6 +1441,7 @@ clearCustomReport=function(clearName=true){reportConditions=[];renderConditionRo
 
 function initV5(){
  initFamilyPrintColumns();
+ ensureFamilyHeadRecords(true);
  syncComputedStatuses(false);
  initReportColumns();
  renderConditionRows();
@@ -1499,7 +1543,7 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "54.2";
+const APP_RELEASE_VERSION = "54.3";
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
