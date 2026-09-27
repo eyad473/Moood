@@ -159,13 +159,13 @@ function renderFamilies(){
  arr=arr.filter(([h,rows])=>{
   const first=rows[0]||{},blob=[h,first["رقم هوية الأسرة"],first["رقم الجوال"],first["العنوان"]].join(" ").toLowerCase();
   if(q&&!blob.includes(q))return false;
-  const n=rows.length;
+  const n=familyDisplayCount(rows);
   if(fs==="1"&&n!==1)return false;if(fs==="2-4"&&(n<2||n>4))return false;if(fs==="5-7"&&(n<5||n>7))return false;if(fs==="8"&&n<8)return false;
   return true;
  });
  document.getElementById("familyList").innerHTML=arr.map(([h,rows])=>{
   const r=rows[0]||{}, key=encodeURIComponent(h);
-  return `<div class="familybox"><div class="familyrow"><div><div class="familytitle">${esc(h)}</div><div class="muted">هوية الأسرة: ${esc(r["رقم هوية الأسرة"]||"—")} · الجوال: ${esc(r["رقم الجوال"]||"—")} · عدد الأفراد: <b>${rows.length}</b></div></div><div class="actions no-print"><button class="btn" onclick="editFamily(decodeURIComponent('${key}'))">تعديل الأسرة</button><button class="btn primary" onclick="addMemberToFamily(decodeURIComponent('${key}'))">＋ فرد</button><button class="btn danger" onclick="deleteFamily(decodeURIComponent('${key}'))">حذف العائلة</button></div></div><div class="memberlist">${rows.map(x=>`<div class="member"><span>${esc(x["اسم الفرد"]||"")} — ${esc(x["صلة القرابة"]||"")} — ${esc(x["رقم هوية الفرد"]||"")}</span><span class="no-print"><button class="pagebtn" onclick="editPerson(${data.indexOf(x)})">تعديل</button></span></div>`).join("")}</div></div>`
+  return `<div class="familybox"><div class="familyrow"><div><div class="familytitle">${esc(h)}</div><div class="muted">هوية الأسرة: ${esc(r["رقم هوية الأسرة"]||"—")} · الجوال: ${esc(r["رقم الجوال"]||"—")} · عدد الأفراد: <b>${familyDisplayCount(rows)}</b></div></div><div class="actions no-print"><button class="btn" onclick="editFamily(decodeURIComponent('${key}'))">تعديل الأسرة</button><button class="btn primary" onclick="addMemberToFamily(decodeURIComponent('${key}'))">＋ فرد</button><button class="btn danger" onclick="deleteFamily(decodeURIComponent('${key}'))">حذف العائلة</button></div></div><div class="memberlist">${rows.map(x=>`<div class="member"><span>${esc(x["اسم الفرد"]||"")} — ${esc(x["صلة القرابة"]||"")} — ${esc(x["رقم هوية الفرد"]||"")}</span><span class="no-print"><button class="pagebtn" onclick="editPerson(${data.indexOf(x)})">تعديل</button></span></div>`).join("")}</div></div>`
  }).join("") || `<div class="empty">لا توجد عائلات مطابقة</div>`;
 }
 function openFamilyModal(name=null){
@@ -218,9 +218,20 @@ function savePerson(e){
  autoSave();closeModal("personModal");rebuildFilters();renderAll();toast(idx===""?"تمت إضافة الفرد":"تم تعديل الفرد");playSaveSound();
 }
 async function deletePerson(idx){
- const r=data[idx];if(await confirmUI(`هل تريد حذف الفرد «${r["اسم الفرد"]||""}»؟
-
-سيتم حفظ العملية محليًا ثم مزامنتها مع السحابة.`,{title:"حذف الفرد",okText:"حذف الفرد",danger:true})){data.splice(idx,1);renumber();autoSave();rebuildFilters();renderAll();toast("تم حذف الفرد")}
+ const r=data[idx];
+ const head=norm(r?.["صلة القرابة"]) === "رب الأسرة";
+ const familyRows=familyMap().get(norm(r?.["اسم رب الأسرة"]))||[];
+ if(head && familyRows.length>1){
+   const ok=await confirmUI(`هذا هو سجل رب الأسرة، وحذفُه سيترك الأسرة بدون ملف فردي لرب الأسرة.\n\nسيبقى ملف الأسرة وبيانات بقية الأفراد محفوظاً، وسيظهر تنبيه جودة حتى يتم إصلاح السجل.\n\nهل تريد المتابعة؟`,{title:"حذف سجل رب الأسرة",okText:"حذف مع التنبيه",danger:true});
+   if(!ok)return;
+ }else if(head && familyRows.length<=1){
+   const ok=await confirmUI(`هذا هو السجل الوحيد للعائلة. حذفُه سيزيل آخر سجل مرتبط بهذه العائلة من قاعدة البيانات.\n\nهل تريد المتابعة؟`,{title:"حذف سجل العائلة",okText:"حذف",danger:true});
+   if(!ok)return;
+ }else{
+   const ok=await confirmUI(`هل تريد حذف الفرد «${r?.["اسم الفرد"]||""}»؟\n\nسيتم حفظ العملية محليًا ثم مزامنتها مع السحابة.`,{title:"حذف الفرد",okText:"حذف الفرد",danger:true});
+   if(!ok)return;
+ }
+ data.splice(idx,1);renumber();autoSave();rebuildFilters();renderAll();toast("تم حذف الفرد");
 }
 function emptyRecord(){const r={};COLUMNS.forEach(k=>r[k]="");return r}
 function renumber(){data.forEach((r,i)=>r["#"]=String(i+1))}
@@ -484,7 +495,15 @@ function familyPeople(r){
 function familyCount(r){
   const fam=familyPeople(r), seen=new Set();
   fam.forEach(x=>{const id=String(x["رقم هوية الفرد"]||"").trim(), name=String(x["اسم الفرد"]||"").trim(), rel=String(x["صلة القرابة"]||"").trim(); const k=id||`${name}|${rel}`; if(k)seen.add(k);});
-  return seen.size || fam.length;
+  // رب الأسرة يُحسب ضمن عدد أفراد الأسرة حتى لو تم حذف/فقد سجل الفرد الخاص به.
+  const hasHead=fam.some(x=>norm(x["صلة القرابة"]) === "رب الأسرة");
+  const actual=seen.size || fam.length;
+  return actual + (hasHead ? 0 : 1);
+}
+function familyDisplayCount(rows){
+  const list=Array.isArray(rows)?rows:[];
+  const hasHead=list.some(x=>norm(x["صلة القرابة"]) === "رب الأسرة");
+  return list.length + (hasHead ? 0 : 1);
 }
 function wifeRecord(r){ return familyPeople(r).find(x=>/زوجة|زوجته|زوج/.test(String(x["صلة القرابة"]||"").trim())) || null; }
 function reportValue(r,c){
@@ -813,7 +832,7 @@ function familyPrintValue(row,people,key){
     "نوع السكن الحالي":"نوع السكن الحالي","ملاحظات الأسرة":"ملاحظات الأسرة"
   };
   if(key==="#") return "";
-  if(key==="عدد الأفراد") return people.length;
+  if(key==="عدد الأفراد") return familyDisplayCount(people);
 
   if(key==="اسم الزوجة") return wife?.["اسم الفرد"]||"";
   if(key==="رقم هوية الزوجة") return personValue(wife,"id");
@@ -995,7 +1014,7 @@ function qualityScan(){
     });
 
     if(!rows.some(r=>norm(r["صلة القرابة"]) === "رب الأسرة"))
-      issues.push({type:"warning",kind:"family",message:`لا يوجد سجل محدد بصفة رب الأسرة لعائلة ${head}`,indexes:[data.indexOf(first)],field:"صلة القرابة"});
+      issues.push({type:"error",kind:"family",message:`ملف رب الأسرة مفقود: لا يوجد سجل فرد محدد بصفة «رب الأسرة» لعائلة ${head}. سيتم احتساب رب الأسرة ضمن العدد حتى يتم إصلاح السجل.`,indexes:[data.indexOf(first)],field:"صلة القرابة"});
 
     // Every actual person row is checked against its own fields.
     rows.forEach((r,i)=>{
@@ -1091,7 +1110,17 @@ function openQualityFamily(name){
   if(!name)return;
   closeModal("qualityModal");
   showView("families");
-  setTimeout(()=>openFamilyModal(name),100);
+  setTimeout(()=>openFamilyModal(name),140);
+}
+function openQualityFamilyByIndex(idx){
+  const r=data[Number(idx)];
+  if(!r){toast("تعذر تحديد الأسرة المرتبطة بهذا التنبيه");return;}
+  const name=norm(r["اسم رب الأسرة"]);
+  if(name){openQualityFamily(name);return;}
+  const fid=normalizeId(r["رقم هوية الأسرة"]);
+  const candidate=data.find(x=>normalizeId(x["رقم هوية الأسرة"])===fid && norm(x["اسم رب الأسرة"]));
+  if(candidate)openQualityFamily(candidate["اسم رب الأسرة"]);
+  else toast("لا يمكن فتح الأسرة لأن اسم رب الأسرة غير موجود في السجل");
 }
 function openQualityModal(){
   qualityIssues=qualityScan();
@@ -1099,12 +1128,13 @@ function openQualityModal(){
   document.getElementById("qualitySummary").innerHTML=`<b>نتيجة الفحص:</b> ${errors} خطأ و${warnings} تنبيه. تم فحص بيانات الأسرة وكل فرد والتعارضات والتكرارات غير الطبيعية. <b>تكرار رقم الجوال مسموح</b> ولا يُحسب خطأ.`;
   const box=document.getElementById("qualityIssues");
   box.innerHTML=qualityIssues.map((x,i)=>{
-    const first=x.indexes?.[0], r=data[first]||{}, head=String(r["اسم رب الأسرة"]||"").trim();
+    const first=Number.isInteger(x.indexes?.[0]) ? x.indexes[0] : undefined, r=data[first]||{}, head=String(r["اسم رب الأسرة"]||"").trim();
+    const familyAction=first!==undefined && (head || filled(r["رقم هوية الأسرة"])) ? `<button class="btn primary" onclick="openQualityFamilyByIndex(${first})">فتح الأسرة</button>` : "";
     return `<div class="issue-row ${x.type==="warning"?"warn":""}">
       <div><b>${x.type==="error"?"خطأ":"تنبيه"} #${i+1}</b> — ${esc(x.message)}${x.field?`<div class="muted" style="margin-top:4px">الحقل الذي يحتاج المراجعة: <b>${esc(x.field)}</b></div>`:""}</div>
       <div class="actions" style="margin-top:7px;flex-wrap:wrap">
         ${first!==undefined?`<button class="btn" onclick="openQualityPerson(${first})">فتح السجل</button>`:""}
-        ${head?`<button class="btn primary" onclick="openQualityFamily(${JSON.stringify(head)})">فتح الأسرة</button>`:""}
+        ${familyAction}
       </div>
     </div>`;
   }).join("") || '<div class="empty">لا توجد أخطاء أو تنبيهات. البيانات سليمة حسب قواعد الفحص الحالية.</div>';
@@ -1131,7 +1161,7 @@ function renderFamiliesCore(){
   arr=arr.filter(([h,rows])=>{
     const first=rows[0]||{}, blob=[h,first["رقم هوية الأسرة"],first["رقم الجوال"],first["العنوان"]].join(" ").toLowerCase();
     if(q&&!blob.includes(q))return false;
-    const n=rows.length;
+    const n=familyDisplayCount(rows);
     if(fs==="1"&&n!==1)return false;if(fs==="2-4"&&(n<2||n>4))return false;if(fs==="5-7"&&(n<5||n>7))return false;if(fs==="8"&&n<8)return false;
     const status=familyStatus(rows).status;
     if(st && status!==st)return false;
@@ -1144,7 +1174,7 @@ function renderFamiliesCore(){
       <div class="familyrow">
        <div style="min-width:0">
         <div class="familytitle">${esc(h)} ${statusBadge(a.status)}</div>
-        <div class="muted">هوية الأسرة: ${esc(r["رقم هوية الأسرة"]||"—")} · الجوال: ${esc(r["رقم الجوال"]||"—")} · عدد الأفراد: <b>${rows.length}</b> · اكتمال: <b>${a.score}%</b></div>
+        <div class="muted">هوية الأسرة: ${esc(r["رقم هوية الأسرة"]||"—")} · الجوال: ${esc(r["رقم الجوال"]||"—")} · عدد الأفراد: <b>${familyDisplayCount(rows)}</b> · اكتمال: <b>${a.score}%</b></div>
         ${a.status!=="مكتملة"?`<div style="margin-top:5px;color:#92400e;font-size:11px">أهم النواقص: ${missing||"راجع البيانات"}</div>`:""}
        </div>
        <div class="actions no-print"><button class="btn" onclick="editFamily(decodeURIComponent('${key}'))">تعديل الأسرة</button><button class="btn primary" onclick="addMemberToFamily(decodeURIComponent('${key}'))">＋ فرد</button><button class="btn danger" onclick="deleteFamily(decodeURIComponent('${key}'))">حذف العائلة</button></div>
@@ -1469,7 +1499,7 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "54.1";
+const APP_RELEASE_VERSION = "54.2";
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
@@ -2209,7 +2239,7 @@ function exportStyledExcel(rows,filename="كشف_أبو_عريبان",sheetName=
             <div class="family-info-item"><div class="family-info-label">رقم الجوال</div><div class="family-info-value">${esc(f["رقم الجوال"]||"غير متوفر")}</div></div>
             <div class="family-info-item"><div class="family-info-label">رقم جوال بديل</div><div class="family-info-value">${esc(f["رقم جوال بديل"]||"غير متوفر")}</div></div>
             <div class="family-info-item"><div class="family-info-label">داخل/خارج المخيم</div><div class="family-info-value">${esc(f["داخل/خارج المخيم"]||"غير محدد")}</div></div>
-            <div class="family-info-item"><div class="family-info-label">عدد الأفراد</div><div class="family-info-value">${people.length}</div></div>
+            <div class="family-info-item"><div class="family-info-label">عدد الأفراد</div><div class="family-info-value">${familyDisplayCount(people)}${people.some(x=>norm(x["صلة القرابة"]) === "رب الأسرة")?'':' <span class="muted">(سجل رب الأسرة مفقود)</span>'}</div></div>
             <div class="family-info-item"><div class="family-info-label">حالة اكتمال البيانات</div><div class="family-info-value">${esc(f["حالة اكتمال بيانات الأسرة"]||"غير محددة")}</div></div>
             <div class="family-info-item"><div class="family-info-label">المحافظة الأصلية</div><div class="family-info-value">${esc(f["المحافظة الأصلية"]||"غير متوفر")}</div></div>
             <div class="family-info-item"><div class="family-info-label">حالة المسكن الأصلي</div><div class="family-info-value">${esc(f["حالة المسكن الأصلي"]||"غير متوفر")}</div></div>
@@ -2219,7 +2249,7 @@ function exportStyledExcel(rows,filename="كشف_أبو_عريبان",sheetName=
           </div>
 
           <div class="family-members">
-            <h3>أفراد العائلة (${people.length})</h3>
+            <h3>الأفراد المسجلون (${people.length})${people.some(x=>norm(x["صلة القرابة"]) === "رب الأسرة")?"":" — رب الأسرة غير مسجل ضمن الأفراد"}</h3>
             <div style="overflow:auto">
               <table class="family-member-table">
                 <thead>
