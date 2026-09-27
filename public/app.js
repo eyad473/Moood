@@ -362,7 +362,7 @@ const REPORT_COLUMNS = [
  ["إصابة؟","إصابة؟"],["سبب الإصابة","سبب الإصابة"],["تفاصيل الإصابة","تفاصيل الإصابة"],
  ["إعاقة؟","إعاقة؟"],["نوع الإعاقة","نوع الإعاقة"],["يتيم/منفصل عن ذويه؟","يتيم/منفصل عن ذويه؟"],
  ["حامل؟","حامل؟"],["مرضعة؟","مرضعة؟"],["ملاحظات الفرد","ملاحظات الفرد"],["ملاحظات الأسرة","ملاحظات الأسرة"],
- ["عدد أفراد الأسرة","عدد أفراد الأسرة"],
+ ["عدد أفراد الأسرة","عدد أفراد الأسرة (اختياري)"],
  ["رب الأسرة — رقم الهوية","رقم هوية رب الأسرة"],["رب الأسرة — رقم الجوال","رقم جوال رب الأسرة"],["رب الأسرة — رقم الجوال البديل","رقم الجوال البديل لرب الأسرة"],["رب الأسرة — العنوان","عنوان رب الأسرة"],["رب الأسرة — داخل/خارج المخيم","إقامة رب الأسرة (داخل/خارج المخيم)"],["رب الأسرة — المحافظة الأصلية","المحافظة الأصلية لرب الأسرة"],["رب الأسرة — حالة المسكن الأصلي","حالة المسكن الأصلي لرب الأسرة"],["رب الأسرة — نوع السكن الحالي","نوع السكن الحالي لرب الأسرة"],["رب الأسرة — الحالة الاجتماعية","الحالة الاجتماعية لرب الأسرة"],["رب الأسرة — تاريخ الميلاد","تاريخ ميلاد رب الأسرة"],["رب الأسرة — العمر","عمر رب الأسرة"],["رب الأسرة — الجنس","جنس رب الأسرة"],["رب الأسرة — مرض مزمن","مرض مزمن لرب الأسرة"],["رب الأسرة — نوع المرض","نوع مرض رب الأسرة"],["رب الأسرة — إصابة","إصابة رب الأسرة"],["رب الأسرة — سبب الإصابة","سبب إصابة رب الأسرة"],["رب الأسرة — تفاصيل الإصابة","تفاصيل إصابة رب الأسرة"],["رب الأسرة — إعاقة","إعاقة رب الأسرة"],["رب الأسرة — نوع الإعاقة","نوع إعاقة رب الأسرة"],["رب الأسرة — يتيم/منفصل","حالة اليتم/الانفصال لرب الأسرة"],["رب الأسرة — حامل","حمل رب الأسرة"],["رب الأسرة — مرضعة","رضاعة رب الأسرة"],["رب الأسرة — ملاحظات","ملاحظات رب الأسرة"],
  ["الزوجة — الاسم","اسم الزوجة"],["الزوجة — رقم الهوية","رقم هوية الزوجة"],["الزوجة — العمر","عمر الزوجة"],["الزوجة — تاريخ الميلاد","تاريخ ميلاد الزوجة"],["الزوجة — الجنس","جنس الزوجة"],["الزوجة — الحالة الاجتماعية","الحالة الاجتماعية للزوجة"],["الزوجة — مرض مزمن","مرض مزمن للزوجة"],["الزوجة — نوع المرض","نوع مرض الزوجة"],["الزوجة — إصابة","إصابة الزوجة"],["الزوجة — سبب الإصابة","سبب إصابة الزوجة"],["الزوجة — تفاصيل الإصابة","تفاصيل إصابة الزوجة"],["الزوجة — إعاقة","إعاقة الزوجة"],["الزوجة — نوع الإعاقة","نوع إعاقة الزوجة"],["الزوجة — يتيم/منفصل","حالة اليتم/الانفصال للزوجة"],["الزوجة — حامل","حمل الزوجة"],["الزوجة — مرضعة","رضاعة الزوجة"],["الزوجة — ملاحظات","ملاحظات الزوجة"]
 ];
@@ -398,7 +398,7 @@ function normalizeGender(g){return ["انثى","أنثى"].includes(g)?"أنثى
 function familyHeadRecord(r){ return (familyMap().get(r["اسم رب الأسرة"])||[])[0] || r; }
 
 function initReportColumns(){
-  if(!reportColumnsInitialized){ selectedReportColumns = REPORT_COLUMNS.map(x=>x[0]); reportColumnsInitialized = true; }
+  if(!reportColumnsInitialized){ selectedReportColumns = REPORT_COLUMNS.map(x=>x[0]).filter(k=>k!=="عدد أفراد الأسرة"); reportColumnsInitialized = true; }
   const box=document.getElementById("reportColumns"); if(!box)return;
   const groups=[
     {title:"بيانات الفرد", desc:"البيانات الخاصة بكل فرد في السجل", cls:"report-fields-section basic", key:"basic", keys:[
@@ -927,7 +927,7 @@ function filled(v){return norm(v)!==""}
 function genderIsFemale(v){return ["أنثى","انثى"].includes(norm(v))}
 function familyStatus(rows){
   if(!rows || !rows.length) return {status:"غير مكتملة",score:0,missing:["لا توجد سجلات لأفراد الأسرة"]};
-  const first=rows[0]||{};
+  const first=rows.find(r=>norm(r["صلة القرابة"]) === "رب الأسرة") || rows[0] || {};
   const familyFilled=FAMILY_REQUIRED.filter(k=>filled(first[k])).length;
   let personTotal=0, personFilled=0, missing=[];
   rows.forEach((r,i)=>{
@@ -975,7 +975,7 @@ function qualityScan(){
   const personIdPeople=new Map();
 
   fm.forEach((rows,head)=>{
-    const first=rows[0]||{};
+    const first=rows.find(r=>norm(r["صلة القرابة"]) === "رب الأسرة") || rows[0] || {};
     const fid=normalizeId(first["رقم هوية الأسرة"]);
     if(fid){
       if(!familyIdHeads.has(fid))familyIdHeads.set(fid,[]);
@@ -993,6 +993,9 @@ function qualityScan(){
         });
       }
     });
+
+    if(!rows.some(r=>norm(r["صلة القرابة"]) === "رب الأسرة"))
+      issues.push({type:"warning",kind:"family",message:`لا يوجد سجل محدد بصفة رب الأسرة لعائلة ${head}`,indexes:[data.indexOf(first)],field:"صلة القرابة"});
 
     // Every actual person row is checked against its own fields.
     rows.forEach((r,i)=>{
@@ -1020,6 +1023,16 @@ function qualityScan(){
       });
 
       const birth=filled(r["تاريخ الميلاد"]), age=filled(r["العمر التقريبي"]);
+      if(birth){
+        const dt=new Date(r["تاريخ الميلاد"]);
+        if(Number.isNaN(dt.getTime()))
+          issues.push({type:"error",kind:"inconsistent",message:`تاريخ الميلاد غير صالح: ${person}`,indexes:[idx],field:"تاريخ الميلاد"});
+        else if(dt > new Date())
+          issues.push({type:"error",kind:"inconsistent",message:`تاريخ الميلاد في المستقبل: ${person}`,indexes:[idx],field:"تاريخ الميلاد"});
+      }
+      const gender=norm(r["الجنس"]);
+      if(gender && !["ذكر","أنثى","انثى"].includes(gender))
+        issues.push({type:"warning",kind:"inconsistent",message:`قيمة الجنس تحتاج مراجعة: ${person} — ${gender}`,indexes:[idx],field:"الجنس"});
       if(!birth && !age)
         issues.push({type:"warning",kind:"missing",message:`تاريخ الميلاد والعمر كلاهما غير مدخلين: ${person}`,indexes:[idx],field:"تاريخ الميلاد"});
 
@@ -1069,18 +1082,29 @@ function qualityScan(){
   return issues;
 }
 
+function openQualityPerson(idx){
+  closeModal("qualityModal");
+  showView("records");
+  setTimeout(()=>editPerson(idx),80);
+}
+function openQualityFamily(name){
+  if(!name)return;
+  closeModal("qualityModal");
+  showView("families");
+  setTimeout(()=>openFamilyModal(name),100);
+}
 function openQualityModal(){
   qualityIssues=qualityScan();
   const errors=qualityIssues.filter(x=>x.type==="error").length, warnings=qualityIssues.filter(x=>x.type==="warning").length;
-  document.getElementById("qualitySummary").innerHTML=`<b>نتيجة الفحص:</b> ${errors} خطأ و${warnings} تنبيه. التكرارات تظهر كتَنبيهات للمراجعة فقط ويمكن تركها كما هي أو تعديلها، ورقم الجوال يمكن أن يتكرر بين أكثر من عائلة ولا يعتبر مشكلة.`;
+  document.getElementById("qualitySummary").innerHTML=`<b>نتيجة الفحص:</b> ${errors} خطأ و${warnings} تنبيه. تم فحص بيانات الأسرة وكل فرد والتعارضات والتكرارات غير الطبيعية. <b>تكرار رقم الجوال مسموح</b> ولا يُحسب خطأ.`;
   const box=document.getElementById("qualityIssues");
   box.innerHTML=qualityIssues.map((x,i)=>{
-    const first=x.indexes?.[0], r=data[first]||{};
+    const first=x.indexes?.[0], r=data[first]||{}, head=String(r["اسم رب الأسرة"]||"").trim();
     return `<div class="issue-row ${x.type==="warning"?"warn":""}">
       <div><b>${x.type==="error"?"خطأ":"تنبيه"} #${i+1}</b> — ${esc(x.message)}${x.field?`<div class="muted" style="margin-top:4px">الحقل الذي يحتاج المراجعة: <b>${esc(x.field)}</b></div>`:""}</div>
-      <div class="actions" style="margin-top:7px">
-        ${first!==undefined?`<button class="btn" onclick="editPerson(${first});closeModal('qualityModal')">فتح السجل</button>`:""}
-        ${x.kind==="family" && r["اسم رب الأسرة"]?`<button class="btn" onclick="editFamily(${JSON.stringify(r["اسم رب الأسرة"])});closeModal('qualityModal')">فتح الأسرة</button>`:""}
+      <div class="actions" style="margin-top:7px;flex-wrap:wrap">
+        ${first!==undefined?`<button class="btn" onclick="openQualityPerson(${first})">فتح السجل</button>`:""}
+        ${head?`<button class="btn primary" onclick="openQualityFamily(${JSON.stringify(head)})">فتح الأسرة</button>`:""}
       </div>
     </div>`;
   }).join("") || '<div class="empty">لا توجد أخطاء أو تنبيهات. البيانات سليمة حسب قواعد الفحص الحالية.</div>';
@@ -1159,7 +1183,7 @@ function conditionFieldOptions(){
   ["العنوان","العنوان"],["داخل/خارج المخيم","داخل/خارج المخيم"],["حالة اكتمال بيانات الأسرة","حالة الأسرة"],
   ["المحافظة الأصلية","المحافظة الأصلية"],["نوع السكن الحالي","نوع السكن"],["اسم الفرد","اسم الفرد"],
   ["رقم هوية الفرد","رقم هوية الفرد"],["صلة القرابة","صلة القرابة"],["الجنس","الجنس"],["الحالة الاجتماعية","الحالة الاجتماعية"],
-  ["العمر","العمر"],["مرض مزمن؟","مرض مزمن"],["نوع المرض","نوع المرض"],["إصابة؟","إصابة"],["سبب الإصابة","سبب الإصابة"],
+  ["العمر","العمر"],["عدد أفراد الأسرة","عدد أفراد الأسرة"],["مرض مزمن؟","مرض مزمن"],["نوع المرض","نوع المرض"],["إصابة؟","إصابة"],["سبب الإصابة","سبب الإصابة"],
   ["تفاصيل الإصابة","تفاصيل الإصابة"],["إعاقة؟","إعاقة"],["نوع الإعاقة","نوع الإعاقة"],["يتيم/منفصل عن ذويه؟","يتيم"],
   ["حامل؟","حامل"],["مرضعة؟","مرضعة"],["بيانات ناقصة","بيانات ناقصة"]
  ];
@@ -1445,13 +1469,13 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "53.5";
+const APP_RELEASE_VERSION = "54.1";
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
 let syncRoleCheckedAt=0;
 const SYNC_ROLE_CACHE_MS=30000;
-const DISPLAY_PERMS_CACHE_KEY="aboreiban_display_permissions_v53_5";
+const DISPLAY_PERMS_CACHE_KEY="aboreiban_display_permissions_v54_0";
 const PRIMARY_RECONCILE_KEY="aboreiban_primary_reconcile_v52";
 const AUTH_GEN_KEY="aboreiban_authoritative_generation_v52_2";
 const AUTH_NOTICE_GEN_KEY="aboreiban_authoritative_notice_generation_v52_2";
@@ -2266,21 +2290,45 @@ function exportStyledExcel(rows,filename="كشف_أبو_عريبان",sheetName=
     if(birth){birth.addEventListener("change",updatePersonAge);birth.addEventListener("input",updatePersonAge);}
   }
 
-  // Override person editor without changing the existing data model.
+  // حفظ واستعادة نموذج الفرد بالكامل: نبني خيارات القوائم أولاً ثم نعيد القيم المخزنة،
+  // حتى لا يؤدي reset() أو إعادة بناء <select> إلى فقدان الحالة الاجتماعية أو صلة القرابة.
+  function restorePersonFormValues(r){
+    if(!r)return;
+    setv("p_name",r["اسم الفرد"]||"");
+    setv("p_head",r["اسم رب الأسرة"]||"");
+    setv("p_id",r["رقم هوية الفرد"]||"");
+    ensureSelectValue("p_rel",r["صلة القرابة"]||"",REL_OPTIONS);
+    setv("p_gender",r["الجنس"]||"");
+    ensureSelectValue("p_marital",r["الحالة الاجتماعية"]||"",MARITAL_OPTIONS);
+    setv("p_birth",r["تاريخ الميلاد"]||"");
+    setv("p_age",r["العمر التقريبي"]||"");
+    setv("p_chronic",r["مرض مزمن؟"]||r["مرض مزمن?"]||"");
+    setv("p_disease",r["نوع المرض"]||"");
+    setv("p_injury",r["إصابة؟"]||r["إصابة?"]||"");
+    setv("p_injuryreason",r["سبب الإصابة"]||"");
+    setv("p_injurydetails",r["تفاصيل الإصابة"]||"");
+    setv("p_disability",r["إعاقة؟"]||"");
+    setv("p_disabilitytype",r["نوع الإعاقة"]||"");
+    setv("p_orphan",r["يتيم/منفصل عن ذويه؟"]||r["يتيم/منفصل عن ذويه?"]||"");
+    setv("p_preg",r["حامل؟"]||"");
+    setv("p_lact",r["مرضعة؟"]||"");
+    setv("p_notes",r["ملاحظات الفرد"]||"");
+    updatePersonAge();
+  }
   window.openPersonModal=function(idx=null){
-    document.getElementById("personForm").reset();document.getElementById("p_index").value=idx==null?"":idx;
+    const form=document.getElementById("personForm");
+    form.reset();
+    // مهم: إعادة بناء خيارات القوائم قبل استعادة القيم القديمة.
+    patchPersonForm();
+    document.getElementById("p_index").value=idx==null?"":idx;
     document.getElementById("personModalTitle").textContent=idx==null?"إضافة فرد":"تعديل فرد";
-    if(idx!=null && data[idx]){
-      const r=data[idx];
-      setv("p_name",r["اسم الفرد"]);setv("p_head",r["اسم رب الأسرة"]);setv("p_id",r["رقم هوية الفرد"]);
-      ensureSelectValue("p_rel",r["صلة القرابة"],REL_OPTIONS);ensureSelectValue("p_marital",r["الحالة الاجتماعية"],MARITAL_OPTIONS);
-      setv("p_gender",r["الجنس"]);setv("p_birth",r["تاريخ الميلاد"]);setv("p_age",r["العمر التقريبي"]);
-      setv("p_chronic",r["مرض مزمن؟"]||r["مرض مزمن?"]);setv("p_disease",r["نوع المرض"]);setv("p_injury",r["إصابة؟"]||r["إصابة?"]);setv("p_injuryreason",r["سبب الإصابة"]);setv("p_injurydetails",r["تفاصيل الإصابة"]);setv("p_disability",r["إعاقة؟"]);setv("p_disabilitytype",r["نوع الإعاقة"]);setv("p_orphan",r["يتيم/منفصل عن ذويه؟"]||r["يتيم/منفصل عن ذويه?"]);setv("p_preg",r["حامل؟"]);setv("p_lact",r["مرضعة؟"]);setv("p_notes",r["ملاحظات الفرد"]);
-    }
-    patchPersonForm();updatePersonAge();document.getElementById("personModal").classList.add("show");
+    if(idx!=null && data[idx]) restorePersonFormValues(data[idx]);
+    else updatePersonAge();
+    document.getElementById("personModal").classList.add("show");
   };
   window.fillPerson=function(r){
-    setv("p_name",r["اسم الفرد"]);setv("p_head",r["اسم رب الأسرة"]);setv("p_id",r["رقم هوية الفرد"]);ensureSelectValue("p_rel",r["صلة القرابة"],REL_OPTIONS);setv("p_gender",r["الجنس"]);ensureSelectValue("p_marital",r["الحالة الاجتماعية"],MARITAL_OPTIONS);setv("p_birth",r["تاريخ الميلاد"]);setv("p_age",r["العمر التقريبي"]);setv("p_chronic",r["مرض مزمن؟"]||r["مرض مزمن?"]);setv("p_disease",r["نوع المرض"]);setv("p_injury",r["إصابة؟"]||r["إصابة?"]);setv("p_injuryreason",r["سبب الإصابة"]);setv("p_injurydetails",r["تفاصيل الإصابة"]);setv("p_disability",r["إعاقة؟"]);setv("p_disabilitytype",r["نوع الإعاقة"]);setv("p_orphan",r["يتيم/منفصل عن ذويه؟"]||r["يتيم/منفصل عن ذويه?"]);setv("p_preg",r["حامل؟"]);setv("p_lact",r["مرضعة؟"]);setv("p_notes",r["ملاحظات الفرد"]);updatePersonAge();
+    patchPersonForm();
+    restorePersonFormValues(r);
   };
   window.savePerson=function(e){
     e.preventDefault();const idx=document.getElementById("p_index").value,r=idx===""?emptyRecord():data[+idx];
@@ -2338,7 +2386,7 @@ function exportStyledExcel(rows,filename="كشف_أبو_عريبان",sheetName=
     const chronic=data.filter(r=>r["مرض مزمن؟"]==="نعم"||r["مرض مزمن?"]==="نعم").length;
     const injury=data.filter(r=>(r["إصابة؟"]||r["إصابة?"])==="نعم").length;
     const disability=data.filter(r=>r["إعاقة؟"]==="نعم").length;
-    const missing=data.filter(r=>!filled(r["اسم الفرد"])||!filled(r["رقم هوية الفرد"])||!filled(r["تاريخ الميلاد"])).length;
+    const missing=data.filter(r=>!filled(r["اسم الفرد"])||!filled(r["رقم هوية الفرد"])||!filled(r["صلة القرابة"])||!filled(r["الجنس"])||!filled(r["الحالة الاجتماعية"])||(!filled(r["تاريخ الميلاد"])&&!filled(r["العمر التقريبي"]))).length;
     return {children,chronic,injury,disability,missing,health:chronic+injury+disability};
   }
   const oldRenderDashboard=window.renderDashboard;
