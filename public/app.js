@@ -75,6 +75,7 @@ function load(){
   }catch(e){bootUsingEmbeddedSeed=false;data=[]}
   data = Array.isArray(data)?data:[];
   ensureFamilyHeadRecords(true);
+  syncAutomaticOrphans(true);
   rebuildFilters(); renderAll();
 }
 function saveNow(){
@@ -104,6 +105,12 @@ function familyMap(){
 
 /* إصلاح تلقائي لملف رب الأسرة: إذا كانت الأسرة موجودة ببياناتها لكن سجل رب الأسرة الفردي مفقود،
    ننشئ له سجلاً من البيانات المعروفة فقط، ونُبقي الحقول الشخصية غير المعروفة فارغة بدل اختراع بيانات. */
+function isWidowStatus(value){const x=norm(value||"");return x.includes("ارمل")||x.includes("ارملة");}
+function isDivorceStatus(value){const x=norm(value||"");return x.includes("مطلق");}
+function isChildRelation(value){const x=norm(value||"");return x.includes("ابن")||x.includes("ابنه")||x.includes("بنت")||x.includes("ولد");}
+function getFamilyHeadRecord(r){const rows=familyMap().get(r?.["اسم رب الأسرة"]||"")||[];return rows.find(x=>norm(x["صلة القرابة"])==="رب الاسرة")||rows[0]||r||{};}
+function syncAutomaticOrphans(persist=true){let changed=0;familyMap().forEach(rows=>{const head=rows.find(x=>norm(x["صلة القرابة"])==="رب الاسرة")||rows[0];const widow=isWidowStatus(head?.["الحالة الاجتماعية"]);rows.forEach(r=>{if(!isChildRelation(r["صلة القرابة"]))return;if(widow){if(r["يتيم/منفصل عن ذويه?"]!=="نعم")r["يتيم/منفصل عن ذويه?"]="نعم";if(r["يتيم/منفصل عن ذويه؟"]!=="نعم")r["يتيم/منفصل عن ذويه؟"]="نعم";if(r.__autoOrphanByWidow!==true){r.__autoOrphanByWidow=true;changed++;}}else if(r.__autoOrphanByWidow===true){delete r.__autoOrphanByWidow;if(r["يتيم/منفصل عن ذويه?"]==="نعم")delete r["يتيم/منفصل عن ذويه?"];if(r["يتيم/منفصل عن ذويه؟"]==="نعم")delete r["يتيم/منفصل عن ذويه؟"];changed++;}})});if(changed&&persist)autoSave();return changed;}
+
 function ensureFamilyHeadRecords(persist=true){
  const fm=familyMap();
  let added=0,updated=0;
@@ -610,6 +617,7 @@ function setReportPreset(type){
    elderMale:["كشف كبار السن - ذكور","ذكر","60","","",""],
    widowed:["كشف الأرامل","أنثى","","","","widowed"],
    divorced:["كشف المطلقات","أنثى","","","","divorced"],
+   orphan:["كشف الأيتام","","0","17","","orphan"],
    children:["كشف الأطفال","","0","17","",""]
   };
   const c=configs[type]; classifiedTitle=c[0];
@@ -625,6 +633,7 @@ function setReportPreset(type){
   else if(type==="pregnant") selectedReportColumns=["اسم الفرد","اسم رب الأسرة","رقم هوية الفرد","رقم الجوال","صلة القرابة","الجنس","العمر التقريبي","الحالة الاجتماعية","حامل؟"];
   else if(type==="lactating") selectedReportColumns=["اسم الفرد","اسم رب الأسرة","رقم هوية الفرد","رقم الجوال","صلة القرابة","الجنس","العمر التقريبي","الحالة الاجتماعية","مرضعة؟"];
   else if(type==="widowed" || type==="divorced") selectedReportColumns=["اسم الفرد","اسم رب الأسرة","رقم هوية الفرد","رقم الجوال","الجنس","العمر التقريبي","الحالة الاجتماعية","العنوان"];
+  else if(type==="orphan") selectedReportColumns=["اسم الفرد","اسم رب الأسرة","رقم هوية الفرد","رقم الجوال","صلة القرابة","الجنس","العمر التقريبي","الحالة الاجتماعية","يتيم/منفصل عن ذويه؟"];
   else selectedReportColumns=["اسم الفرد","اسم رب الأسرة","رقم هوية الفرد","رقم الجوال","صلة القرابة","الجنس","العمر التقريبي","الحالة الاجتماعية"];
   initReportColumns(); renderPersonPicker(); runCustomReport();
 }
@@ -662,6 +671,7 @@ function uniqueFamilyRows(rows){
 }
 
 function runCustomReport(){
+ syncAutomaticOrphans(true);
  const name=(document.getElementById("cr_name").value||"").trim()||"كشف مصنف";
  const gender=document.getElementById("cr_gender").value;
  const min=document.getElementById("cr_minage").value===""?null:+document.getElementById("cr_minage").value;
@@ -1228,6 +1238,7 @@ function renderFamiliesCore(){
 }
 
 function renderDashboard(){
+  syncAutomaticOrphans(true);
   syncComputedStatuses(false);
   const fm=familyMap(), inside=new Set(), counts={مكتملة:0,جزئية:0,"غير مكتملة":0};
   fm.forEach((rows,h)=>{const r=rows[0]||{};if(r["داخل/خارج المخيم"]==="داخل المخيم")inside.add(h);counts[familyStatus(rows).status]++});
@@ -1244,7 +1255,16 @@ function renderDashboard(){
   banner.classList.toggle("ok",(errors+warnings)===0);
   document.getElementById("qualityBannerText").textContent=(errors+warnings)===0?"فحص جودة البيانات: يتم التحقق من بيانات الأسرة وكل فرد والحالات المتعارضة والتكرارات غير الطبيعية. تكرار الجوال لا يُحسب خطأ.":`تنبيه: يوجد ${errors} خطأ و${warnings} تنبيه يحتاج مراجعة. اضغط "فحص التفاصيل" لمعرفة المشكلة ومكانها.`;
   const gender=[ ["ذكر",data.filter(x=>x["الجنس"]==="ذكر").length],["أنثى",data.filter(x=>genderIsFemale(x["الجنس"])).length] ];
-  const health=[["مرض مزمن",data.filter(x=>x["مرض مزمن؟"]==="نعم").length],["إصابة",data.filter(x=>(x["إصابة؟"]||x["إصابة?"])==="نعم").length],["إعاقة",data.filter(x=>x["إعاقة؟"]==="نعم").length],["حامل",data.filter(x=>x["حامل؟"]==="نعم").length],["مرضعة",data.filter(x=>x["مرضعة؟"]==="نعم").length],["يتيم/منفصل",data.filter(x=>x["يتيم/منفصل عن ذويه؟"]==="نعم").length]];
+  const health=[
+    ["مرض مزمن",data.filter(x=>x["مرض مزمن؟"]==="نعم").length],
+    ["إصابة",data.filter(x=>(x["إصابة؟"]||x["إصابة?"])==="نعم").length],
+    ["إعاقة",data.filter(x=>x["إعاقة؟"]==="نعم").length],
+    ["حامل",data.filter(x=>x["حامل؟"]==="نعم").length],
+    ["مرضعة",data.filter(x=>x["مرضعة؟"]==="نعم").length],
+    ["أيتام",data.filter(x=>hasSpecial(x,"orphan")).length],
+    ["أرامل",data.filter(x=>isWidowStatus(x["الحالة الاجتماعية"])).length],
+    ["مطلقات",data.filter(x=>isDivorceStatus(x["الحالة الاجتماعية"])).length]
+  ];
   renderGenderChart(gender); renderAgeChart(); renderHealthBars(health); renderFamilyStatusChart(counts,fm.size);
   const recent=data.slice(-6).reverse();
   document.getElementById("recent").innerHTML=recent.map(r=>`<div class="member"><span><b>${esc(r["اسم الفرد"]||"")}</b> — ${esc(r["اسم رب الأسرة"]||"")} — ${esc(r["صلة القرابة"]||"")}</span><span>${statusBadge(familyStatus(familyMap().get(r["اسم رب الأسرة"])||[]).status)}</span></div>`).join("")||'<div class="empty">لا توجد بيانات</div>';
@@ -1543,7 +1563,7 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "54.3";
+const APP_RELEASE_VERSION = "55.0";
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
