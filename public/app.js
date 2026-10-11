@@ -1520,7 +1520,7 @@ function startNextDistributionFromCoverage(){
 }
 function saveBulkDistribution(){
  const scope=document.getElementById("bulkScopeLabel").value==="عائلات"?"families":document.getElementById("bulkScopeLabel").value==="أفراد"?"persons":"children",type=distNorm(document.getElementById("bulkType").value),qty=Number(document.getElementById("bulkQty").value||1),unit=distNorm(document.getElementById("bulkUnit").value),date=document.getElementById("bulkDate").value||distToday(),by=distNorm(document.getElementById("bulkBy").value);const keys=[...document.querySelectorAll('#bulkTbody input[type="checkbox"]:checked')].map(x=>x.dataset.key);if(!keys.length){toast("حدد مستفيداً واحداً على الأقل");return}
- const universe=new Map(distCoverageUniverse(scope).map(x=>[x.key,x]));let added=0;keys.forEach(k=>{const x=universe.get(k);if(!x)return;const obj={id:distId(),beneficiaryType:scope==="families"?"عائلة":"فرد",beneficiaryName:x.name,personId:scope==="families"?"":x.id,familyId:data.find(r=>distCoverageKeyFamily(r)===distCoverageKeyFamily({"رقم هوية الأسرة":scope==="families"?x.id:data.find(q=>distCoverageKeyPerson(q)===x.key)?.["رقم هوية الأسرة"]||""}))?.["رقم هوية الأسرة"]||"",familyName:x.familyName,type,quantity:qty,unit,date,reference:"DST-"+Date.now().toString().slice(-8)+"-"+(added+1),distributedBy:by,notes:"توزيع جماعي من كشف غير المستلمين",updatedAt:Date.now()};if(scope==="families"){obj.familyId=x.id}else{const rr=data.find(r=>distCoverageKeyPerson(r)===x.key);obj.familyId=rr?.["رقم هوية الأسرة"]||""}distributions.push(obj);added++});distSave();closeDistBulkModal();renderDistributions();toast(`تم تسجيل ${added} توزيع`);distSyncSoon()}
+ const universe=new Map(distCoverageUniverse(scope).map(x=>[x.key,x]));let added=0,skipped=0;keys.forEach(k=>{const x=universe.get(k);if(!x)return;const obj={id:distId(),beneficiaryType:scope==="families"?"عائلة":"فرد",beneficiaryName:x.name,personId:scope==="families"?"":x.id,familyId:data.find(r=>distCoverageKeyFamily(r)===distCoverageKeyFamily({"رقم هوية الأسرة":scope==="families"?x.id:data.find(q=>distCoverageKeyPerson(q)===x.key)?.["رقم هوية الأسرة"]||""}))?.["رقم هوية الأسرة"]||"",familyName:x.familyName,type,quantity:qty,unit,date,reference:"DST-"+Date.now().toString().slice(-8)+"-"+(added+1),distributedBy:by,notes:"توزيع جماعي من كشف غير المستلمين",updatedAt:Date.now()};if(scope==="families"){obj.familyId=x.id}else{const rr=data.find(r=>distCoverageKeyPerson(r)===x.key);obj.familyId=rr?.["رقم هوية الأسرة"]||""}if(distCampaignFindDuplicate(obj,"")){skipped++;return}const stamp=Date.now();Object.assign(obj,{workflowStatus:"تم التسليم",registeredAt:stamp,approvedAt:stamp,deliveredAt:stamp});distributions.push(obj);added++});distSave();closeDistBulkModal();renderDistributions();toast(`تم تسليم ${added} سجل${skipped?`، وتجاوز ${skipped} مكرر`:""}`);distSyncSoon()}
 
 /* ================= إدارة التوزيعات — Offline First + D1 Sync ================= */
 const DIST_KEY="aboreiban_distributions_v1", DIST_SHADOW_KEY="aboreiban_dist_shadow_v1", DIST_PENDING_KEY="aboreiban_dist_pending_v1", DIST_CURSOR_KEY="aboreiban_dist_cursor_v1";
@@ -2663,7 +2663,7 @@ if ('serviceWorker' in navigator) {
   window.toggleAllBulkRegister=function(v){const scope=document.getElementById('bulkRegScope').value,q=document.getElementById('bulkRegSearch').value,arr=bulkUniverse(scope,q);arr.forEach(x=>v?bulkRegSelected.add(x.key):bulkRegSelected.delete(x.key));renderBulkRegisterPeople()};
   window.saveBulkRegisterDistribution=function(){
     const scope=document.getElementById('bulkRegScope').value,type=distNorm(document.getElementById('bulkRegType').value),qty=Number(document.getElementById('bulkRegQty').value||1),unit=distNorm(document.getElementById('bulkRegUnit').value),date=document.getElementById('bulkRegDate').value||distToday(),by=document.getElementById('bulkRegBy').value;if(!type){toast('اكتب نوع التوزيع أولاً');return}if(!bulkRegSelected.size){toast('حدد مستفيداً واحداً على الأقل');return}if(!by){toast('اختر تم بواسطة');return}
-    const all=bulkUniverse(scope,''),map=new Map(all.map(x=>[x.key,x]));let n=0;for(const key of bulkRegSelected){const x=map.get(key);if(!x)continue;const bt=scope==='families'?'عائلة':scope==='children'?'طفل':'فرد';const duplicate=distributions.some(d=>d.beneficiaryType===bt&&norm(d.beneficiaryName)===norm(x.name)&&norm(d.type)===norm(type)&&String(d.familyId||'')===String(scope==='families'?x.id:x.fid||''));if(duplicate)continue;distributions.push({id:distId(),beneficiaryType:bt,beneficiaryName:x.name,personId:scope==='families'?'':x.id,familyId:scope==='families'?x.id:x.fid,familyName:x.family,type,quantity:qty,unit,date,reference:'DST-'+Date.now().toString().slice(-8)+'-'+(n+1),distributedBy:by,notes:'تسجيل توزيع جماعي',updatedAt:Date.now()});n++}
+    const all=bulkUniverse(scope,''),map=new Map(all.map(x=>[x.key,x]));let n=0;for(const key of bulkRegSelected){const x=map.get(key);if(!x)continue;const bt=scope==='families'?'عائلة':scope==='children'?'طفل':'فرد';const draft={beneficiaryType:bt,beneficiaryName:x.name,personId:scope==='families'?'':x.id,familyId:scope==='families'?x.id:x.fid,familyName:x.family,type};if(distCampaignFindDuplicate(draft,''))continue;const stamp=Date.now();distributions.push({id:distId(),...draft,quantity:qty,unit,date,reference:'DST-'+stamp.toString().slice(-8)+'-'+(n+1),distributedBy:by,notes:'تسجيل جماعي',workflowStatus:'تم التسليم',registeredAt:stamp,approvedAt:stamp,deliveredAt:stamp,updatedAt:stamp});n++}
     distSave();closeDistBulkRegisterModal();renderDistributions();toast(n?'تم تسجيل '+n+' توزيع':'لم تتم إضافة توزيعات جديدة — توجد سجلات مكررة');distSyncSoon();
   };
   function distSearchNorm(v){return String(v??'').toLowerCase().replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[ًٌٍَُِّْـ]/g,'').replace(/\s+/g,' ').trim()}
@@ -2807,3 +2807,92 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("displayLoginPasswordToggle")?.addEventListener("click",setLoginPasswordVisibility);
 });
 /* V53.3.1.1_LOGIN_UX_END */
+
+
+/* V58 — Campaign-level assistance deduplication + direct register/approve/deliver workflow.
+   Only distribution records are changed. Existing family records and sync protocol remain untouched. */
+(function(){
+  const campaignNorm = value => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[ًٌٍَُِّْـ]/g,'').replace(/ـ/g,'').replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/\s+/g,' ').trim().toLowerCase();
+  function familyIdentity(record){
+    const fid=campaignNorm(record?.familyId);
+    if(fid) return 'id:'+fid;
+    const head=campaignNorm(record?.familyName || (record?.beneficiaryType==='عائلة'?record?.beneficiaryName:''));
+    return head ? 'name:'+head : '';
+  }
+  function resolveFamily(record){
+    let out={...record};
+    if(campaignNorm(out.familyId)) return out;
+    let match=null;
+    const pid=campaignNorm(out.personId), name=campaignNorm(out.beneficiaryName), head=campaignNorm(out.familyName);
+    if(pid) match=(data||[]).find(r=>campaignNorm(r['رقم هوية الفرد'])===pid);
+    if(!match && head) match=(data||[]).find(r=>campaignNorm(r['اسم رب الأسرة'])===head);
+    if(!match && name && out.beneficiaryType!=='عائلة') match=(data||[]).find(r=>campaignNorm(r['اسم الفرد'])===name);
+    if(!match && name && out.beneficiaryType==='عائلة') match=(data||[]).find(r=>campaignNorm(r['اسم رب الأسرة'])===name);
+    if(match){out.familyId=String(match['رقم هوية الأسرة']||out.familyId||'').trim();out.familyName=String(match['اسم رب الأسرة']||out.familyName||'').trim();}
+    return out;
+  }
+  function findDuplicate(record, excludeId){
+    const candidate=resolveFamily(record), familyKey=familyIdentity(candidate), typeKey=campaignNorm(candidate.type);
+    if(!familyKey || !typeKey) return null;
+    return (distributions||[]).find(d=>d.id!==excludeId && campaignNorm(d.type)===typeKey && familyIdentity(resolveFamily(d))===familyKey && campaignNorm(d.workflowStatus)!=='ملغي') || null;
+  }
+  window.distCampaignFindDuplicate=findDuplicate;
+  // Coverage is family-based for every beneficiary scope, matching the campaign's one-aid-type-per-family rule.
+  window.distCoverageUniverse=function(scope){
+    const familyKeyOfRow=r=>{const id=campaignNorm(r?.['رقم هوية الأسرة']);if(id)return 'id:'+id;const head=campaignNorm(r?.['اسم رب الأسرة']);return head?'name:'+head:''};
+    if(scope==='families'){
+      const groups=new Map();(data||[]).forEach(r=>{const fk=familyKeyOfRow(r);if(!fk||groups.has(fk))return;groups.set(fk,{key:fk,familyKey:fk,name:distNorm(r['اسم رب الأسرة']),familyName:distNorm(r['اسم رب الأسرة']),id:distNorm(r['رقم هوية الأسرة']),familyId:distNorm(r['رقم هوية الأسرة']),age:''})});return [...groups.values()];
+    }
+    const people=new Map();(data||[]).forEach(r=>{const age=Number(r['العمر التقريبي']);if(scope==='children'&&(!Number.isFinite(age)||age>=18))return;const name=distNorm(r['اسم الفرد']);if(!name)return;const pk=distCoverageKeyPerson(r);if(people.has(pk))return;const fk=familyKeyOfRow(r);people.set(pk,{key:pk,familyKey:fk,name,familyName:distNorm(r['اسم رب الأسرة']),familyId:distNorm(r['رقم هوية الأسرة']),id:distNorm(r['رقم هوية الفرد']),age:Number.isFinite(age)?age:''})});return [...people.values()];
+  };
+  window.distCoverageReceived=function(scope,type){
+    const result=new Map();if(!type)return result;
+    const eligible=(distributions||[]).filter(x=>campaignNorm(x.type)===campaignNorm(type)).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    const byFamily=new Map();for(const d of eligible){const resolved=resolveFamily(d),fk=familyIdentity(resolved);if(fk&&!byFamily.has(fk))byFamily.set(fk,d)}
+    for(const person of window.distCoverageUniverse(scope)){const fk=person.familyKey||familyIdentity({familyId:person.familyId,familyName:person.familyName});const rec=byFamily.get(fk);if(rec)result.set(person.key,{date:rec.date||'',quantity:rec.quantity,reference:rec.reference});}
+    return result;
+  };
+  window.saveDistribution=function(){
+    if(appReadOnly===true){toast('جهاز العرض للقراءة فقط؛ التسجيل من الجهاز الرئيسي');return;}
+    const id=document.getElementById('distId')?.value||distId();
+    let obj=resolveFamily({id,beneficiaryType:distNorm(document.getElementById('distBeneficiaryForm')?.value),beneficiaryName:distNorm(document.getElementById('distName')?.value),personId:distNorm(document.getElementById('distPersonId')?.value),familyId:distNorm(document.getElementById('distFamilyId')?.value),familyName:distNorm(document.getElementById('distFamilyName')?.value),type:distNorm(document.getElementById('distTypeForm')?.value),quantity:Number(document.getElementById('distQty')?.value||1),unit:distNorm(document.getElementById('distUnit')?.value),date:document.getElementById('distDate')?.value||distToday(),reference:distNorm(document.getElementById('distRef')?.value),distributedBy:distNorm(document.getElementById('distBy')?.value),notes:distNorm(document.getElementById('distNotes')?.value)});
+    if(!obj.beneficiaryName||!obj.type){toast('أدخل اسم المستفيد ونوع المساعدة');return;}
+    if(!obj.familyId && !obj.familyName){toast('تعذر تحديد العائلة. اختر المستفيد من نتائج البحث أو أدخل رب الأسرة');return;}
+    if(!Number.isFinite(obj.quantity)||obj.quantity<=0){toast('الكمية يجب أن تكون أكبر من صفر');return;}
+    const duplicate=findDuplicate(obj,id);
+    if(duplicate){toast('ممنوع التكرار: هذه العائلة مسجل لها نوع المساعدة نفسه ('+obj.type+') بالمرجع '+(duplicate.reference||'—'));return;}
+    const old=distributions.find(x=>x.id===id), stamp=Date.now();
+    obj={...obj,workflowStatus:'تم التسليم',registeredAt:old?.registeredAt||stamp,approvedAt:old?.approvedAt||stamp,deliveredAt:old?.deliveredAt||stamp,updatedAt:stamp};
+    const i=distributions.findIndex(x=>x.id===id);if(i<0)distributions.push(obj);else distributions[i]=obj;
+    try{distSave();}catch(e){toast('تعذر الحفظ المحلي؛ لم يتم إكمال العملية');return;}
+    closeDistributionModal();renderDistributions();toast('تم التسجيل والاعتماد والتسليم بنجاح');distSyncSoon();
+  };
+  const priorRender=window.renderDistributions;
+  window.renderDistributions=function(){
+    priorRender();
+    const table=document.querySelector('#distributions .dist-table');
+    const head=table?.querySelector('thead tr');
+    if(head&&!head.querySelector('[data-campaign-status-head]')){const th=document.createElement('th');th.dataset.campaignStatusHead='1';th.textContent='حالة العملية';const actions=head.lastElementChild;if(actions)head.insertBefore(th,actions);else head.appendChild(th);}
+    document.querySelectorAll('#distTbody tr').forEach(tr=>{
+      if(tr.querySelector('[data-campaign-status-cell]'))return;
+      const edit=tr.querySelector('button[onclick^="openDistributionModal("]');
+      const match=edit?.getAttribute('onclick')?.match(/openDistributionModal\('([^']+)'\)/);
+      const rec=match?(distributions||[]).find(x=>x.id===match[1]):null;
+      const td=document.createElement('td');td.dataset.campaignStatusCell='1';
+      if(rec?.workflowStatus==='تم التسليم') td.innerHTML='<span class="dist-workflow-pill done">تم التسجيل والاعتماد والتسليم</span><small class="dist-workflow-date">'+String(rec.deliveredAt?new Date(rec.deliveredAt).toLocaleDateString('ar-EG'):rec.date||'')+'</small>';
+      else td.innerHTML='<span class="dist-workflow-pill legacy">سجل سابق</span>';
+      const actions=tr.lastElementChild;if(actions)tr.insertBefore(td,actions);else tr.appendChild(td);
+    });
+  };
+  const priorExport=window.exportDistributionsExcel;
+  window.exportDistributionsExcel=function(){
+    const q=campaignNorm(document.getElementById('distQ')?.value),bt=document.getElementById('distBeneficiary')?.value||'',ty=document.getElementById('distType')?.value||'',from=document.getElementById('distFrom')?.value||'',to=document.getElementById('distTo')?.value||'';
+    const rows=(distributions||[]).filter(x=>{const blob=campaignNorm([x.beneficiaryName,x.familyName,x.type,x.reference,x.notes,x.personId,x.familyId].join(' '));return(!q||blob.includes(q))&&(!bt||x.beneficiaryType===bt)&&(!ty||x.type===ty)&&(!from||x.date>=from)&&(!to||x.date<=to)}).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    if(!rows.length){toast('لا توجد توزيعات مطابقة للتصدير');return;}
+    const headers=['#','التاريخ','نوع المستفيد','اسم المستفيد','رقم هوية الفرد','رقم هوية الأسرة','رب الأسرة','نوع المساعدة','الكمية','الوحدة','رقم المرجع','تم بواسطة','حالة العملية','وقت التسجيل','وقت الاعتماد','وقت التسليم','ملاحظات'];
+    const stamp=v=>v?new Date(Number(v)).toLocaleString('ar-EG'):'';
+    const matrix=[['سجل توزيعات مخيم أبو عريبان'],['التسجيل والاعتماد والتسليم المباشر — منع التكرار حسب العائلة ونوع المساعدة'],['تاريخ التصدير: '+new Date().toLocaleString('ar-EG')],[],headers];
+    rows.forEach((x,i)=>matrix.push([i+1,x.date||'',x.beneficiaryType||'',x.beneficiaryName||'',x.personId||'',x.familyId||'',x.familyName||'',x.type||'',x.quantity??'',x.unit||'',x.reference||'',x.distributedBy||'',x.workflowStatus||'سجل سابق',stamp(x.registeredAt),stamp(x.approvedAt),stamp(x.deliveredAt),x.notes||'']));
+    try{downloadXLSX(matrix,'توزيعات_مخيم_أبو_عريبان_'+dateStamp()+'.xlsx',{headerRow:5,title:'سجل توزيعات مخيم أبو عريبان'});toast('تم تصدير سجل التوزيعات مع حالة الاعتماد والتسليم');}catch(e){console.error(e);toast('تعذر تصدير Excel: '+(e?.message||'خطأ غير معروف'));}
+  };
+})();

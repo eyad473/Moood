@@ -1,4 +1,4 @@
-const CACHE = "abu-areiban-v54-2-family-quality-fix-1";
+const CACHE = "abu-areiban-v58-distribution-campaign-direct-workflow";
 const APP_SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
