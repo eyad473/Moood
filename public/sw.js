@@ -1,4 +1,4 @@
-const CACHE = "abu-areiban-v58-distribution-campaign-direct-workflow";
+const CACHE = "abu-areiban-v58-centered-success-check-1";
 const APP_SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
