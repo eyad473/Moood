@@ -2745,26 +2745,29 @@ if ('serviceWorker' in navigator) {
       const name=String(r['اسم الفرد']||'').trim(), head=String(r['اسم رب الأسرة']||'').trim(), pid=String(r['رقم هوية الفرد']||'').trim(), fid=String(r['رقم هوية الأسرة']||'').trim();
       if(beneficiaryFilter==='عائلة'){
         if(!head)continue;
-        const hay=distSearchNorm(head+' '+fid); if(!hay.includes(q))continue;
-        const key='f|'+fid+'|'+head;
+        if(!distSearchNorm(head+' '+fid).includes(q))continue;
+        const key='f|'+(fid||distSearchNorm(head));
         if(!candidates.has(key))candidates.set(key,{kind:'عائلة',name:head,head,pid:'',fid});
       }else{
-        const hay=distSearchNorm(name+' '+head+' '+pid+' '+fid); if(!hay.includes(q))continue;
-        const key=pid?('p|'+pid):('f|'+fid+'|'+head);
+        if(!distSearchNorm(name+' '+head+' '+pid+' '+fid).includes(q))continue;
+        const key=pid?('p|'+distSearchNorm(pid)):('f|'+(fid||distSearchNorm(head)));
         if(!candidates.has(key))candidates.set(key,{kind:pid?'فرد':'عائلة',name:pid?name:head,head,pid,fid});
       }
     }
-    const types=[...new Set(distributions.map(x=>x.type).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ar'));
-    const arr=[...candidates.values()].slice(0,20).map(c=>{
-      const got=distributions.filter(d=>{
-        if(c.pid) return distSearchNorm(d.personId)===distSearchNorm(c.pid) || (!d.personId&&distSearchNorm(d.beneficiaryName)===distSearchNorm(c.name));
-        return distSearchNorm(d.familyId)===distSearchNorm(c.fid) || (!d.familyId&&distSearchNorm(d.familyName)===distSearchNorm(c.name));
-      });
-      const gotTypes=new Set(got.map(x=>x.type).filter(Boolean));
-      const shownTypes=selectedType?[selectedType]:types.slice(0,8);
-      return {...c,got,gotTypes,shownTypes};
-    });
-    panel.innerHTML=arr.length?`<div class="dist-beneficiary-head"><div><b>نتائج دقيقة للبحث: ${escv(document.getElementById('distQ')?.value||'')}</b><span>الحالة توضح فوراً شو استلم المستفيد وشو لسه ما استلم.</span></div><span class="badge">${arr.length} نتيجة</span></div><div class="dist-beneficiary-grid">${arr.map(c=>`<div class="dist-beneficiary-card"><div class="dist-beneficiary-title"><div><b>${escv(c.name)}</b><small>${escv(c.kind)} • رب الأسرة: ${escv(c.head||c.name)}${c.pid?' • هوية: '+escv(c.pid):''}</small></div><span class="dist-main-status ${c.got.length?'received':'missing'}">${c.got.length?'استفاد':'لم يستفد'}</span></div><div class="dist-help-chips">${c.shownTypes.length?c.shownTypes.map(t=>`<span class="dist-help-chip ${c.gotTypes.has(t)?'yes':'no'}"><i></i>${escv(t)} — ${c.gotTypes.has(t)?'استلم':'لم يستلم'}</span>`).join(''):'<span class="dist-beneficiary-empty">لا توجد أنواع مساعدات مسجلة بعد</span>'}</div>${c.got.length?`<div class="dist-beneficiary-history">${c.got.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,4).map(d=>`<span>${escv(d.date)} • ${escv(d.type)} • ${escv(d.quantity)} ${escv(d.unit||'')}</span>`).join('')}</div>`:''}</div>`).join('')}</div>`:'<div class="dist-beneficiary-empty">لا توجد مطابقة دقيقة لهذا البحث.</div>';
+    const isReceived=d=>typeof window.distCampaignIsReceived==='function'?window.distCampaignIsReceived(d):(!d?.workflowStatus||['تم التسليم','تم التسجيل والاعتماد والتسليم','تم الاستلام','مستلم','received','delivered'].includes(distSearchNorm(d.workflowStatus)));
+    const sameFamily=(c,d)=>{
+      const cf=String(c.fid||'').replace(/[^\p{L}\p{N}]/gu,'').toLowerCase(),df=String(d.familyId||'').replace(/[^\p{L}\p{N}]/gu,'').toLowerCase();
+      if(cf&&df)return cf===df;
+      const cn=distSearchNorm(c.head||c.name),dn=distSearchNorm(d.familyName||(d.beneficiaryType==='عائلة'?d.beneficiaryName:''));
+      return !!cn&&cn===dn;
+    };
+    const arr=[...candidates.values()].slice(0,100).map(c=>{
+      const got=distributions.filter(d=>sameFamily(c,d)&&isReceived(d)&&(!selectedType||distSearchNorm(d.type)===distSearchNorm(selectedType)))
+        .sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+      const receivedTypes=[...new Set(got.map(x=>String(x.type||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ar'));
+      return {...c,got,receivedTypes};
+    }).filter(c=>c.got.length>0).slice(0,20);
+    panel.innerHTML=arr.length?`<div class="dist-beneficiary-head"><div><b>سجلات الاستلام المؤكدة</b><span>تظهر هنا المساعدات التي تم تسليمها فقط.</span></div><span class="badge">${arr.length} نتيجة</span></div><div class="dist-beneficiary-grid">${arr.map(c=>`<div class="dist-beneficiary-card"><div class="dist-beneficiary-title"><div><b>${escv(c.name)}</b><small>${escv(c.kind)} • رب الأسرة: ${escv(c.head||c.name)}${c.pid?' • هوية: '+escv(c.pid):''}</small></div><span class="dist-main-status received">تم الاستلام</span></div><div class="dist-help-chips">${c.receivedTypes.map(t=>`<span class="dist-help-chip yes"><i></i>${escv(t)} — تم الاستلام</span>`).join('')}</div><div class="dist-beneficiary-history">${c.got.slice(0,4).map(d=>`<span>${escv(d.date||'')} • ${escv(d.type)} • ${escv(d.quantity)} ${escv(d.unit||'')}</span>`).join('')}</div></div>`).join('')}</div>`:'<div class="dist-beneficiary-empty">لا توجد سجلات استلام مؤكدة لهذا البحث.</div>';
     panel.hidden=false;
   }
   const originalRenderDistributions=window.renderDistributions;
@@ -3110,4 +3113,66 @@ document.addEventListener("DOMContentLoaded",()=>{
  function matches(){const box=$('distCampaignFamilyMatches'),input=$('distCampaignFamilySearch');if(!box||!input)return;const q=norm(input.value),qi=idNorm(input.value);chosenFamily=null;if(q.length<2){box.innerHTML='';return}const arr=familyRows().map(f=>({...f,score:norm(f.name)===q||idNorm(f.id)===qi?0:(norm(f.name).startsWith(q)||idNorm(f.id).startsWith(qi)?1:2)})).filter(f=>norm(f.name).includes(q)||idNorm(f.id).includes(qi)).sort((a,b)=>a.score-b.score||a.name.localeCompare(b.name,'ar')).slice(0,8);box.innerHTML=arr.map((f,i)=>`<button type="button" class="dist-campaign-match" data-family-index="${i}"><span><b>${String(f.name).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</b><small>هوية الأسرة: ${String(f.id||'غير مسجلة')} • ${f.members} فرد</small></span><span aria-hidden="true">›</span></button>`).join('');const refs=arr;box.querySelectorAll('[data-family-index]').forEach(btn=>btn.addEventListener('click',()=>{const f=refs[Number(btn.dataset.familyIndex)];if(!f)return;chosenFamily=f;input.value=f.name;box.innerHTML='';check(f)}));}
  function init(){if(!$('distCampaignQuickCheck'))return;const input=$('distCampaignFamilySearch'),type=$('distCampaignAidType');input?.addEventListener('input',matches);type?.addEventListener('input',()=>{summary(type.value);if(chosenFamily)check(chosenFamily)});type?.addEventListener('change',()=>{summary(type.value);if(chosenFamily)check(chosenFamily)});$('distCampaignCheckBtn')?.addEventListener('click',()=>{const q=norm(input?.value),qi=idNorm(input?.value),fam=chosenFamily||familyRows().find(f=>norm(f.name)===q||idNorm(f.id)===qi);check(fam||null)});const original=window.renderDistributions;window.renderDistributions=function(){original();const types=[...new Set((distributions||[]).map(x=>String(x.type||'').trim()).filter(Boolean))];const dl=$('distCampaignAidTypes');if(dl){const known=new Set([...dl.querySelectorAll('option')].map(o=>norm(o.value)));types.forEach(t=>{if(!known.has(norm(t))){const o=document.createElement('option');o.value=t;dl.appendChild(o)}})}summary(type?.value||'')};summary(type?.value||'');}
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+})();
+
+
+/* V63 — Received-only visibility + stronger campaign integrity.
+   Existing local storage keys, D1 schema, sync routes, and project layout are preserved. */
+(function(){
+ 'use strict';
+ const norm=v=>String(v??'').normalize('NFKC').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[ًٌٍَُِّْـٰ]/g,'').replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[ـ\u200e\u200f\u202a-\u202e]/g,'').replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim().toLowerCase();
+ const cancelled=r=>['ملغي','ملغى','ملغاه','الغاء','canceled','cancelled'].includes(norm(r?.workflowStatus||r?.statusLabel||''));
+ const received=r=>{if(!r||cancelled(r))return false;const s=norm(r.workflowStatus||r.statusLabel||'');if(!s)return true;return ['تم التسليم','تم التسجيل والاعتماد والتسليم','تم الاستلام','مستلم','received','delivered'].includes(s)};
+ window.distCampaignIsReceived=received;
+ // Coverage counts and exports are based only on confirmed receipts, never pending or cancelled entries.
+ window.distCoverageReceived=function(scope,type){
+   const result=new Map();if(!type)return result;
+   const idNorm=v=>String(v??'').normalize('NFKC').replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/[^\p{L}\p{N}]/gu,'').toLowerCase();
+   const familyKey=r=>{const id=idNorm(r?.familyId);if(id)return 'id:'+id;const head=norm(r?.familyName||(r?.beneficiaryType==='عائلة'?r?.beneficiaryName:''));const pid=idNorm(r?.personId);let row=null;if(head&&pid)row=(data||[]).find(x=>norm(x['اسم رب الأسرة'])===head&&idNorm(x['رقم هوية الفرد'])===pid);if(!row&&head)row=(data||[]).find(x=>norm(x['اسم رب الأسرة'])===head);if(!row&&pid)row=(data||[]).find(x=>idNorm(x['رقم هوية الفرد'])===pid);if(!row&&r?.beneficiaryType==='عائلة')row=(data||[]).find(x=>norm(x['اسم رب الأسرة'])===norm(r?.beneficiaryName));const resolvedId=idNorm(row?.['رقم هوية الأسرة']);if(resolvedId)return 'id:'+resolvedId;const name=norm(row?.['اسم رب الأسرة']||head||(r?.beneficiaryType==='عائلة'?r?.beneficiaryName:''));return name?'name:'+name:''};
+   const byFamily=new Map();
+   (Array.isArray(distributions)?distributions:[]).filter(d=>norm(d.type)===norm(type)&&received(d)).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).forEach(d=>{const key=familyKey(d);if(key&&!byFamily.has(key))byFamily.set(key,d)});
+   for(const person of (window.distCoverageUniverse(scope)||[])){const id=idNorm(person.familyId),key=id?'id:'+id:(person.familyKey||familyKey({familyName:person.familyName}));const rec=byFamily.get(key);if(rec)result.set(person.key,{date:rec.date||'',quantity:rec.quantity,reference:rec.reference,recordId:rec.id});}
+   return result;
+ };
+ const previousRender=window.renderDistributions;
+ window.renderDistributions=function(){
+   previousRender();
+   const tbody=document.getElementById('distTbody'), table=document.querySelector('#distributions .dist-table');
+   const statusHead=table?.querySelector('thead [data-campaign-status-head]');if(statusHead)statusHead.textContent='حالة الاستلام';
+   if(!tbody)return;let shown=0;
+   [...tbody.querySelectorAll('tr')].forEach(tr=>{
+     const button=tr.querySelector('button[onclick^="openDistributionModal("]');
+     const match=button?.getAttribute('onclick')?.match(/openDistributionModal\('([^']+)'\)/);
+     if(!match)return;
+     const rec=(window.distributions||[]).find(x=>x.id===match[1]);
+     if(!received(rec)){tr.remove();return;}
+     shown++;
+     const cell=tr.querySelector('[data-campaign-status-cell]');
+     if(cell){const d=rec.deliveredAt?new Date(rec.deliveredAt).toLocaleDateString('ar-EG'):(rec.date||'');cell.innerHTML='<span class="dist-workflow-pill done">تم الاستلام</span>'+(d?'<small class="dist-workflow-date">'+String(d).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))+'</small>':'');}
+   });
+   if(!shown&&!tbody.querySelector('tr'))tbody.innerHTML='<tr><td colspan="9"><div class="dist-empty">لا توجد سجلات استلام مؤكدة لعرضها</div></td></tr>';
+ };
+ window.renderDistributionCoverage=function(){
+   if(typeof window.distCoverageTypeFill==='function')window.distCoverageTypeFill();
+   const scope=document.getElementById('distCoverageScope')?.value||'children',type=document.getElementById('distCoverageType')?.value||'',tbody=document.getElementById('distCoverageTbody');if(!tbody)return;
+   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=String(v)};
+   if(!type){tbody.innerHTML='<tr><td colspan="6"><div class="dist-empty">اختر نوع المساعدة لعرض سجلات الاستلام المؤكدة</div></td></tr>';['covTotal','covReceived','covMissing','covPercent'].forEach(id=>set(id,id==='covPercent'?'0%':'0'));return;}
+   const universe=window.distCoverageUniverse(scope)||[],gotMap=window.distCoverageReceived(scope,type)||new Map();
+   const rows=universe.filter(x=>gotMap.has(x.key)).map(x=>({...x,receipt:gotMap.get(x.key)}));const total=universe.length,got=rows.length;
+   set('covTotal',total);set('covReceived',got);set('covMissing',Math.max(0,total-got));set('covPercent',total?Math.round(got*100/total)+'%':'0%');
+   const e=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+   tbody.innerHTML=rows.length?rows.map((x,i)=>`<tr><td>${i+1}</td><td><b>${e(x.name)}</b>${x.age!==''?`<div class="muted">العمر ${e(x.age)}</div>`:''}</td><td>${e(x.familyName||'—')}</td><td>${e(x.id||'—')}</td><td><span class="dist-workflow-pill done">تم الاستلام</span></td><td>${e(x.receipt?.date||'—')}</td></tr>`).join(''):'<tr><td colspan="6"><div class="dist-empty">لا توجد سجلات استلام مؤكدة لهذا النوع حتى الآن</div></td></tr>';
+ };
+ window.exportDistributionCoverageExcel=function(){
+   const scope=document.getElementById('distCoverageScope')?.value||'children',type=document.getElementById('distCoverageType')?.value||'';if(!type){toast('اختر نوع المساعدة أولاً');return;}
+   const universe=window.distCoverageUniverse(scope)||[],gotMap=window.distCoverageReceived(scope,type)||new Map();
+   const rows=universe.filter(x=>gotMap.has(x.key)).map(x=>({'نوع الكشف':scope==='families'?'عائلات':scope==='persons'?'أفراد':'أطفال','نوع المساعدة':type,'الاسم':x.name,'رب الأسرة':x.familyName,'رقم الهوية':x.id,'حالة الاستلام':'تم الاستلام','تاريخ الاستلام':gotMap.get(x.key)?.date||'','رقم المرجع':gotMap.get(x.key)?.reference||''}));
+   if(!rows.length){toast('لا توجد سجلات استلام لتصديرها');return;}exportStyledExcel(rows,`كشف_المستلمين_${type}`,'كشف المستلمين');
+ };
+ const oldExport=window.exportDistributionsExcel;
+ window.exportDistributionsExcel=function(){const original=window.distributions;try{window.distributions=original.filter(received);oldExport();}finally{window.distributions=original;}};
+ // Expose the existing lexical collection to this additive UI layer without changing its storage.
+ try{Object.defineProperty(window,'distributions',{configurable:true,get(){return distributions},set(v){distributions=v}})}catch(e){}
+ const refresh=()=>{try{window.renderDistributions?.();window.renderDistributionCoverage?.()}catch(e){console.warn('V63 distribution refresh',e)}};
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',refresh,{once:true});else setTimeout(refresh,0);
 })();
