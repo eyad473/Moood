@@ -1491,14 +1491,12 @@ function distCoverageUniverse(scope){
 }
 function distCoverageReceived(scope,type){
   const m=new Map();if(!type)return m;
-  const nrm=v=>String(v??"").toLowerCase().normalize("NFKC").replace(/[إأآٱ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/[ًٌٍَُِّْـ]/g,"").replace(/\s+/g," ").trim();
-  const sameFamily=(fidA,nameA,fidB,nameB)=>{const a=nrm(fidA),b=nrm(fidB);if(a&&b)return a===b;const na=nrm(nameA),nb=nrm(nameB);return !!na&&!!nb&&na===nb};
-  const received=distributions.filter(x=>nrm(x.type)===nrm(type));
-  if(scope==="families"){
-    const families=new Map();data.forEach(r=>{const key=distCoverageKeyFamily(r);if(!families.has(key))families.set(key,{fid:r["رقم هوية الأسرة"],name:r["اسم رب الأسرة"]})});
-    for(const [key,f] of families){const got=received.filter(x=>sameFamily(f.fid,f.name,x.familyId,x.familyName||(x.beneficiaryType==="عائلة"?x.beneficiaryName:""))).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];if(got)m.set(key,{date:got.date,quantity:got.quantity,reference:got.reference})}return m;
-  }
-  data.forEach(r=>{const personKey=distCoverageKeyPerson(r);if(!personKey)return;const got=received.filter(x=>sameFamily(r["رقم هوية الأسرة"],r["اسم رب الأسرة"],x.familyId,x.familyName||(x.beneficiaryType==="عائلة"?x.beneficiaryName:""))).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];if(got){const old=m.get(personKey);if(!old||String(got.date)>String(old.date))m.set(personKey,{date:got.date,quantity:got.quantity,reference:got.reference})}});return m;
+  distributions.filter(x=>distNorm(x.type)===type).forEach(x=>{
+    let k="";
+    if(scope==="families") k=x.familyId?("f:"+distNorm(x.familyId)):(x.familyName?("fn:"+distNorm(x.familyName)):"");
+    else k=x.personId?("p:"+distNorm(x.familyId)+"|"+distNorm(x.personId)):("pn:"+distNorm(x.familyId)+"|"+distNorm(x.beneficiaryName));
+    if(!k)return;const old=m.get(k);if(!old||String(x.date)>String(old.date))m.set(k,{date:x.date,quantity:x.quantity,reference:x.reference});
+  });return m;
 }
 function renderDistributionCoverage(){
   distCoverageTypeFill();const scope=document.getElementById("distCoverageScope")?.value||"children",type=document.getElementById("distCoverageType")?.value||"",status=document.getElementById("distCoverageStatus")?.value||"not_received";const tbody=document.getElementById("distCoverageTbody");if(!tbody)return;
@@ -1521,8 +1519,16 @@ function startNextDistributionFromCoverage(){
  document.getElementById("bulkTbody").innerHTML=missing.map((x,i)=>`<tr><td><input type="checkbox" data-key="${esc(x.key)}" onchange="updateBulkSelected()"></td><td>${i+1}</td><td><b>${esc(x.name)}</b></td><td>${esc(x.familyName||"—")}</td><td>${esc(x.id||"—")}</td></tr>`).join("");document.getElementById("bulkAll").checked=false;updateBulkSelected();const m=document.getElementById("distBulkModal");m.classList.add("show");m.setAttribute("aria-hidden","false");
 }
 function saveBulkDistribution(){
- const scope=document.getElementById("bulkScopeLabel").value==="عائلات"?"families":document.getElementById("bulkScopeLabel").value==="أفراد"?"persons":"children",type=distNorm(document.getElementById("bulkType").value),qty=Number(document.getElementById("bulkQty").value||1),unit=distNorm(document.getElementById("bulkUnit").value),date=document.getElementById("bulkDate").value||distToday(),by=distNorm(document.getElementById("bulkBy").value);const keys=[...document.querySelectorAll('#bulkTbody input[type="checkbox"]:checked')].map(x=>x.dataset.key);if(!keys.length){toast("حدد مستفيداً واحداً على الأقل");return}
- const universe=new Map(distCoverageUniverse(scope).map(x=>[x.key,x]));let added=0;keys.forEach(k=>{const x=universe.get(k);if(!x)return;const obj={id:distId(),beneficiaryType:scope==="families"?"عائلة":"فرد",beneficiaryName:x.name,personId:scope==="families"?"":x.id,familyId:data.find(r=>distCoverageKeyFamily(r)===distCoverageKeyFamily({"رقم هوية الأسرة":scope==="families"?x.id:data.find(q=>distCoverageKeyPerson(q)===x.key)?.["رقم هوية الأسرة"]||""}))?.["رقم هوية الأسرة"]||"",familyName:x.familyName,type,quantity:qty,unit,date,reference:"DST-"+Date.now().toString().slice(-8)+"-"+(added+1),distributedBy:by,notes:"توزيع جماعي من كشف غير المستلمين",updatedAt:Date.now()};if(scope==="families"){obj.familyId=x.id}else{const rr=data.find(r=>distCoverageKeyPerson(r)===x.key);obj.familyId=rr?.["رقم هوية الأسرة"]||""}distributions.push(obj);added++});distSave();closeDistBulkModal();renderDistributions();toast(`تم تسجيل ${added} توزيع`);distSyncSoon()}
+ if(appReadOnly===true){toast("جهاز العرض للقراءة فقط؛ التسجيل من الجهاز الرئيسي");return;}
+ const scope=document.getElementById("bulkScopeLabel").value==="عائلات"?"families":document.getElementById("bulkScopeLabel").value==="أفراد"?"persons":"children",type=distNorm(document.getElementById("bulkType").value),qty=Number(document.getElementById("bulkQty").value||1),unit=distNorm(document.getElementById("bulkUnit").value),date=document.getElementById("bulkDate").value||distToday(),by=distNorm(document.getElementById("bulkBy").value);const keys=[...document.querySelectorAll('#bulkTbody input[type="checkbox"]:checked')].map(x=>x.dataset.key);
+ if(!type){toast("اختر نوع المساعدة");return}if(!keys.length){toast("حدد مستفيداً واحداً على الأقل");return}if(!Number.isFinite(qty)||qty<=0){toast("الكمية يجب أن تكون أكبر من صفر");return}if(!distValidDate(date)){toast("تحقق من تاريخ التوزيع");return}if(!by){toast("أدخل اسم الجهة أو المسؤول الذي سلّم المساعدة");return}
+ const universe=new Map(distCoverageUniverse(scope).map(x=>[x.key,x])),before=distributions.slice();let added=0,skipped=0;const stamp=Date.now();
+ for(const k of keys){const x=universe.get(k);if(!x)continue;const row=scope==="families"?null:data.find(r=>distCoverageKeyPerson(r)===x.key);const obj={id:distId(),beneficiaryType:scope==="families"?"عائلة":"فرد",beneficiaryName:x.name,personId:scope==="families"?"":x.id,familyId:scope==="families"?x.id:(row?.["رقم هوية الأسرة"]||x.familyId||""),familyName:x.familyName,type,quantity:qty,unit,date,reference:"DST-"+stamp.toString().slice(-8)+"-"+(added+1),distributedBy:by,notes:"توزيع جماعي من كشف غير المستلمين",updatedAt:stamp};
+  if(distCampaignFindDuplicate(obj,"")){skipped++;continue}Object.assign(obj,{workflowStatus:"تم التسليم",registeredAt:stamp,approvedAt:stamp,deliveredAt:stamp});distributions.push(obj);added++;
+ }
+ try{distSave()}catch(e){distributions=before;toast("تعذر الحفظ على الهاتف؛ أُلغيت العملية الجماعية");return}
+ closeDistBulkModal();renderDistributions();toast(`تم تسليم ${added} سجل${skipped?`، وتجاوز ${skipped} مكرر حسب العائلة ونوع المساعدة`:""}`);distSyncSoon();
+}
 
 /* ================= إدارة التوزيعات — Offline First + D1 Sync ================= */
 const DIST_KEY="aboreiban_distributions_v1", DIST_SHADOW_KEY="aboreiban_dist_shadow_v1", DIST_PENDING_KEY="aboreiban_dist_pending_v1", DIST_CURSOR_KEY="aboreiban_dist_cursor_v1";
@@ -1531,7 +1537,8 @@ function distId(){return "dist:"+(crypto.randomUUID?crypto.randomUUID():Date.now
 function distLoad(){try{distributions=JSON.parse(localStorage.getItem(DIST_KEY)||"[]");if(!Array.isArray(distributions))distributions=[]}catch(e){distributions=[]}}
 function distSave(){localStorage.setItem(DIST_KEY,JSON.stringify(distributions))}
 function distNorm(x){return String(x??"").replace(/\s+/g," ").trim()}
-function distToday(){return new Date().toISOString().slice(0,10)}
+function distToday(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function distValidDate(value){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(value||'')))return false;const [y,m,d]=String(value).split('-').map(Number);const x=new Date(y,m-1,d);return x.getFullYear()===y&&x.getMonth()===m-1&&x.getDate()===d}
 function openDistributionModal(id=""){const m=document.getElementById("distModal"); if(!m)return; const r=distributions.find(x=>x.id===id); document.getElementById("distId").value=r?.id||""; document.getElementById("distBeneficiaryForm").value=r?.beneficiaryType||"طفل"; document.getElementById("distName").value=r?.beneficiaryName||""; document.getElementById("distPersonId").value=r?.personId||""; document.getElementById("distFamilyId").value=r?.familyId||""; document.getElementById("distFamilyName").value=r?.familyName||""; document.getElementById("distTypeForm").value=r?.type||""; document.getElementById("distQty").value=r?.quantity||1; document.getElementById("distUnit").value=r?.unit||""; document.getElementById("distDate").value=r?.date||distToday(); document.getElementById("distRef").value=r?.reference||("DST-"+new Date().getTime().toString().slice(-8)); document.getElementById("distBy").value=r?.distributedBy||""; document.getElementById("distNotes").value=r?.notes||""; document.getElementById("distModalTitle").textContent=r?"تعديل التوزيع":"تسجيل توزيع"; distFillNames();m.classList.add("show");m.setAttribute("aria-hidden","false");}
 function closeDistributionModal(){const m=document.getElementById("distModal");m?.classList.remove("show");m?.setAttribute("aria-hidden","true")}
 function distFillNames(){const dl=document.getElementById("distNames");if(!dl)return; const people=[...new Set(data.map(r=>r["اسم الفرد"]).filter(Boolean))];const heads=[...new Set(data.map(r=>r["اسم رب الأسرة"]).filter(Boolean))];dl.innerHTML=[...people,...heads].slice(0,1200).map(x=>`<option value="${esc(x)}">`).join("")}
@@ -1540,35 +1547,83 @@ function saveDistribution(){const id=document.getElementById("distId").value||di
 function deleteDistribution(id){if(!confirm("حذف سجل التوزيع؟"))return;distributions=distributions.filter(x=>x.id!==id);distSave();renderDistributions();toast("تم حذف التوزيع");distSyncSoon()}
 function renderDistributions(){const q=distNorm(document.getElementById("distQ")?.value).toLowerCase(),bt=document.getElementById("distBeneficiary")?.value||"",ty=document.getElementById("distType")?.value||"",from=document.getElementById("distFrom")?.value||"",to=document.getElementById("distTo")?.value||"";const types=[...new Set(distributions.map(x=>x.type).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ar"));const sel=document.getElementById("distType");if(sel){const old=sel.value;sel.innerHTML='<option value="">الكل</option>'+types.map(x=>`<option>${esc(x)}</option>`).join("");sel.value=types.includes(old)?old:""}const arr=distributions.filter(x=>{const blob=[x.beneficiaryName,x.familyName,x.type,x.reference,x.notes].join(" ").toLowerCase();return(!q||blob.includes(q))&&(!bt||x.beneficiaryType===bt)&&(!ty||x.type===ty)&&(!from||x.date>=from)&&(!to||x.date<=to)}).sort((a,b)=>String(b.date).localeCompare(String(a.date)));document.getElementById("distTbody").innerHTML=arr.length?arr.map(x=>`<tr><td>${esc(x.date)}</td><td><b>${esc(x.beneficiaryName)}</b><div class="muted">${esc(x.beneficiaryType)}</div></td><td>${esc(x.familyName||"—")}</td><td>${esc(x.type)}</td><td>${esc(x.quantity)} ${esc(x.unit)}</td><td>${esc(x.reference||"—")}</td><td>${esc(x.distributedBy||"—")}</td><td><div class="dist-actions"><button class="pagebtn" onclick="openDistributionModal('${x.id}')">تعديل</button><button class="pagebtn" onclick="deleteDistribution('${x.id}')">حذف</button></div></td></tr>`).join(""):'<tr><td colspan="8"><div class="dist-empty">لا توجد توزيعات مطابقة</div></td></tr>';document.getElementById("distTotal").textContent=distributions.length;const ym=distToday().slice(0,7);document.getElementById("distMonth").textContent=distributions.filter(x=>String(x.date).startsWith(ym)).length;document.getElementById("distChildren").textContent=distributions.filter(x=>x.beneficiaryType==="طفل").length;document.getElementById("distFamilies").textContent=distributions.filter(x=>x.beneficiaryType==="عائلة").length;document.getElementById("distSyncState").textContent=navigator.onLine?"متصل — بانتظار المزامنة":"دون اتصال";renderDistributionCoverage()}
 function exportDistributionsCSV(){const rows=[["التاريخ","نوع المستفيد","اسم المستفيد","رقم هوية الفرد","رقم هوية الأسرة","رب الأسرة","نوع التوزيع","الكمية","الوحدة","المرجع","بواسطة","ملاحظات"],...distributions.map(x=>[x.date,x.beneficiaryType,x.beneficiaryName,x.personId,x.familyId,x.familyName,x.type,x.quantity,x.unit,x.reference,x.distributedBy,x.notes])];const csv="\uFEFF"+rows.map(r=>r.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(",")).join("\n");const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="توزيعات_مخيم_أبو_عريبان.csv";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
-function distBuildChanges(){const old=new Map(distShadow.map(x=>[x.id,x])),now=new Map(distributions.map(x=>[x.id,x])),out=[];for(const r of distributions){const o=old.get(r.id);if(!o||JSON.stringify(o)!==JSON.stringify(r))out.push({opId:crypto.randomUUID(),recordId:r.id,operation:"upsert",updatedAt:r.updatedAt||Date.now(),data:r})}for(const o of distShadow)if(!now.has(o.id))out.push({opId:crypto.randomUUID(),recordId:o.id,operation:"delete",updatedAt:Date.now()});return out}
-function distSavePending(c){localStorage.setItem(DIST_PENDING_KEY,JSON.stringify(c||[]))}function distLoadPending(){try{return JSON.parse(localStorage.getItem(DIST_PENDING_KEY)||"[]")}catch(e){return[]}}
-async function distSync(){if(distBusy||!navigator.onLine)return;distBusy=true;try{
-  // Display devices are read-only: they must never upload local distribution changes.
-  if(!appReadOnly){
-    let pending=distLoadPending();
-    if(!pending.length){pending=distBuildChanges();distSavePending(pending)}
-    if(pending.length){
-      const originalPending=pending.slice();
-      const r=await syncFetch("/sync/push",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),changes:pending})});
-      const accepted=new Set([...(r.accepted||[]).map(x=>typeof x==="string"?x:x.opId)]);
-      const rejectedDuplicates=(r.skipped||[]).filter(x=>/تكرار نوع المساعدة للعائلة/.test(x.reason||''));
-      if(rejectedDuplicates.length){
-        const rejectedIds=new Set(rejectedDuplicates.map(x=>x.recordId));
-        distributions=distributions.filter(x=>!rejectedIds.has(x.id));distSave();
-        toast(`رفض الخادم ${rejectedDuplicates.length} سجل مكرر لنفس نوع المساعدة للعائلة`);
-      }
-      const handled=new Set([...accepted,...rejectedDuplicates.map(x=>x.opId).filter(Boolean)]);
-      if(handled.size>=originalPending.length){distShadow=structuredClone(distributions);localStorage.setItem(DIST_SHADOW_KEY,JSON.stringify(distShadow));distSavePending([])}
-      else if(rejectedDuplicates.length){distSavePending(originalPending.filter(x=>!rejectedDuplicates.some(r=>r.opId===x.opId)));}
+function distBuildChanges(){
+  const old=new Map((Array.isArray(distShadow)?distShadow:[]).map(x=>[x.id,x]));
+  const now=new Map((Array.isArray(distributions)?distributions:[]).map(x=>[x.id,x]));
+  const prior=Array.isArray(distLoadPending())?distLoadPending():[];
+  const priorByKey=new Map(prior.map(c=>[String(c.operation)+'|'+String(c.recordId),c]));
+  const out=[];
+  for(const r of distributions){
+    const o=old.get(r.id);
+    if(!o||JSON.stringify(o)!==JSON.stringify(r)){
+      const key='upsert|'+r.id,prev=priorByKey.get(key);
+      out.push({opId:prev?.opId||('distop:'+((crypto.randomUUID&&crypto.randomUUID())||Date.now()+'-'+Math.random().toString(16).slice(2))),recordId:r.id,operation:'upsert',updatedAt:Number(r.updatedAt||prev?.updatedAt||Date.now()),data:structuredClone(r)});
     }
   }
-  const pr=await syncFetch(`/sync/pull?scope=distributions&since=${distCursor}&limit=500`,{method:"GET"});
-  for(const c of pr.changes||[]){if(c.recordId?.startsWith("dist:")){if(c.operation==="delete")distributions=distributions.filter(x=>x.id!==c.recordId);else if(c.data){const i=distributions.findIndex(x=>x.id===c.recordId);if(i<0)distributions.push(c.data);else distributions[i]=c.data}}}
-  distCursor=Number(pr.nextSince||distCursor);localStorage.setItem(DIST_CURSOR_KEY,String(distCursor));distSave();renderDistributions();
-  const st=document.getElementById("distSyncState");if(st)st.textContent="تمت المزامنة"
-}catch(e){const st=document.getElementById("distSyncState");if(st)st.textContent="بانتظار الاتصال"}finally{distBusy=false}}
-function distSyncSoon(){distSavePending(distBuildChanges());if(navigator.onLine)setTimeout(distSync,250);}
-function distInit(){try{distLoad();distShadow=JSON.parse(localStorage.getItem(DIST_SHADOW_KEY)||"[]");if(!Array.isArray(distShadow))distShadow=[]}catch(e){distShadow=[]}renderDistributions();window.addEventListener("online",()=>setTimeout(distSync,400));setTimeout(()=>{if(navigator.onLine)distSync()},1200)}
+  for(const o of distShadow){
+    if(!now.has(o.id)){
+      const key='delete|'+o.id,prev=priorByKey.get(key);
+      out.push({opId:prev?.opId||('distop:'+((crypto.randomUUID&&crypto.randomUUID())||Date.now()+'-'+Math.random().toString(16).slice(2))),recordId:o.id,operation:'delete',updatedAt:Number(prev?.updatedAt||Date.now())});
+    }
+  }
+  return out;
+}
+function distSavePending(c){try{localStorage.setItem(DIST_PENDING_KEY,JSON.stringify(Array.isArray(c)?c:[]))}catch(e){console.error('تعذر حفظ طابور التوزيعات',e);throw e}distRenderPendingCenter?.()}
+function distLoadPending(){try{const x=JSON.parse(localStorage.getItem(DIST_PENDING_KEY)||'[]');return Array.isArray(x)?x:[]}catch(e){return[]}}
+function distRenderPendingCenter(){
+  const box=document.getElementById('distPendingCenter'),badge=document.getElementById('distPendingBadge');
+  if(!box)return;
+  const pending=distLoadPending();if(badge)badge.textContent=String(pending.length);
+  const online=navigator.onLine;
+  const state=document.getElementById('distSyncState');
+  if(state){state.textContent=pending.length?(!online?'دون اتصال · '+pending.length+' معلّق': 'بانتظار المزامنة · '+pending.length):(!online?'دون اتصال · محفوظ محلياً':'متصل · تمت المزامنة');state.dataset.state=pending.length?'pending':online?'online':'offline'}
+  const body=document.getElementById('distPendingRows');if(!body)return;
+  if(!pending.length){body.innerHTML='<div class="dist-empty">لا توجد عمليات توزيع معلّقة. التغييرات المحلية متطابقة مع آخر نسخة مؤكدة.</div>';return}
+  const byId=new Map(distributions.map(x=>[x.id,x]));
+  body.innerHTML=pending.map((c,i)=>{const d=byId.get(c.recordId)||c.data||{},op=c.operation==='delete'?'حذف سجل': 'حفظ / تحديث';return `<div class="dist-pending-row"><div><b>${String(d.familyName||d.beneficiaryName||c.recordId||'سجل توزيع').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}</b><small>${String(d.type||'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))} · ${op} · ${String(d.date||'').replace(/[&<>"']/g,'')}</small></div><span class="dist-pending-index">${i+1}</span></div>`}).join('');
+}
+window.toggleDistPendingCenter=function(){const box=document.getElementById('distPendingPanel');if(!box)return;box.hidden=!box.hidden;if(!box.hidden)distRenderPendingCenter()};
+window.retryDistPendingSync=async function(){if(!navigator.onLine){toast('لا يوجد اتصال بالإنترنت. العمليات محفوظة على هذا الجهاز وستُرفع عند عودة الاتصال.');distRenderPendingCenter();return}try{distSavePending(distBuildChanges());await distSync();distRenderPendingCenter();const n=distLoadPending().length;toast(n?'بقيت '+n+' عملية بانتظار تأكيد الخادم':'تمت مزامنة عمليات التوزيع المعلّقة')}catch(e){distRenderPendingCenter();toast('تعذرت المزامنة؛ بقيت العمليات محفوظة محلياً')}};
+async function distSync(){
+  if(distBusy||!navigator.onLine)return;distBusy=true;
+  try{
+    if(!appReadOnly){
+      let pending=distBuildChanges();distSavePending(pending);
+      if(pending.length){
+        const remaining=[];
+        for(let i=0;i<pending.length;i+=100){
+          const batch=pending.slice(i,i+100);
+          try{
+            const r=await syncFetch('/sync/push',{method:'POST',body:JSON.stringify({deviceId:syncDeviceId(),changes:batch,scope:'distributions'})});
+            const accepted=new Set([...(r.accepted||[]).map(x=>typeof x==='string'?x:x.opId)]);
+            for(const c of batch)if(!accepted.has(c.opId))remaining.push(c);
+            // Only acknowledge operations the server explicitly accepted.
+            for(const c of batch){if(!accepted.has(c.opId))continue;const i=distShadow.findIndex(x=>x.id===c.recordId);if(c.operation==='delete'){if(i>=0)distShadow.splice(i,1)}else if(c.data){if(i>=0)distShadow[i]=structuredClone(c.data);else distShadow.push(structuredClone(c.data))}}
+          }catch(e){remaining.push(...batch,...pending.slice(i+batch.length));break}
+        }
+        distSavePending(remaining);localStorage.setItem(DIST_SHADOW_KEY,JSON.stringify(distShadow));
+      }
+    }
+    const protectedIds=new Set(distLoadPending().map(c=>c.recordId));
+    let cursor=distCursor,loops=0,all=[];
+    while(loops++<20){
+      const pr=await syncFetch(`/sync/pull?scope=distributions&since=${encodeURIComponent(cursor)}&limit=500`,{method:'GET'});
+      all.push(...(pr.changes||[]));cursor=Number(pr.nextSince||cursor);if(!pr.hasMore)break;
+    }
+    for(const c of all){
+      if(!c.recordId?.startsWith('dist:'))continue;
+      // Do not let a remote copy overwrite a local record that still has an unconfirmed operation.
+      if(protectedIds.has(c.recordId))continue;
+      const i=distributions.findIndex(x=>x.id===c.recordId),si=distShadow.findIndex(x=>x.id===c.recordId);
+      if(c.operation==='delete'){if(i>=0)distributions.splice(i,1);if(si>=0)distShadow.splice(si,1)}
+      else if(c.data){if(i>=0)distributions[i]=structuredClone(c.data);else distributions.push(structuredClone(c.data));if(si>=0)distShadow[si]=structuredClone(c.data);else distShadow.push(structuredClone(c.data))}
+    }
+    distCursor=cursor;localStorage.setItem(DIST_CURSOR_KEY,String(distCursor));distSave();localStorage.setItem(DIST_SHADOW_KEY,JSON.stringify(distShadow));renderDistributions();distRenderPendingCenter();
+  }catch(e){console.warn('Distribution sync retained local queue:',e);const st=document.getElementById('distSyncState');if(st)st.textContent='فشل الاتصال · محفوظ محلياً';distRenderPendingCenter()}
+  finally{distBusy=false;distRenderPendingCenter()}
+}
+function distSyncSoon(){try{distSavePending(distBuildChanges());distRenderPendingCenter()}catch(e){toast('تم حفظ السجل محلياً لكن تعذر تحديث قائمة المزامنة')}if(navigator.onLine)setTimeout(distSync,250)}
+function distInit(){try{distLoad();distShadow=JSON.parse(localStorage.getItem(DIST_SHADOW_KEY)||'[]');if(!Array.isArray(distShadow))distShadow=[]}catch(e){distShadow=[]}renderDistributions();distRenderPendingCenter();window.addEventListener('online',()=>setTimeout(distSync,400));window.addEventListener('offline',distRenderPendingCenter);setTimeout(()=>{if(navigator.onLine)distSync()},1200)}
 
 /* ================= مزامنة سحابية D1 — Worker moood — V24 offline-first ================= */
 const SYNC_API_URL = "https://moood.eyad2000515.workers.dev";
@@ -1576,8 +1631,8 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "57.0";
-const APP_RELEASE_KEY = "aboreiban_app_release_seen_v58";
+const APP_RELEASE_VERSION = "62.0"
+const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
 let syncRoleCheckedAt=0;
@@ -2673,9 +2728,12 @@ if ('serviceWorker' in navigator) {
   window.renderBulkRegisterPeople=function(){const scope=document.getElementById('bulkRegScope').value,q=document.getElementById('bulkRegSearch').value,arr=bulkUniverse(scope,q),tb=document.getElementById('bulkRegTbody');tb.innerHTML=arr.map((x,i)=>`<tr><td><input type="checkbox" class="bulk-reg-check" data-key="${escv(x.key)}" ${bulkRegSelected.has(x.key)?'checked':''}></td><td>${i+1}</td><td><b>${escv(x.name)}</b></td><td>${escv(x.family||'—')}</td><td>${escv(x.id||'—')}</td></tr>`).join('')||'<tr><td colspan="5"><div class="dist-empty">لا توجد نتائج</div></td></tr>';tb.querySelectorAll('.bulk-reg-check').forEach(c=>c.addEventListener('change',()=>{if(c.checked)bulkRegSelected.add(c.dataset.key);else bulkRegSelected.delete(c.dataset.key);bulkRegUpdateCount();}));document.getElementById('bulkRegAll').checked=arr.length>0&&arr.every(x=>bulkRegSelected.has(x.key));bulkRegUpdateCount()};
   window.toggleAllBulkRegister=function(v){const scope=document.getElementById('bulkRegScope').value,q=document.getElementById('bulkRegSearch').value,arr=bulkUniverse(scope,q);arr.forEach(x=>v?bulkRegSelected.add(x.key):bulkRegSelected.delete(x.key));renderBulkRegisterPeople()};
   window.saveBulkRegisterDistribution=function(){
-    const scope=document.getElementById('bulkRegScope').value,type=distNorm(document.getElementById('bulkRegType').value),qty=Number(document.getElementById('bulkRegQty').value||1),unit=distNorm(document.getElementById('bulkRegUnit').value),date=document.getElementById('bulkRegDate').value||distToday(),by=document.getElementById('bulkRegBy').value;if(!type){toast('اكتب نوع التوزيع أولاً');return}if(!bulkRegSelected.size){toast('حدد مستفيداً واحداً على الأقل');return}if(!by){toast('اختر تم بواسطة');return}
-    const all=bulkUniverse(scope,''),map=new Map(all.map(x=>[x.key,x]));let n=0;for(const key of bulkRegSelected){const x=map.get(key);if(!x)continue;const bt=scope==='families'?'عائلة':scope==='children'?'طفل':'فرد';const duplicate=distributions.some(d=>d.beneficiaryType===bt&&norm(d.beneficiaryName)===norm(x.name)&&norm(d.type)===norm(type)&&String(d.familyId||'')===String(scope==='families'?x.id:x.fid||''));if(duplicate)continue;distributions.push({id:distId(),beneficiaryType:bt,beneficiaryName:x.name,personId:scope==='families'?'':x.id,familyId:scope==='families'?x.id:x.fid,familyName:x.family,type,quantity:qty,unit,date,reference:'DST-'+Date.now().toString().slice(-8)+'-'+(n+1),distributedBy:by,notes:'تسجيل توزيع جماعي',updatedAt:Date.now()});n++}
-    distSave();closeDistBulkRegisterModal();renderDistributions();toast(n?'تم تسجيل '+n+' توزيع':'لم تتم إضافة توزيعات جديدة — توجد سجلات مكررة');distSyncSoon();
+    if(appReadOnly===true){toast('جهاز العرض للقراءة فقط؛ التسجيل من الجهاز الرئيسي');return;}
+    const scope=document.getElementById('bulkRegScope').value,type=distNorm(document.getElementById('bulkRegType').value),qty=Number(document.getElementById('bulkRegQty').value||1),unit=distNorm(document.getElementById('bulkRegUnit').value),date=document.getElementById('bulkRegDate').value||distToday(),by=document.getElementById('bulkRegBy').value;
+    if(!type){toast('اكتب نوع المساعدة أولاً');return}if(!bulkRegSelected.size){toast('حدد مستفيداً واحداً على الأقل');return}if(!Number.isFinite(qty)||qty<=0){toast('الكمية يجب أن تكون أكبر من صفر');return}if(!distValidDate(date)){toast('تحقق من تاريخ التوزيع');return}if(!by){toast('اختر الجهة أو المسؤول الذي سلّم المساعدة');return}
+    const all=bulkUniverse(scope,''),map=new Map(all.map(x=>[x.key,x])),before=distributions.slice();let n=0,skipped=0;const stamp=Date.now();
+    for(const key of bulkRegSelected){const x=map.get(key);if(!x)continue;const bt=scope==='families'?'عائلة':scope==='children'?'طفل':'فرد';const draft={beneficiaryType:bt,beneficiaryName:x.name,personId:scope==='families'?'':x.id,familyId:scope==='families'?x.id:x.fid,familyName:x.family,type};if(distCampaignFindDuplicate(draft,'')){skipped++;continue}distributions.push({id:distId(),...draft,quantity:qty,unit,date,reference:'DST-'+stamp.toString().slice(-8)+'-'+(n+1),distributedBy:by,notes:'تسجيل جماعي',workflowStatus:'تم التسليم',registeredAt:stamp,approvedAt:stamp,deliveredAt:stamp,updatedAt:stamp});n++}
+    try{distSave()}catch(e){distributions=before;toast('تعذر الحفظ على الهاتف؛ أُلغيت العملية الجماعية');return}closeDistBulkRegisterModal();renderDistributions();toast('تم تسليم '+n+' سجل'+(skipped?'، وتجاوز '+skipped+' مكرر حسب العائلة ونوع المساعدة':''));distSyncSoon();
   };
   function distSearchNorm(v){return String(v??'').toLowerCase().replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[ًٌٍَُِّْـ]/g,'').replace(/\s+/g,' ').trim()}
   function renderBeneficiarySearch(){
@@ -2820,87 +2878,236 @@ document.addEventListener("DOMContentLoaded",()=>{
 /* V53.3.1.1_LOGIN_UX_END */
 
 
-/* V58 — حملة التوزيع الحالية: استحقاق حسب نوع المساعدة + تسليم مباشر + منع التكرار على مستوى الأسرة */
+/* V58 — Campaign-level assistance deduplication + direct register/approve/deliver workflow.
+   Only distribution records are changed. Existing family records and sync protocol remain untouched. */
 (function(){
-  const normText=v=>String(v??'').toLowerCase().normalize('NFKC').replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[ًٌٍَُِّْـ]/g,'').replace(/\s+/g,' ').trim();
-  const familyName=x=>normText(x?.familyName || (x?.beneficiaryType==='عائلة'?x?.beneficiaryName:''));
-  const sameFamily=(a,b)=>{const ai=normText(a?.familyId),bi=normText(b?.familyId);if(ai&&bi)return ai===bi;const an=familyName(a),bn=familyName(b);return !!an&&!!bn&&an===bn};
-  const sameClaim=(a,b)=>normText(a?.type)===normText(b?.type)&&!!normText(a?.type)&&sameFamily(a,b);
-  const isDelivered=x=>!x?.status || ['تم التسليم','مسلّم','مسلم','delivered','approved'].includes(normText(x.status));
-  const duplicateForFamily=(candidate,excludeId='')=>distributions.find(d=>d.id!==excludeId&&sameClaim(d,candidate)&&isDelivered(d))||null;
-  function setDistributionStatus(obj,old){
-    const stamp=Date.now();
-    return {...obj,status:'تم التسليم',approvalStatus:'معتمد',approvedAt:old?.approvedAt||stamp,approvedBy:old?.approvedBy||obj.distributedBy||'إدارة مخيم أبو عريبان',deliveredAt:old?.deliveredAt||stamp,deliveredBy:obj.distributedBy||old?.deliveredBy||'',updatedAt:stamp};
+  // Canonical comparison for Arabic family names, national IDs and aid labels.
+  // Keep this limited to campaign matching; stored values are never rewritten.
+  const campaignNorm = value => String(value ?? '').normalize('NFKC').normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'').replace(/[ًٌٍَُِّْـٰ]/g,'')
+    .replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+    .replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+    .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+    .replace(/[ـ\u200e\u200f\u202a-\u202e]/g,'')
+    .replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim().toLowerCase();
+  const campaignIdNorm = value => String(value ?? '').normalize('NFKC')
+    .replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+    .replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+    .replace(/[^\p{L}\p{N}]/gu,'').toLowerCase();
+  function familyIdentity(record){
+    const fid=campaignIdNorm(record?.familyId);
+    if(fid) return 'id:'+fid;
+    const head=campaignNorm(record?.familyName || (record?.beneficiaryType==='عائلة'?record?.beneficiaryName:''));
+    return head ? 'name:'+head : '';
   }
-  function ensureWorkflowBanner(){
-    const section=document.getElementById('distributions'); if(!section||document.getElementById('distWorkflowBanner'))return;
-    const anchor=section.querySelector('.dist-stats'); if(!anchor)return;
-    const panel=document.createElement('div');panel.id='distWorkflowBanner';panel.className='dist-insight no-print';panel.style.cssText='margin:0 0 12px;border-color:#b8d8ca;background:linear-gradient(110deg,#f0fdf4,#f8fafc);align-items:flex-start';
-    panel.innerHTML='<div><b>آلية الحملة الحالية: استحقاق حسب نوع المساعدة</b><span>تسجيل واحد = اعتماد + تسليم مباشرة. لا يسمح بتسجيل نوع المساعدة نفسه مرتين للعائلة، حتى لو سُجّل باسم أحد أفرادها.</span><span id="distWorkflowSummary" style="display:block;margin-top:6px;color:#166534;font-weight:700"></span></div><span class="badge" style="white-space:nowrap">تسليم مباشر</span>';
-    anchor.parentNode.insertBefore(panel,anchor);
+  function isCampaignCancelled(record){
+    const status=campaignNorm(record?.workflowStatus || record?.statusLabel || '');
+    return status==='ملغي' || status==='ملغى' || status==='ملغاه' || status==='الغاء' || status==='cancelled' || status==='canceled';
   }
-  function updateWorkflowSummary(){
-    const el=document.getElementById('distWorkflowSummary');if(!el)return;
-    const delivered=distributions.filter(isDelivered).length;
-    const pending=Array.isArray(distLoadPending())?distLoadPending().length:0;
-    el.textContent=`${delivered.toLocaleString('ar')} عملية مسجلة ومسلّمة • ${pending.toLocaleString('ar')} تغييرات بانتظار المزامنة`;
+  function resolveFamily(record){
+    const out={...record};
+    if(campaignNorm(out.familyId)) return out;
+    const pid=campaignIdNorm(out.personId), name=campaignNorm(out.beneficiaryName), head=campaignNorm(out.familyName);
+    const rows=Array.isArray(data)?data:[];
+    let match=null;
+    if(head && pid) match=rows.find(r=>campaignNorm(r['اسم رب الأسرة'])===head && campaignIdNorm(r['رقم هوية الفرد'])===pid);
+    if(!match && head) match=rows.find(r=>campaignNorm(r['اسم رب الأسرة'])===head);
+    if(!match && pid) match=rows.find(r=>campaignIdNorm(r['رقم هوية الفرد'])===pid);
+    if(!match && name && out.beneficiaryType!=='عائلة') match=rows.find(r=>campaignNorm(r['اسم الفرد'])===name && (!head || campaignNorm(r['اسم رب الأسرة'])===head));
+    if(!match && name && out.beneficiaryType==='عائلة') match=rows.find(r=>campaignNorm(r['اسم رب الأسرة'])===name);
+    if(match){out.familyId=String(match['رقم هوية الأسرة']||out.familyId||'').trim();out.familyName=String(match['اسم رب الأسرة']||out.familyName||'').trim();}
+    return out;
   }
-  window.saveDistribution=function(){
-    const id=document.getElementById('distId')?.value||distId();
-    const beneficiaryType=distNorm(document.getElementById('distBeneficiaryForm')?.value||'فرد');
-    const beneficiaryName=distNorm(document.getElementById('distName')?.value);
-    const obj={id,beneficiaryType,beneficiaryName,personId:distNorm(document.getElementById('distPersonId')?.value),familyId:distNorm(document.getElementById('distFamilyId')?.value),familyName:distNorm(document.getElementById('distFamilyName')?.value),type:distNorm(document.getElementById('distTypeForm')?.value),quantity:Number(document.getElementById('distQty')?.value||1),unit:distNorm(document.getElementById('distUnit')?.value),date:document.getElementById('distDate')?.value||distToday(),reference:distNorm(document.getElementById('distRef')?.value),distributedBy:distNorm(document.getElementById('distBy')?.value),notes:distNorm(document.getElementById('distNotes')?.value)};
-    if(!obj.beneficiaryName||!obj.type){toast('أدخل اسم المستفيد ونوع المساعدة');return}
-    if(!Number.isFinite(obj.quantity)||obj.quantity<=0){toast('الكمية لازم تكون أكبر من صفر');return}
-    if(!obj.familyId&&!obj.familyName&&beneficiaryType!=='عائلة'){toast('اختَر المستفيد من نتائج البحث حتى يرتبط التوزيع بالعائلة بشكل صحيح');return}
-    if(!obj.familyId&&beneficiaryType==='عائلة')obj.familyId=obj.personId||'';
-    const old=distributions.find(x=>x.id===id);
-    const duplicate=duplicateForFamily(obj,id);
-    if(duplicate){toast(`ممنوع التكرار: العائلة استلمت «${duplicate.type}» بتاريخ ${duplicate.date||'غير محدد'}، المرجع ${duplicate.reference||'—'}`);return}
-    const finalObj=setDistributionStatus(obj,old);
-    if(old)distributions=distributions.map(x=>x.id===id?finalObj:x);else distributions.push(finalObj);
-    distSave();closeDistributionModal();renderDistributions();toast('تم التسجيل والاعتماد والتسليم مباشرة');distSyncSoon();updateWorkflowSummary();
-  };
-  window.saveBulkRegisterDistribution=function(){
-    const scope=document.getElementById('bulkRegScope')?.value||'families',type=distNorm(document.getElementById('bulkRegType')?.value),qty=Number(document.getElementById('bulkRegQty')?.value||1),unit=distNorm(document.getElementById('bulkRegUnit')?.value),date=document.getElementById('bulkRegDate')?.value||distToday(),by=distNorm(document.getElementById('bulkRegBy')?.value);
-    if(!type){toast('اكتب نوع المساعدة أولاً');return}if(!bulkRegSelected.size){toast('حدد مستفيداً واحداً على الأقل');return}if(!by){toast('اختر الجهة المسؤولة');return}if(!Number.isFinite(qty)||qty<=0){toast('الكمية لازم تكون أكبر من صفر');return}
-    const all=bulkUniverse(scope,''),map=new Map(all.map(x=>[x.key,x]));let added=0,skipped=0;const now=Date.now();
-    for(const key of bulkRegSelected){const x=map.get(key);if(!x)continue;const bt=scope==='families'?'عائلة':scope==='children'?'طفل':'فرد';const candidate={id:'',beneficiaryType:bt,beneficiaryName:x.name,personId:scope==='families'?'':x.id,familyId:scope==='families'?x.id:(x.fid||''),familyName:x.family||x.name,type};if(!candidate.familyId&&!candidate.familyName){skipped++;continue}if(duplicateForFamily(candidate)){skipped++;continue}const obj=setDistributionStatus({ ...candidate,id:distId(),quantity:qty,unit,date,reference:'DST-'+now.toString().slice(-8)+'-'+(added+1),distributedBy:by,notes:'تسجيل جماعي — معتمد ومسلّم مباشرة' });distributions.push(obj);added++}
-    distSave();closeDistBulkRegisterModal();renderDistributions();distSyncSoon();updateWorkflowSummary();toast(`تم تسليم ${added} مستفيد${skipped?` • تم تجاوز ${skipped} بسبب التكرار أو نقص ربط الأسرة`:''}`);
-  };
-  window.saveBulkDistribution=function(){
-    const scope=document.getElementById('bulkScopeLabel')?.value==='عائلات'?'families':document.getElementById('bulkScopeLabel')?.value==='أفراد'?'persons':'children',type=distNorm(document.getElementById('bulkType')?.value),qty=Number(document.getElementById('bulkQty')?.value||1),unit=distNorm(document.getElementById('bulkUnit')?.value),date=document.getElementById('bulkDate')?.value||distToday(),by=distNorm(document.getElementById('bulkBy')?.value);
-    const keys=[...document.querySelectorAll('#bulkTbody input[type="checkbox"]:checked')].map(x=>x.dataset.key);if(!type){toast('نوع المساعدة غير محدد');return}if(!keys.length){toast('حدد مستفيداً واحداً على الأقل');return}if(!by){toast('اكتب اسم المسؤول أو الجهة في خانة تم بواسطة');return}if(!Number.isFinite(qty)||qty<=0){toast('الكمية لازم تكون أكبر من صفر');return}
-    const universe=new Map(distCoverageUniverse(scope).map(x=>[x.key,x]));let added=0,skipped=0;const now=Date.now();
-    keys.forEach(k=>{const x=universe.get(k);if(!x)return;const row=scope==='families'?null:data.find(q=>distCoverageKeyPerson(q)===x.key);const obj={id:distId(),beneficiaryType:scope==='families'?'عائلة':'فرد',beneficiaryName:x.name,personId:scope==='families'?'':x.id,familyId:scope==='families'?x.id:(row?.['رقم هوية الأسرة']||''),familyName:x.familyName||row?.['اسم رب الأسرة']||x.name,type,quantity:qty,unit,date,reference:'DST-'+now.toString().slice(-8)+'-'+(added+1),distributedBy:by,notes:'توزيع من كشف غير المستلمين'};if(duplicateForFamily(obj)){skipped++;return}distributions.push(setDistributionStatus(obj));added++});
-    distSave();closeDistBulkModal();renderDistributions();distSyncSoon();updateWorkflowSummary();toast(`تم اعتماد وتسليم ${added} مستفيد${skipped?` • تم تجاوز ${skipped} مكرر`:''}`);
-  };
-  const oldRender=window.renderDistributions;
-  window.renderDistributions=function(){
-    oldRender();ensureWorkflowBanner();updateWorkflowSummary();
-    const table=document.querySelector('#distributions .dist-table thead tr');if(table&&!table.querySelector('[data-status-col]')){const th=document.createElement('th');th.dataset.statusCol='1';th.textContent='الحالة';table.insertBefore(th,table.lastElementChild)}
-    const tbody=document.getElementById('distTbody');if(tbody){
-      const q=distNorm(document.getElementById('distQ')?.value).toLowerCase(),bt=document.getElementById('distBeneficiary')?.value||'',ty=document.getElementById('distType')?.value||'',from=document.getElementById('distFrom')?.value||'',to=document.getElementById('distTo')?.value||'';
-      const arr=distributions.filter(x=>{const blob=[x.beneficiaryName,x.familyName,x.type,x.reference,x.notes,x.personId,x.familyId].join(' ').toLowerCase();return(!q||blob.includes(q))&&(!bt||x.beneficiaryType===bt)&&(!ty||x.type===ty)&&(!from||x.date>=from)&&(!to||x.date<=to)}).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-      if(arr.length)tbody.innerHTML=arr.map(x=>`<tr><td>${esc(x.date||'—')}</td><td><b>${esc(x.beneficiaryName||'—')}</b><div class="muted">${esc(x.beneficiaryType||'—')}</div></td><td>${esc(x.familyName||'—')}</td><td>${esc(x.type||'—')}</td><td>${esc(x.quantity??'—')} ${esc(x.unit||'')}</td><td>${esc(x.reference||'—')}</td><td>${esc(x.distributedBy||'—')}</td><td><span class="badge" style="background:#dcfce7;color:#166534">${esc(x.status||'تم التسليم')}</span></td><td><div class="dist-actions"><button class="pagebtn" onclick="openDistributionModal('${String(x.id).replace(/'/g,'\\\'')}')">عرض / تعديل</button><button class="pagebtn" onclick="deleteDistribution('${String(x.id).replace(/'/g,'\\\'')}')">حذف</button></div></td></tr>`).join('');
-      else tbody.innerHTML='<tr><td colspan="9"><div class="dist-empty">لا توجد توزيعات مطابقة</div></td></tr>';
+  function findDuplicate(record, excludeId){
+    const candidate=resolveFamily(record), familyKey=familyIdentity(candidate), typeKey=campaignNorm(candidate.type);
+    if(!familyKey || !typeKey) return null;
+    return (Array.isArray(distributions)?distributions:[]).find(d=>d.id!==excludeId && campaignNorm(d.type)===typeKey && familyIdentity(resolveFamily(d))===familyKey && !isCampaignCancelled(d)) || null;
+  }
+  window.distCampaignFindDuplicate=findDuplicate;
+  // Coverage is family-based for every beneficiary scope, matching the campaign's one-aid-type-per-family rule.
+  window.distCoverageUniverse=function(scope){
+    const familyKeyOfRow=r=>{const id=campaignIdNorm(r?.['رقم هوية الأسرة']);if(id)return 'id:'+id;const head=campaignNorm(r?.['اسم رب الأسرة']);return head?'name:'+head:''};
+    if(scope==='families'){
+      const groups=new Map();(data||[]).forEach(r=>{const fk=familyKeyOfRow(r);if(!fk||groups.has(fk))return;groups.set(fk,{key:fk,familyKey:fk,name:distNorm(r['اسم رب الأسرة']),familyName:distNorm(r['اسم رب الأسرة']),id:distNorm(r['رقم هوية الأسرة']),familyId:distNorm(r['رقم هوية الأسرة']),age:''})});return [...groups.values()];
     }
+    const people=new Map();(data||[]).forEach(r=>{const age=Number(r['العمر التقريبي']);if(scope==='children'&&(!Number.isFinite(age)||age>=18))return;const name=distNorm(r['اسم الفرد']);if(!name)return;const pk=distCoverageKeyPerson(r);if(people.has(pk))return;const fk=familyKeyOfRow(r);people.set(pk,{key:pk,familyKey:fk,name,familyName:distNorm(r['اسم رب الأسرة']),familyId:distNorm(r['رقم هوية الأسرة']),id:distNorm(r['رقم هوية الفرد']),age:Number.isFinite(age)?age:''})});return [...people.values()];
   };
-  const oldExcel=window.exportDistributionsExcel;
+  window.distCoverageReceived=function(scope,type){
+    const result=new Map();if(!type)return result;
+    const eligible=(distributions||[]).filter(x=>campaignNorm(x.type)===campaignNorm(type)).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    const byFamily=new Map();for(const d of eligible){const resolved=resolveFamily(d),fk=familyIdentity(resolved);if(fk&&!byFamily.has(fk))byFamily.set(fk,d)}
+    for(const person of window.distCoverageUniverse(scope)){const fk=person.familyKey||familyIdentity({familyId:person.familyId,familyName:person.familyName});const rec=byFamily.get(fk);if(rec)result.set(person.key,{date:rec.date||'',quantity:rec.quantity,reference:rec.reference});}
+    return result;
+  };
+  window.saveDistribution=function(){
+    if(appReadOnly===true){toast('جهاز العرض للقراءة فقط؛ التسجيل من الجهاز الرئيسي');return;}
+    const id=document.getElementById('distId')?.value||distId();
+    let obj=resolveFamily({id,beneficiaryType:distNorm(document.getElementById('distBeneficiaryForm')?.value),beneficiaryName:distNorm(document.getElementById('distName')?.value),personId:distNorm(document.getElementById('distPersonId')?.value),familyId:distNorm(document.getElementById('distFamilyId')?.value),familyName:distNorm(document.getElementById('distFamilyName')?.value),type:distNorm(document.getElementById('distTypeForm')?.value),quantity:Number(document.getElementById('distQty')?.value||1),unit:distNorm(document.getElementById('distUnit')?.value),date:document.getElementById('distDate')?.value||distToday(),reference:distNorm(document.getElementById('distRef')?.value),distributedBy:distNorm(document.getElementById('distBy')?.value),notes:distNorm(document.getElementById('distNotes')?.value)});
+    if(!obj.beneficiaryName||!obj.type){toast('أدخل اسم المستفيد ونوع المساعدة');return;}
+    if(!obj.familyId && !obj.familyName){toast('تعذر تحديد العائلة. اختر المستفيد من نتائج البحث أو أدخل رب الأسرة');return;}
+    if(!Number.isFinite(obj.quantity)||obj.quantity<=0){toast('الكمية يجب أن تكون أكبر من صفر');return;}
+    if(!distValidDate(obj.date)){toast('أدخل تاريخ تسليم صحيحاً');return;}
+    if(!obj.distributedBy){toast('حدّد المسؤول أو الجهة التي سلّمت المساعدة لتوثيق العملية');return;}
+    const duplicate=findDuplicate(obj,id);
+    if(duplicate){toast('ممنوع التكرار: هذه العائلة مسجل لها نوع المساعدة نفسه ('+obj.type+') بالمرجع '+(duplicate.reference||'—'));return;}
+    const old=distributions.find(x=>x.id===id), stamp=Date.now(), before=distributions.slice();
+    obj={...obj,workflowStatus:'تم التسليم',registeredAt:old?.registeredAt||stamp,approvedAt:old?.approvedAt||stamp,deliveredAt:old?.deliveredAt||stamp,updatedAt:stamp};
+    const i=distributions.findIndex(x=>x.id===id);if(i<0)distributions.push(obj);else distributions[i]=obj;
+    try{distSave();}catch(e){distributions=before;toast('تعذر الحفظ على الهاتف؛ أُلغيت العملية ولم تُعتمد');return;}
+    closeDistributionModal();renderDistributions();toast('تم التسجيل والاعتماد والتسليم بنجاح');distSyncSoon();
+  };
+  const priorRender=window.renderDistributions;
+  window.renderDistributions=function(){
+    priorRender();
+    const table=document.querySelector('#distributions .dist-table');
+    const head=table?.querySelector('thead tr');
+    if(head&&!head.querySelector('[data-campaign-status-head]')){const th=document.createElement('th');th.dataset.campaignStatusHead='1';th.textContent='حالة العملية';const actions=head.lastElementChild;if(actions)head.insertBefore(th,actions);else head.appendChild(th);}
+    document.querySelectorAll('#distTbody tr').forEach(tr=>{
+      if(tr.querySelector('[data-campaign-status-cell]'))return;
+      const edit=tr.querySelector('button[onclick^="openDistributionModal("]');
+      const match=edit?.getAttribute('onclick')?.match(/openDistributionModal\('([^']+)'\)/);
+      const rec=match?(distributions||[]).find(x=>x.id===match[1]):null;
+      const td=document.createElement('td');td.dataset.campaignStatusCell='1';
+      if(rec?.workflowStatus==='تم التسليم') td.innerHTML='<span class="dist-workflow-pill done">تم التسجيل والاعتماد والتسليم</span><small class="dist-workflow-date">'+String(rec.deliveredAt?new Date(rec.deliveredAt).toLocaleDateString('ar-EG'):rec.date||'')+'</small>';
+      else td.innerHTML='<span class="dist-workflow-pill legacy">سجل سابق</span>';
+      const actions=tr.lastElementChild;if(actions)tr.insertBefore(td,actions);else tr.appendChild(td);
+    });
+  };
+  const priorExport=window.exportDistributionsExcel;
   window.exportDistributionsExcel=function(){
-    const q=normText(document.getElementById('distQ')?.value||''),bt=document.getElementById('distBeneficiary')?.value||'',ty=document.getElementById('distType')?.value||'',from=document.getElementById('distFrom')?.value||'',to=document.getElementById('distTo')?.value||'';
-    const rows=distributions.filter(x=>{const blob=normText([x.beneficiaryName,x.familyName,x.type,x.reference,x.notes,x.personId,x.familyId].join(' '));return(!q||blob.includes(q))&&(!bt||x.beneficiaryType===bt)&&(!ty||x.type===ty)&&(!from||x.date>=from)&&(!to||x.date<=to)}).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-    if(!rows.length){toast('لا توجد توزيعات مطابقة للتصدير');return}
-    const matrix=[['سجل توزيعات مخيم أبو عريبان'],['حملة التوزيع الحالية — سجل الاعتماد والتسليم'],['تاريخ التصدير: '+new Date().toLocaleString('ar-EG')],[],['#','التاريخ','نوع المستفيد','اسم المستفيد','هوية الفرد','هوية الأسرة','رب الأسرة','نوع المساعدة','الكمية','الوحدة','رقم المرجع','تم بواسطة','حالة الاعتماد','حالة التسليم','تاريخ التسليم','ملاحظات']];
-    rows.forEach((x,i)=>matrix.push([i+1,x.date||'',x.beneficiaryType||'',x.beneficiaryName||'',x.personId||'',x.familyId||'',x.familyName||'',x.type||'',x.quantity??'',x.unit||'',x.reference||'',x.distributedBy||'',x.approvalStatus||'معتمد',x.status||'تم التسليم',x.deliveredAt?new Date(x.deliveredAt).toLocaleString('ar-EG'):'',x.notes||'']));
-    try{downloadXLSX(matrix,'حملة_توزيع_مخيم_أبو_عريبان_'+dateStamp()+'.xlsx',{headerRow:5,title:'حملة توزيع مخيم أبو عريبان'});toast('تم تصدير سجل الحملة مع الاعتماد والتسليم')}catch(e){console.error(e);if(typeof oldExcel==='function')oldExcel();else toast('تعذر تصدير Excel')}
+    const q=campaignNorm(document.getElementById('distQ')?.value),bt=document.getElementById('distBeneficiary')?.value||'',ty=document.getElementById('distType')?.value||'',from=document.getElementById('distFrom')?.value||'',to=document.getElementById('distTo')?.value||'';
+    const rows=(distributions||[]).filter(x=>{const blob=campaignNorm([x.beneficiaryName,x.familyName,x.type,x.reference,x.notes,x.personId,x.familyId].join(' '));return(!q||blob.includes(q))&&(!bt||x.beneficiaryType===bt)&&(!ty||x.type===ty)&&(!from||x.date>=from)&&(!to||x.date<=to)}).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    if(!rows.length){toast('لا توجد توزيعات مطابقة للتصدير');return;}
+    const headers=['#','التاريخ','نوع المستفيد','اسم المستفيد','رقم هوية الفرد','رقم هوية الأسرة','رب الأسرة','نوع المساعدة','الكمية','الوحدة','رقم المرجع','تم بواسطة','حالة العملية','وقت التسجيل','وقت الاعتماد','وقت التسليم','ملاحظات'];
+    const stamp=v=>v?new Date(Number(v)).toLocaleString('ar-EG'):'';
+    const matrix=[['سجل توزيعات مخيم أبو عريبان'],['التسجيل والاعتماد والتسليم المباشر — منع التكرار حسب العائلة ونوع المساعدة'],['تاريخ التصدير: '+new Date().toLocaleString('ar-EG')],[],headers];
+    rows.forEach((x,i)=>matrix.push([i+1,x.date||'',x.beneficiaryType||'',x.beneficiaryName||'',x.personId||'',x.familyId||'',x.familyName||'',x.type||'',x.quantity??'',x.unit||'',x.reference||'',x.distributedBy||'',x.workflowStatus||'سجل سابق',stamp(x.registeredAt),stamp(x.approvedAt),stamp(x.deliveredAt),x.notes||'']));
+    try{downloadXLSX(matrix,'توزيعات_مخيم_أبو_عريبان_'+dateStamp()+'.xlsx',{headerRow:5,title:'سجل توزيعات مخيم أبو عريبان'});toast('تم تصدير سجل التوزيعات مع حالة الاعتماد والتسليم');}catch(e){console.error(e);toast('تعذر تصدير Excel: '+(e?.message||'خطأ غير معروف'));}
   };
-  const oldSync=window.distSync;
-  if(typeof oldSync==='function')window.distSync=async function(){return oldSync.apply(this,arguments)};
-  const syncFn=window.distSync;
-  if(typeof syncFn==='function'){
-    // A server-side duplicate rejection is a definitive validation result: roll back only those rejected new records.
-    window.__distDuplicateRollback=function(rejected){const ids=new Set((rejected||[]).filter(x=>/تكرار نوع المساعدة للعائلة/.test(x.reason||'')).map(x=>x.recordId));if(!ids.size)return 0;distributions=distributions.filter(x=>!ids.has(x.id));distSave();return ids.size};
+})();
+
+
+/* V59 — Cross-application operations center, global search and live local/sync health.
+   Additive UI layer only: preserves existing storage keys, API routes, D1 schema and project layout. */
+(function(){
+  'use strict';
+  const norm = value => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[ًٌٍَُِّْـ]/g,'').replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/ـ/g,'').replace(/\s+/g,' ').trim().toLowerCase();
+  const txt = value => String(value ?? '').trim();
+  const escText = value => typeof window.esc === 'function' ? window.esc(String(value ?? '')) : String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let palette, input, resultBox, statusNode, statusTimer, activeResults=[], selectedIndex=0;
+  function ready(fn){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',fn,{once:true}); else fn(); }
+  function installStyles(){
+    const s=document.createElement('style'); s.id='v59-global-ops-style'; s.textContent=`
+      .v59-header-tools{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+      .v59-search-open{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+      .v59-shortcut{font-size:10px;opacity:.72;border:1px solid currentColor;border-radius:5px;padding:1px 5px;direction:ltr}
+      .v59-system-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:999px;background:var(--bg,#f5f7fb);border:1px solid var(--line,#e5e7eb);font-size:11px;font-weight:800;color:var(--text,#172033)}
+      .v59-system-dot{width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 0 3px #10b98120}.v59-system-chip[data-state="offline"] .v59-system-dot{background:#f59e0b;box-shadow:0 0 0 3px #f59e0b22}.v59-system-chip[data-state="pending"] .v59-system-dot{background:#f97316;box-shadow:0 0 0 3px #f9731622}
+      .v59-ops-panel{margin:16px 0 4px;padding:16px;border:1px solid var(--line,#e5e7eb);border-radius:18px;background:var(--card,#fff);box-shadow:var(--shadow,0 8px 30px #0f172a0a)}
+      .v59-ops-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}.v59-ops-head h2{margin:0;font-size:16px}.v59-ops-head p{margin:4px 0 0;color:var(--muted,#64748b);font-size:11px}
+      .v59-ops-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px}.v59-op{display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:12px;min-height:90px;padding:12px;border:1px solid var(--line,#e5e7eb);border-radius:13px;background:var(--bg,#f8fafc);color:var(--text,#172033);text-align:right;cursor:pointer;transition:transform .16s,border-color .16s}.v59-op:hover{transform:translateY(-2px);border-color:var(--primary,#2563eb)}.v59-op-icon{font-size:22px}.v59-op strong{font-size:12px}.v59-op small{font-size:10px;color:var(--muted,#64748b);line-height:1.4}
+      .v59-ops-status{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}.v59-health{padding:10px 12px;border-radius:12px;background:var(--bg,#f8fafc);border:1px solid var(--line,#e5e7eb);display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px}.v59-health b{font-size:12px}
+      .v59-palette{position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.58);backdrop-filter:blur(5px);display:none;align-items:flex-start;justify-content:center;padding: min(12vh,90px) 14px 20px}.v59-palette.open{display:flex}.v59-palette-box{width:min(720px,100%);max-height:78vh;overflow:hidden;background:var(--card,#fff);color:var(--text,#172033);border:1px solid var(--line,#e5e7eb);border-radius:20px;box-shadow:0 30px 100px #0004;display:flex;flex-direction:column}.v59-palette-top{padding:14px;border-bottom:1px solid var(--line,#e5e7eb)}.v59-palette-input{width:100%;border:0;outline:0;background:transparent;color:inherit;font:inherit;font-size:17px;padding:6px}.v59-palette-hint{font-size:11px;color:var(--muted,#64748b);padding:0 6px 4px}.v59-palette-results{overflow:auto;padding:8px;min-height:90px}.v59-result{width:100%;display:flex;align-items:center;gap:12px;text-align:right;border:1px solid transparent;border-radius:12px;padding:11px;background:transparent;color:inherit;cursor:pointer}.v59-result:hover,.v59-result.active{background:var(--bg,#f8fafc);border-color:var(--primary,#2563eb)}.v59-result-icon{width:38px;height:38px;flex:0 0 38px;border-radius:11px;display:grid;place-items:center;background:var(--bg,#eef2ff);font-size:18px}.v59-result-main{flex:1;min-width:0}.v59-result-main b{display:block;font-size:13px;overflow-wrap:anywhere}.v59-result-main small{display:block;color:var(--muted,#64748b);font-size:11px;margin-top:3px;overflow-wrap:anywhere}.v59-result-type{font-size:10px;color:var(--muted,#64748b);white-space:nowrap}.v59-palette-empty{text-align:center;padding:26px 12px;color:var(--muted,#64748b);font-size:12px}.v59-palette-foot{padding:9px 14px;border-top:1px solid var(--line,#e5e7eb);font-size:10px;color:var(--muted,#64748b);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+      @media(max-width:1050px){.v59-ops-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.v59-system-chip{display:none}}
+      @media(max-width:640px){.v59-ops-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.v59-ops-panel{padding:12px}.v59-ops-status{grid-template-columns:1fr}.v59-palette{padding-top:5vh}.v59-palette-box{max-height:88vh}.v59-palette-input{font-size:16px}.v59-result-type{display:none}.v59-shortcut{display:none}}
+      @media(prefers-reduced-motion:reduce){.v59-op{transition:none}.v59-op:hover{transform:none}}
+    `; document.head.appendChild(s);
   }
-  ensureWorkflowBanner();
+  function installPalette(){
+    palette=document.createElement('div'); palette.className='v59-palette'; palette.id='v59Palette'; palette.setAttribute('aria-hidden','true');
+    palette.innerHTML=`<section class="v59-palette-box" role="dialog" aria-modal="true" aria-label="البحث الشامل والتنقل السريع"><div class="v59-palette-top"><input class="v59-palette-input" id="v59PaletteInput" type="search" autocomplete="off" placeholder="ابحث عن عائلة أو فرد أو رقم هوية أو توزيع…" aria-label="البحث الشامل"/><div class="v59-palette-hint">اكتب حرفين على الأقل للبحث في سجلات المخيم والتوزيعات.</div></div><div class="v59-palette-results" id="v59PaletteResults"><div class="v59-palette-empty">ابحث بالاسم أو رقم الهوية أو الجوال أو رقم مرجع التوزيع.</div></div><div class="v59-palette-foot"><span>↑ ↓ للتنقل · Enter للفتح · Esc للإغلاق</span><span>Ctrl / ⌘ + K لفتح البحث</span></div></section>`;
+    document.body.appendChild(palette); input=palette.querySelector('#v59PaletteInput'); resultBox=palette.querySelector('#v59PaletteResults');
+    palette.addEventListener('click',e=>{if(e.target===palette)closePalette()});
+    input.addEventListener('input',renderSearchResults);
+    input.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();selectResult(Math.min(activeResults.length-1,selectedIndex+1))}else if(e.key==='ArrowUp'){e.preventDefault();selectResult(Math.max(0,selectedIndex-1))}else if(e.key==='Enter'){e.preventDefault();activateResult(activeResults[selectedIndex])}else if(e.key==='Escape'){e.preventDefault();closePalette()}});
+  }
+  function openPalette(){if(!palette)return;palette.classList.add('open');palette.setAttribute('aria-hidden','false');input.value='';activeResults=[];selectedIndex=0;resultBox.innerHTML='<div class="v59-palette-empty">ابحث بالاسم أو رقم الهوية أو الجوال أو رقم مرجع التوزيع.</div>';setTimeout(()=>input.focus(),20)}
+  function closePalette(){if(!palette)return;palette.classList.remove('open');palette.setAttribute('aria-hidden','true')}
+  function pushResult(arr,item){if(arr.length<35)arr.push(item)}
+  function renderSearchResults(){
+    const q=norm(input.value); activeResults=[];selectedIndex=0;
+    if(q.length<2){resultBox.innerHTML='<div class="v59-palette-empty">اكتب حرفين على الأقل لبدء البحث.</div>';return}
+    const arr=[];
+    try{
+      const fm=typeof familyMap==='function'?familyMap():new Map();
+      for(const [head,rows] of fm){const r=rows[0]||{}, blob=norm([head,r['رقم هوية الأسرة'],r['رقم الجوال'],r['رقم جوال بديل'],r['العنوان']].join(' '));if(blob.includes(q)){pushResult(arr,{kind:'family',icon:'👨‍👩‍👧',title:'عائلة '+head,sub:'هوية الأسرة: '+(r['رقم هوية الأسرة']||'—')+' · الجوال: '+(r['رقم الجوال']||'—')+' · '+rows.length+' سجل',familyId:String(r['رقم هوية الأسرة']||''),head,score:blob.startsWith(q)?0:1})}}
+      const seenPeople=new Set();
+      (Array.isArray(data)?data:[]).forEach((r,index)=>{const name=txt(r['اسم الفرد']),head=txt(r['اسم رب الأسرة']);if(!name)return;const key=norm([name,head,r['رقم هوية الفرد']].join('|'));if(seenPeople.has(key))return;seenPeople.add(key);const blob=norm([name,head,r['رقم هوية الفرد'],r['رقم الجوال'],r['العنوان'],r['صلة القرابة']].join(' '));if(blob.includes(q))pushResult(arr,{kind:'person',icon:'👤',title:name,sub:(r['صلة القرابة']||'فرد')+' · رب الأسرة: '+(head||'—')+' · الهوية: '+(r['رقم هوية الفرد']||'—'),familyId:String(r['رقم هوية الأسرة']||''),head,index,score:blob.startsWith(q)?0:2})});
+      (Array.isArray(distributions)?distributions:[]).forEach(d=>{const blob=norm([d.beneficiaryName,d.familyName,d.familyId,d.personId,d.type,d.reference,d.distributedBy,d.notes].join(' '));if(blob.includes(q))pushResult(arr,{kind:'distribution',icon:'📦',title:(d.type||'توزيع')+' — '+(d.beneficiaryName||d.familyName||'مستفيد'),sub:'التاريخ: '+(d.date||'—')+' · رب الأسرة: '+(d.familyName||'—')+' · المرجع: '+(d.reference||'—'),query:txt(d.reference||d.beneficiaryName||d.type),score:blob.startsWith(q)?0:3})});
+    }catch(e){console.warn('V59 global search:',e)}
+    arr.sort((a,b)=>a.score-b.score||a.title.localeCompare(b.title,'ar'));activeResults=arr.slice(0,35);
+    if(!activeResults.length){resultBox.innerHTML='<div class="v59-palette-empty">ما لقينا نتائج مطابقة. جرّب الاسم بدون همزات أو رقم الهوية.</div>';return}
+    resultBox.innerHTML=activeResults.map((r,i)=>`<button type="button" class="v59-result${i===0?' active':''}" data-v59-result="${i}"><span class="v59-result-icon">${r.icon}</span><span class="v59-result-main"><b>${escText(r.title)}</b><small>${escText(r.sub)}</small></span><span class="v59-result-type">${r.kind==='family'?'عائلة':r.kind==='person'?'فرد':'توزيع'}</span></button>`).join('');
+    resultBox.querySelectorAll('[data-v59-result]').forEach(b=>b.addEventListener('mouseenter',()=>selectResult(Number(b.dataset.v59Result))));
+    resultBox.querySelectorAll('[data-v59-result]').forEach(b=>b.addEventListener('click',()=>activateResult(activeResults[Number(b.dataset.v59Result)])));
+  }
+  function selectResult(i){if(!activeResults.length)return;selectedIndex=Math.max(0,Math.min(activeResults.length-1,i));resultBox.querySelectorAll('[data-v59-result]').forEach((b,n)=>{b.classList.toggle('active',n===selectedIndex);if(n===selectedIndex)b.scrollIntoView({block:'nearest'})})}
+  function activateResult(r){if(!r)return;closePalette();if(r.kind==='family'||r.kind==='person'){
+      showView('familySearch');const search=document.getElementById('familySearchInput');if(search){search.value=r.familyId||r.head||r.title;if(typeof runFamilySearch==='function')runFamilySearch();}
+      if(r.familyId&&typeof showFamilyCard==='function')setTimeout(()=>showFamilyCard(r.familyId),80);
+      else if(r.kind==='person'&&typeof editPerson==='function'&&appReadOnly!==true)setTimeout(()=>editPerson(r.index),80);
+    }else{showView('distributions');const q=document.getElementById('distQ');if(q){q.value=r.query||r.title;if(typeof renderDistributions==='function')renderDistributions()}}
+  }
+  function installHeaderTools(){
+    const actions=document.querySelector('.top .actions');if(!actions)return;
+    const box=document.createElement('div');box.className='v59-header-tools no-print';
+    const btn=document.createElement('button');btn.type='button';btn.className='btn v59-search-open';btn.innerHTML='⌕ بحث شامل <span class="v59-shortcut">Ctrl K</span>';btn.addEventListener('click',openPalette);
+    statusNode=document.createElement('button');statusNode.type='button';statusNode.className='v59-system-chip';statusNode.title='فتح مركز المزامنة وحالة النظام';statusNode.innerHTML='<span class="v59-system-dot"></span><span id="v59SystemLabel">فحص النظام…</span>';statusNode.addEventListener('click',()=>showView('syncCenter'));
+    box.append(btn,statusNode);actions.prepend(box);
+  }
+  function installOperationsPanel(){
+    const stats=document.querySelector('#dashboard .grid.stats');if(!stats||document.getElementById('v59OpsPanel'))return;
+    const panel=document.createElement('section');panel.className='v59-ops-panel no-print';panel.id='v59OpsPanel';panel.setAttribute('aria-label','مركز العمليات السريع');
+    panel.innerHTML=`<div class="v59-ops-head"><div><h2>مركز العمليات السريع</h2><p>أهم مهام إدارة المخيم في مكان واحد — وصول مباشر بدون التنقل بين الصفحات.</p></div><span class="badge">اختصارات الإدارة</span></div><div class="v59-ops-grid">
+      <button type="button" class="v59-op" data-v59-action="add-family"><span class="v59-op-icon">＋</span><strong>إضافة عائلة</strong><small>تسجيل أسرة جديدة</small></button>
+      <button type="button" class="v59-op" data-v59-action="search"><span class="v59-op-icon">⌕</span><strong>بحث شامل</strong><small>عائلات وأفراد وتوزيعات</small></button>
+      <button type="button" class="v59-op" data-v59-action="distribution"><span class="v59-op-icon">📦</span><strong>إدارة التوزيعات</strong><small>تسجيل ومتابعة الاستفادة</small></button>
+      <button type="button" class="v59-op" data-v59-action="reports"><span class="v59-op-icon">▤</span><strong>الكشوفات</strong><small>تقارير وتصدير البيانات</small></button>
+      <button type="button" class="v59-op" data-v59-action="quality"><span class="v59-op-icon">✓</span><strong>جودة البيانات</strong><small>فحص النواقص والتكرار</small></button>
+      <button type="button" class="v59-op" data-v59-action="backup"><span class="v59-op-icon">⤓</span><strong>نسخة احتياطية</strong><small>حفظ نسخة من البيانات</small></button>
+      </div><div class="v59-ops-status"><div class="v59-health"><span>حالة الاتصال</span><b id="v59OpsNetwork">—</b></div><div class="v59-health"><span>تعديلات بانتظار المزامنة</span><b id="v59OpsPending">—</b></div><div class="v59-health"><span>سجلات العائلات والأفراد</span><b id="v59OpsRecords">—</b></div></div>`;
+    stats.insertAdjacentElement('afterend',panel);
+    panel.querySelectorAll('[data-v59-action]').forEach(b=>b.addEventListener('click',()=>{
+      const a=b.dataset.v59Action;
+      if(a==='add-family'){if(appReadOnly===true){if(typeof toast==='function')toast('جهاز العرض للقراءة فقط');return}openFamilyModal()}
+      else if(a==='search')openPalette();else if(a==='distribution')showView('distributions');else if(a==='reports')showView('classified');else if(a==='quality')openQualityModal();else if(a==='backup')backup();
+    }));
+  }
+  function refreshHealth(){
+    const online=navigator.onLine, pending=(()=>{let n=0;try{if(typeof syncLoadPending==='function')n+=syncLoadPending().length}catch(e){}try{if(typeof distLoadPending==='function')n+=distLoadPending().length}catch(e){}return n})();
+    if(statusNode){statusNode.dataset.state=!online?'offline':pending?'pending':'online';const label=statusNode.querySelector('#v59SystemLabel');if(label)label.textContent=!online?'دون اتصال':pending?`مزامنة معلقة: ${pending}`:'متصل · لا توجد تعديلات معلقة';}
+    const n=document.getElementById('v59OpsNetwork');if(n)n.textContent=online?'متصل بالإنترنت':'دون اتصال';
+    const p=document.getElementById('v59OpsPending');if(p)p.textContent=String(pending).replace(/\d/g,d=>'٠١٢٣٤٥٦٧٨٩'[+d]);
+    const r=document.getElementById('v59OpsRecords');if(r){let fam=0;try{fam=typeof familyMap==='function'?familyMap().size:0}catch(e){}r.textContent=`${fam.toLocaleString('ar-EG')} عائلة · ${(Array.isArray(data)?data.length:0).toLocaleString('ar-EG')} فرد/سجل`}
+  }
+  ready(()=>{
+    try{installStyles();installPalette();installHeaderTools();installOperationsPanel();refreshHealth();window.addEventListener('online',refreshHealth);window.addEventListener('offline',refreshHealth);window.addEventListener('storage',refreshHealth);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshHealth()});statusTimer=setInterval(refreshHealth,8000);
+      document.addEventListener('keydown',e=>{const key=String(e.key||'').toLowerCase(),mod=e.ctrlKey||e.metaKey;const target=e.target;const editing=target&&(target.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));if(mod&&key==='k'){e.preventDefault();openPalette();return}if(key==='escape'&&palette?.classList.contains('open')){e.preventDefault();closePalette();return}if(!editing&&!mod&&!e.altKey&&key==='/'){e.preventDefault();openPalette();return}if(!editing&&e.altKey&&/^[1-8]$/.test(key)){const ids=['dashboard','familySearch','families','distributions','records','classified','syncCenter','settings'];showView(ids[Number(key)-1]);}});
+      document.addEventListener('click',e=>{if(e.target.closest('.tab,.mobile-bottom-nav'))setTimeout(refreshHealth,100)});
+      
+    }catch(e){console.error('V59 global operations layer:',e)}
+  });
+  function panelButton(action){return document.querySelector(`[data-v59-action="${action}"]`)}
+})();
+
+
+
+/* V61 — Hardened campaign eligibility, identity normalization and audit warnings.
+   Additive to the existing local-first distribution store and existing sync endpoints. */
+(function(){
+ 'use strict';
+ const $=id=>document.getElementById(id);
+ const norm=v=>String(v??'').normalize('NFKC').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[ًٌٍَُِّْـٰ]/g,'').replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[ـ\u200e\u200f\u202a-\u202e]/g,'').replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim().toLowerCase();
+ const idNorm=v=>String(v??'').normalize('NFKC').replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/[^\p{L}\p{N}]/gu,'').toLowerCase();
+ let chosenFamily=null;
+ function familyRows(){const m=new Map();for(const r of (data||[])){const id=String(r['رقم هوية الأسرة']||'').trim(),name=String(r['اسم رب الأسرة']||'').trim(),key=id?'id:'+idNorm(id):(name?'name:'+norm(name):'');if(!key)continue;if(!m.has(key))m.set(key,{key,id,name,rows:[]});m.get(key).rows.push(r)}return [...m.values()].map(f=>{const head=f.rows.find(r=>norm(r['صلة القرابة'])===norm('رب الأسرة'))||f.rows[0];return {...f,name:f.name||String(head['اسم رب الأسرة']||'').trim(),id:f.id||String(head['رقم هوية الأسرة']||'').trim(),members:f.rows.length}}).filter(f=>f.name)}
+ function familyForDistribution(f,type){return {id:'',familyId:f.id,familyName:f.name,beneficiaryType:'عائلة',beneficiaryName:f.name,type:String(type??'').trim()}}
+ function sameFamilyRecord(f,d){const a=idNorm(f.id),b=idNorm(d.familyId),an=norm(f.name),bn=norm(d.familyName||(d.beneficiaryType==='عائلة'?d.beneficiaryName:''));if(a&&b&&a===b)return true;return (!a||!b)&&!!an&&an===bn}
+ function duplicateFor(f,type){if(!f||!type)return null;const active=(distributions||[]).filter(d=>norm(d.type)===norm(type)&&!['ملغي','ملغى','ملغاه','الغاء','canceled','cancelled'].includes(norm(d.workflowStatus||d.statusLabel)));return window.distCampaignFindDuplicate(familyForDistribution(f,type),'')||active.find(d=>sameFamilyRecord(f,d))||null}
+ function summary(type){const el=$('distCampaignTypeSummary');if(!el)return;if(!type){el.innerHTML='';return}const fam=familyRows(),received=new Set(),byFamily=new Map();for(const f of fam){const rec=duplicateFor(f,type);if(rec)received.add(f.key)}for(const d of (distributions||[])){if(norm(d.type)!==norm(type)||['ملغي','ملغى','ملغاه','الغاء','canceled','cancelled'].includes(norm(d.workflowStatus||d.statusLabel)))continue;const key=idNorm(d.familyId)?'id:'+idNorm(d.familyId):'name:'+norm(d.familyName||(d.beneficiaryType==='عائلة'?d.beneficiaryName:''));if(key&&key!=='name:')byFamily.set(key,(byFamily.get(key)||0)+1)}const legacyDuplicates=[...byFamily.values()].reduce((n,count)=>n+Math.max(0,count-1),0),total=fam.length,got=received.size;const cards=[['إجمالي العائلات',total],['استفادت من هذا النوع',got],['ما زالت مستحقة',Math.max(0,total-got)],['تكرارات قديمة للمراجعة',legacyDuplicates]];el.innerHTML=cards.map(([label,n],i)=>`<div class="dist-campaign-summary-item${i===3&&n?' warning':''}"><span>${label}</span><b>${Number(n).toLocaleString('ar')}</b></div>`).join('')+(legacyDuplicates?'<p class="dist-campaign-legacy-warning">تم رصد سجلات مكررة سابقة لهذا النوع. لن نحذفها تلقائياً؛ منع التكرار يطبّق على التسجيلات الجديدة.</p>':'')}
+ function setResult(kind,title,detail,button){const el=$('distCampaignCheckResult');if(!el)return;el.className='dist-campaign-result'+(kind?' '+kind:'');el.innerHTML=`<span class="dist-campaign-result-icon">${kind==='is-blocked'?'!':kind==='is-eligible'?'✓':'i'}</span><div><b>${title}</b><p>${detail}</p>${button||''}</div>`}
+ function check(f){const type=String($('distCampaignAidType')?.value||'').trim();chosenFamily=f||null;summary(type);if(!f){setResult('', 'اختَر العائلة أولاً','اكتب اسم رب الأسرة أو رقم هوية الأسرة ثم اختر النتيجة الصحيحة.');return}if(!type){setResult('', 'حدّد نوع المساعدة','اختَر نوع المساعدة الذي تريد التحقق منه لهذه العائلة.');return}const dup=duplicateFor(f,type);if(dup){setResult('is-blocked','غير مستحقة لهذا النوع حالياً',`سبق تسجيل «${dup.type}» لهذه العائلة. المرجع: ${dup.reference||'غير مسجل'} • التاريخ: ${dup.date||'غير محدد'}. لا يمكن تكرار نوع المساعدة نفسه للعائلة. `);return}setResult('is-eligible','العائلة مستحقة لهذا النوع',`لم يُعثر على تسجيل سابق لنوع «${type}» لهذه العائلة. عند المتابعة سيتم تسجيل العملية واعتمادها وتسليمها مباشرة.`,`<button type="button" class="btn primary" id="distCampaignProceedBtn">تسجيل المساعدة لهذه العائلة</button>`);$('distCampaignProceedBtn')?.addEventListener('click',()=>{if(appReadOnly===true){toast('جهاز العرض للقراءة فقط؛ التسجيل من الجهاز الرئيسي');return}openDistributionModal();$('distBeneficiaryForm').value='عائلة';$('distName').value=f.name;$('distPersonId').value='';$('distFamilyId').value=f.id;$('distFamilyName').value=f.name;$('distTypeForm').value=type;$('distQty').value='1';$('distRef').value='DST-'+Date.now().toString().slice(-8);$('distName').dispatchEvent(new Event('change',{bubbles:true}));});}
+ function matches(){const box=$('distCampaignFamilyMatches'),input=$('distCampaignFamilySearch');if(!box||!input)return;const q=norm(input.value),qi=idNorm(input.value);chosenFamily=null;if(q.length<2){box.innerHTML='';return}const arr=familyRows().map(f=>({...f,score:norm(f.name)===q||idNorm(f.id)===qi?0:(norm(f.name).startsWith(q)||idNorm(f.id).startsWith(qi)?1:2)})).filter(f=>norm(f.name).includes(q)||idNorm(f.id).includes(qi)).sort((a,b)=>a.score-b.score||a.name.localeCompare(b.name,'ar')).slice(0,8);box.innerHTML=arr.map((f,i)=>`<button type="button" class="dist-campaign-match" data-family-index="${i}"><span><b>${String(f.name).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</b><small>هوية الأسرة: ${String(f.id||'غير مسجلة')} • ${f.members} فرد</small></span><span aria-hidden="true">›</span></button>`).join('');const refs=arr;box.querySelectorAll('[data-family-index]').forEach(btn=>btn.addEventListener('click',()=>{const f=refs[Number(btn.dataset.familyIndex)];if(!f)return;chosenFamily=f;input.value=f.name;box.innerHTML='';check(f)}));}
+ function init(){if(!$('distCampaignQuickCheck'))return;const input=$('distCampaignFamilySearch'),type=$('distCampaignAidType');input?.addEventListener('input',matches);type?.addEventListener('input',()=>{summary(type.value);if(chosenFamily)check(chosenFamily)});type?.addEventListener('change',()=>{summary(type.value);if(chosenFamily)check(chosenFamily)});$('distCampaignCheckBtn')?.addEventListener('click',()=>{const q=norm(input?.value),qi=idNorm(input?.value),fam=chosenFamily||familyRows().find(f=>norm(f.name)===q||idNorm(f.id)===qi);check(fam||null)});const original=window.renderDistributions;window.renderDistributions=function(){original();const types=[...new Set((distributions||[]).map(x=>String(x.type||'').trim()).filter(Boolean))];const dl=$('distCampaignAidTypes');if(dl){const known=new Set([...dl.querySelectorAll('option')].map(o=>norm(o.value)));types.forEach(t=>{if(!known.has(norm(t))){const o=document.createElement('option');o.value=t;dl.appendChild(o)}})}summary(type?.value||'')};summary(type?.value||'');}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();

@@ -1,4 +1,4 @@
-const CACHE = "abu-areiban-v58-distribution-workflow-1";
+const CACHE = "abu-areiban-v62-distribution-offline-queue";
 const APP_SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
