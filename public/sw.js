@@ -1,4 +1,4 @@
-const CACHE = "abu-areiban-v64-distribution-confirmed-only";
+const CACHE = "abu-areiban-v66-campaign-integrity";
 const APP_SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {

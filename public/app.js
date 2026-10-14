@@ -1631,7 +1631,7 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "62.0"
+const APP_RELEASE_VERSION = "66.0"
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
@@ -3182,4 +3182,72 @@ document.addEventListener("DOMContentLoaded",()=>{
  try{Object.defineProperty(window,'distributions',{configurable:true,get(){return distributions},set(v){distributions=v}})}catch(e){}
  const refresh=()=>{try{window.renderDistributions?.();window.renderDistributionCoverage?.()}catch(e){console.warn('V63 distribution refresh',e)}};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',refresh,{once:true});else setTimeout(refresh,0);
+})();
+
+
+/* V66 — Campaign integrity hardening.
+   Distribution-only patch: safer family matching when legacy rows lack an ID,
+   duplicate guard at the final save boundary, and protection against double taps. */
+(function(){
+ 'use strict';
+ const norm=v=>String(v??'').normalize('NFKC').normalize('NFD')
+   .replace(/[\u0300-\u036f]/g,'').replace(/[ًٌٍَُِّْـٰ]/g,'')
+   .replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+   .replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+   .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+   .replace(/[ـ\u200e\u200f\u202a-\u202e]/g,'')
+   .replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim().toLowerCase();
+ const idNorm=v=>String(v??'').normalize('NFKC')
+   .replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+   .replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+   .replace(/[^\p{L}\p{N}]/gu,'').toLowerCase();
+ const cancelled=r=>['ملغي','ملغى','ملغاه','الغاء','canceled','cancelled'].includes(norm(r?.workflowStatus||r?.statusLabel||''));
+ function familyBits(record){
+   const r={...(record||{})};
+   let fid=idNorm(r.familyId), name=norm(r.familyName||(r.beneficiaryType==='عائلة'?r.beneficiaryName:''));
+   if(!fid || !name){
+     const pid=idNorm(r.personId), beneficiary=norm(r.beneficiaryName);
+     const rows=Array.isArray(data)?data:[]; let row=null;
+     if(name&&pid)row=rows.find(x=>norm(x['اسم رب الأسرة'])===name&&idNorm(x['رقم هوية الفرد'])===pid);
+     if(!row&&fid)row=rows.find(x=>idNorm(x['رقم هوية الأسرة'])===fid);
+     if(!row&&name)row=rows.find(x=>norm(x['اسم رب الأسرة'])===name);
+     if(!row&&pid)row=rows.find(x=>idNorm(x['رقم هوية الفرد'])===pid);
+     if(!row&&r.beneficiaryType==='عائلة'&&beneficiary)row=rows.find(x=>norm(x['اسم رب الأسرة'])===beneficiary);
+     if(row){fid=fid||idNorm(row['رقم هوية الأسرة']);name=name||norm(row['اسم رب الأسرة']);}
+   }
+   return {fid,name};
+ }
+ function sameFamily(a,b){
+   const x=familyBits(a),y=familyBits(b);
+   if(x.fid&&y.fid)return x.fid===y.fid;
+   return !!x.name&&!!y.name&&x.name===y.name;
+ }
+ function findCampaignDuplicate(candidate,excludeId=''){
+   const type=norm(candidate?.type); if(!type)return null;
+   const f=familyBits(candidate); if(!f.fid&&!f.name)return null;
+   return (Array.isArray(distributions)?distributions:[]).find(d=>d.id!==excludeId&&!cancelled(d)&&norm(d.type)===type&&sameFamily(candidate,d))||null;
+ }
+ window.distCampaignFindDuplicate=findCampaignDuplicate;
+ // Final-boundary check also protects the single-registration form, including legacy rows.
+ const originalSave=window.saveDistribution;
+ let singleBusy=false;
+ if(typeof originalSave==='function')window.saveDistribution=function(){
+   if(singleBusy)return;
+   const button=document.querySelector('#distModal .modalfoot button.primary');
+   const id=document.getElementById('distId')?.value||'';
+   const candidate={id,beneficiaryType:document.getElementById('distBeneficiaryForm')?.value||'',beneficiaryName:document.getElementById('distName')?.value||'',personId:document.getElementById('distPersonId')?.value||'',familyId:document.getElementById('distFamilyId')?.value||'',familyName:document.getElementById('distFamilyName')?.value||'',type:document.getElementById('distTypeForm')?.value||''};
+   const dup=findCampaignDuplicate(candidate,id);
+   if(dup){const type=String(candidate.type||'').trim();toast('تم إيقاف العملية لمنع تكرار «'+type+'» لهذه العائلة. المرجع السابق: '+(dup.reference||'غير مسجل'));return;}
+   singleBusy=true;const oldText=button?.textContent;if(button){button.disabled=true;button.textContent='جارٍ حفظ التسليم…';}
+   try{return originalSave.apply(this,arguments)}finally{singleBusy=false;if(button){button.disabled=false;button.textContent=oldText||'تسجيل واعتماد وتسليم';}}
+ };
+ // Prevent repeated taps from submitting a bulk campaign twice.
+ const originalBulk=window.saveBulkRegisterDistribution;
+ let bulkBusy=false;
+ if(typeof originalBulk==='function')window.saveBulkRegisterDistribution=function(){
+   if(bulkBusy)return;
+   bulkBusy=true;const button=document.querySelector('#distBulkRegisterModal .modalfoot button.primary');const oldText=button?.textContent;
+   if(button){button.disabled=true;button.textContent='جارٍ التحقق والحفظ…';}
+   try{return originalBulk.apply(this,arguments)}finally{bulkBusy=false;if(button){button.disabled=false;button.textContent=oldText||'حفظ التوزيعات المحددة';}}
+ };
 })();
