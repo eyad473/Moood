@@ -36,6 +36,22 @@ function requireAuth(request, env) {
   return { ok: true, deviceId: cleanString(request.headers.get("X-Device-Id"), 120) };
 }
 
+
+function distNormalize(value) {
+  return String(value ?? "").toLowerCase().normalize("NFKC").replace(/[إأآٱ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/[ًٌٍَُِّْـ]/g,"").replace(/\s+/g," ").trim();
+}
+function distributionFamilyName(data) { return distNormalize(data?.familyName || (data?.beneficiaryType === "عائلة" ? data?.beneficiaryName : "")); }
+function sameDistributionFamily(a,b) {
+  const ai=distNormalize(a?.familyId), bi=distNormalize(b?.familyId);
+  if(ai && bi) return ai===bi;
+  const an=distributionFamilyName(a), bn=distributionFamilyName(b);
+  return !!an && !!bn && an===bn;
+}
+function sameDistributionClaim(a,b) {
+  const at=distNormalize(a?.type), bt=distNormalize(b?.type);
+  return !!at && at===bt && sameDistributionFamily(a,b);
+}
+
 function validRecord(item) {
   if (!item || typeof item !== "object") return false;
   const id = cleanString(item.recordId, 200);
@@ -297,6 +313,14 @@ async function push(request, env) {
   const conflicts = [];
   const skipped = [];
   const statements = [];
+  // Load existing distribution claims once per push request. This protects the family/type rule across devices.
+  const distributionClaims = [];
+  if (incoming.some(x => String(x?.recordId || "").startsWith("dist:") && x?.operation !== "delete")) {
+    const existingDist = await env.DB.prepare(`SELECT record_id, data_json FROM sync_records WHERE record_id LIKE 'dist:%' AND deleted = 0`).all();
+    for (const row of (existingDist.results || [])) {
+      try { const parsed = row.data_json ? JSON.parse(row.data_json) : null; if (parsed) distributionClaims.push({recordId:String(row.record_id),data:parsed}); } catch {}
+    }
+  }
 
   for (const item of incoming) {
     if (!validRecord(item)) {
@@ -369,9 +393,17 @@ async function push(request, env) {
       continue;
     }
 
+    const dataJson = operation === "delete" ? null : JSON.stringify(data);
+    if (recordId.startsWith("dist:") && operation !== "delete" && (!current || Number(current.deleted) === 1)) {
+      const duplicate = distributionClaims.find(entry => entry.recordId !== recordId && sameDistributionClaim(entry.data, data));
+      if (duplicate) {
+        skipped.push({ opId, recordId, reason: "تكرار نوع المساعدة للعائلة — يوجد سجل سابق لنفس العائلة ونوع المساعدة" });
+        continue;
+      }
+      distributionClaims.push({recordId,data});
+    }
     const nextVersion = current ? Number(current.version) + 1 : 1;
     const createdAt = now();
-    const dataJson = operation === "delete" ? null : JSON.stringify(data);
 
     statements.push(
       env.DB.prepare(`
