@@ -138,6 +138,31 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
 #distModal .dist-modal-foot .btn,#distBulkModal .modalfoot .btn,#distBulkRegisterModal .modalfoot .btn{min-height:46px}
 @media(max-width:700px){#distributions .card{padding:11px;border-radius:15px}#distributions .cardhead{align-items:flex-start;flex-direction:column}#distributions .cardhead>.actions{display:grid;grid-template-columns:1fr 1fr;width:100%}#distributions .cardhead>.actions .btn{min-height:46px;padding:10px 8px}#distributions .dist-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#distributions .dist-stat{padding:11px;border-radius:13px}#distributions .dist-stat b{font-size:22px}#distributions .dist-filters{display:grid;grid-template-columns:1fr!important;gap:10px}#distributions .dist-filters .field input,#distributions .dist-filters .field select{min-height:46px;font-size:16px}#distributions .dist-insight{align-items:flex-start}#distributions .dist-campaign-check{padding:12px;border-radius:15px}#distributions .dist-campaign-check-head{display:block}#distributions .dist-campaign-mark{display:inline-flex;margin-top:8px}#distributions .dist-campaign-check-fields{grid-template-columns:1fr;gap:10px}#distributions .dist-campaign-check-btn{width:100%;min-height:48px}#distributions .dist-campaign-matches{grid-template-columns:1fr}#distributions .dist-campaign-type-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}#distributions .dist-campaign-summary-item{padding:8px}#distributions .dist-campaign-summary-item b{font-size:18px}#distributions .dist-coverage.card{padding:11px!important}#distributions .dist-coverage .filters{grid-template-columns:1fr!important}#distributions .dist-coverage .actions{display:grid;grid-template-columns:1fr;width:100%}#distributions .dist-coverage .actions .btn{min-height:46px;width:100%}#distributions .tablewrap{max-width:100%;overscroll-behavior-x:contain}#distributions .dist-table{min-width:850px}#distModal.modal,#distBulkModal.modal,#distBulkRegisterModal.modal{padding:0;align-items:flex-end}#distModal .modalbox,#distBulkModal .modalbox,#distBulkRegisterModal .modalbox{width:100%;max-width:none!important;max-height:94dvh;border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom)}#distModal .modalhead,#distBulkModal .modalhead,#distBulkRegisterModal .modalhead{padding:13px 14px}#distModal .modalbody,#distBulkModal .modalbody,#distBulkRegisterModal .modalbody{padding:12px;overflow-x:hidden}#distModal .formgrid,#distBulkModal .formgrid,#distBulkRegisterModal .formgrid{grid-template-columns:1fr;gap:11px}#distModal .span2,#distModal .span3,#distBulkModal .span2,#distBulkModal .span3,#distBulkRegisterModal .span2,#distBulkRegisterModal .span3{grid-column:auto}#distModal .field input,#distModal .field select,#distModal .field textarea,#distBulkModal .field input,#distBulkModal .field select,#distBulkRegisterModal .field input,#distBulkRegisterModal .field select{min-height:46px;font-size:16px;width:100%}#distModal .modalfoot,#distBulkModal .modalfoot,#distBulkRegisterModal .modalfoot{display:grid;grid-template-columns:1fr;padding:10px 12px;gap:8px}#distModal .modalfoot .btn,#distBulkModal .modalfoot .btn,#distBulkRegisterModal .modalfoot .btn{width:100%;min-height:48px}.dist-campaign-match{min-height:60px}}
 
+
+/* V70 — animated, touch-friendly charts */
+.chart-svgbox{position:relative;transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}
+.chart-svgbox:hover{border-color:#bfdbfe;box-shadow:0 10px 26px rgba(37,99,235,.08)}
+.chart-svgbox svg{overflow:visible}
+.chart-svgbox svg .chart-segment{cursor:pointer;transform-box:fill-box;transform-origin:center;transition:filter .22s ease,opacity .22s ease,transform .22s ease;outline:none}
+.chart-svgbox svg .chart-segment:hover,.chart-svgbox svg .chart-segment:focus-visible{filter:brightness(1.08) drop-shadow(0 4px 5px rgba(37,99,235,.22));transform:scale(1.025)}
+.chart-svgbox svg .chart-bar{transform-box:fill-box;transform-origin:bottom;animation:chartBarRise .75s cubic-bezier(.2,.75,.2,1) both;cursor:pointer;transition:filter .2s ease}
+.chart-svgbox svg .chart-bar:hover,.chart-svgbox svg .chart-bar:focus-visible{filter:brightness(1.12) drop-shadow(0 3px 4px rgba(8,145,178,.25));outline:none}
+.chart-svgbox svg .chart-bar-label{opacity:0;animation:chartLabelIn .4s ease .35s forwards}
+.health-item,.housing-chart-item{animation:chartItemIn .45s both;animation-delay:calc(var(--chart-i,0) * 65ms)}
+.health-fill,.housing-chart-fill{transform-origin:right center;animation:chartFillIn .85s cubic-bezier(.2,.75,.2,1) both}
+.donut{animation:chartDonutIn .7s cubic-bezier(.2,.75,.2,1) both;transition:filter .2s ease,transform .2s ease}
+.donut:hover{filter:drop-shadow(0 8px 12px rgba(22,163,74,.14));transform:scale(1.025)}
+.legend-row{padding:4px 6px;border-radius:8px;transition:background .18s ease,transform .18s ease}
+.legend-row:hover{background:rgba(148,163,184,.12);transform:translateX(-2px)}
+.housing-chart-item{cursor:default}
+.housing-chart-item:hover .housing-chart-fill{filter:brightness(1.1)}
+@keyframes chartBarRise{from{transform:scaleY(.05);opacity:.45}to{transform:scaleY(1);opacity:1}}
+@keyframes chartLabelIn{to{opacity:1}}
+@keyframes chartItemIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+@keyframes chartFillIn{from{transform:scaleX(.03);opacity:.5}to{transform:scaleX(1);opacity:1}}
+@keyframes chartDonutIn{from{opacity:.4;transform:scale(.86) rotate(-18deg)}to{opacity:1;transform:scale(1) rotate(0)}}
+@media(prefers-reduced-motion:reduce){.chart-svgbox,.chart-svgbox svg .chart-segment,.chart-svgbox svg .chart-bar,.health-item,.housing-chart-item,.health-fill,.housing-chart-fill,.donut,.legend-row{animation:none!important;transition:none!important}}
+
 </style>
 <style>
 .family-search-card{margin-bottom:18px}
@@ -414,6 +439,37 @@ html[data-theme="dark"] body{background:#0b1120;color:#e5e7eb}html[data-theme="d
 </style>
 
 <style id="dist-pending-v62-style">.dist-pending-tools{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.dist-pending-count{display:inline-flex;min-width:22px;height:22px;align-items:center;justify-content:center;border-radius:99px;background:#dbeafe;color:#1d4ed8;font-weight:800;margin-inline-start:5px;padding:0 5px}.dist-pending-panel{border:1px solid var(--border,#dbe2ea);border-radius:14px;padding:14px;margin:10px 0;background:var(--card,#fff)}.dist-pending-panel[hidden]{display:none}.dist-pending-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}.dist-pending-panel-head p{font-size:12px;color:var(--muted,#64748b);line-height:1.7;margin:5px 0}.dist-pending-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 2px;border-top:1px solid var(--border,#e2e8f0)}.dist-pending-row small{display:block;color:var(--muted,#64748b);margin-top:4px;font-size:11px}.dist-pending-index{font-size:12px;font-weight:700;color:var(--muted,#64748b)}#distSyncState[data-state="pending"]{background:#fff7ed;color:#9a3412}#distSyncState[data-state="offline"]{background:#fef3c7;color:#92400e}#distSyncState[data-state="online"]{background:#dcfce7;color:#166534}@media(max-width:560px){.dist-pending-tools>*{flex:1;justify-content:center}.dist-pending-panel{padding:11px}.dist-pending-panel-head{align-items:center}}</style>
+
+<style id="distCampaignAnalyticsStyles">
+.dist-campaign-analytics{margin:14px 0 16px;padding:17px;border:1px solid var(--border,#e2e8f0);border-radius:18px;background:linear-gradient(135deg,var(--card,#fff) 0%,rgba(239,246,255,.56) 100%);overflow:hidden}
+.dist-campaign-analytics-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.dist-campaign-analytics-head h3{margin:3px 0 4px;font-size:17px;letter-spacing:-.2px}
+.dist-campaign-analytics-head p{margin:0;color:var(--muted,#64748b);font-size:12px;line-height:1.7;max-width:650px}
+.dist-campaign-eyebrow{font-size:10px;font-weight:800;letter-spacing:.7px;color:#2563eb}
+.dist-campaign-live{display:inline-flex;align-items:center;gap:7px;border:1px solid #bbf7d0;background:#f0fdf4;color:#166534;border-radius:999px;padding:6px 10px;font-size:10px;white-space:nowrap}
+.dist-campaign-live i{width:7px;height:7px;background:#22c55e;border-radius:50%;box-shadow:0 0 0 0 rgba(34,197,94,.45);animation:distLivePulse 1.8s infinite}
+.dist-campaign-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:15px 0}
+.dist-campaign-kpi{min-width:0;padding:12px;border:1px solid var(--border,#e2e8f0);border-radius:13px;background:var(--card,#fff)}
+.dist-campaign-kpi span{display:block;color:var(--muted,#64748b);font-size:11px}.dist-campaign-kpi strong{display:block;font-size:23px;line-height:1.25;margin:5px 0 2px;font-variant-numeric:tabular-nums}.dist-campaign-kpi small{color:var(--muted,#64748b);font-size:10px}
+.dist-campaign-chart-wrap{padding:14px;border:1px solid var(--border,#e2e8f0);border-radius:15px;background:var(--card,#fff)}
+.dist-campaign-chart-title{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px}.dist-campaign-chart-title b{font-size:13px}.dist-campaign-chart-title span{font-size:10px;color:var(--muted,#64748b)}
+.dist-campaign-aid-chart{display:grid;gap:10px}
+.dist-campaign-aid-row{width:100%;display:grid;grid-template-columns:minmax(100px,155px) minmax(60px,1fr) 82px;align-items:center;gap:11px;padding:9px 10px;border:1px solid transparent;border-radius:12px;background:transparent;color:inherit;text-align:start;cursor:pointer;transition:background .2s,border-color .2s,transform .2s}
+.dist-campaign-aid-row:hover{background:#f8fafc;border-color:#dbeafe;transform:translateY(-1px)}
+.dist-campaign-aid-row:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+.dist-campaign-aid-row[aria-pressed="true"]{background:#eff6ff;border-color:#93c5fd}
+.dist-campaign-aid-name{font-size:12px;font-weight:750;overflow-wrap:anywhere}.dist-campaign-aid-name small{display:block;color:var(--muted,#64748b);font-size:10px;font-weight:500;margin-top:3px}
+.dist-campaign-track{height:13px;border-radius:999px;background:#e2e8f0;overflow:hidden;display:flex;direction:rtl;box-shadow:inset 0 1px 2px rgba(15,23,42,.06)}
+.dist-campaign-got{height:100%;width:0;background:linear-gradient(90deg,#10b981,#059669);border-radius:999px 0 0 999px;transition:width .75s cubic-bezier(.2,.75,.2,1)}
+.dist-campaign-left{height:100%;flex:1;background:linear-gradient(90deg,#dbeafe,#bfdbfe);transition:width .75s cubic-bezier(.2,.75,.2,1)}
+.dist-campaign-aid-meta{text-align:end;white-space:nowrap}.dist-campaign-aid-meta b{font-size:12px;display:block;font-variant-numeric:tabular-nums}.dist-campaign-aid-meta small{font-size:10px;color:var(--muted,#64748b)}
+.dist-campaign-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:10px;color:var(--muted,#64748b)}
+.dist-campaign-legend span{display:inline-flex;align-items:center;gap:6px}.dist-campaign-legend i{width:9px;height:9px;border-radius:3px;display:inline-block}.dist-campaign-legend .got{background:#059669}.dist-campaign-legend .left{background:#bfdbfe}
+.dist-campaign-analytics-foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px;color:var(--muted,#64748b);font-size:10px}
+@keyframes distLivePulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}70%{box-shadow:0 0 0 7px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+@media(max-width:650px){.dist-campaign-analytics{padding:12px}.dist-campaign-kpis{gap:6px}.dist-campaign-kpi{padding:9px}.dist-campaign-kpi strong{font-size:20px}.dist-campaign-aid-row{grid-template-columns:minmax(80px,112px) minmax(45px,1fr) 58px;gap:7px;padding:8px 5px}.dist-campaign-aid-name{font-size:11px}.dist-campaign-aid-meta b{font-size:11px}.dist-campaign-track{height:11px}.dist-campaign-chart-wrap{padding:9px}}
+@media(prefers-reduced-motion:reduce){.dist-campaign-live i,.dist-campaign-got,.dist-campaign-left,.dist-campaign-aid-row{animation:none!important;transition:none!important}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -577,6 +633,19 @@ html[data-theme="dark"] body{background:#0b1120;color:#e5e7eb}html[data-theme="d
   <div class="dist-campaign-type-summary" id="distCampaignTypeSummary" aria-live="polite"></div>
 </div>
 <div class="dist-stats"><div class="dist-stat"><span>إجمالي التوزيعات</span><b id="distTotal">0</b></div><div class="dist-stat"><span>هذا الشهر</span><b id="distMonth">0</b></div><div class="dist-stat"><span>للأطفال</span><b id="distChildren">0</b></div><div class="dist-stat"><span>للعائلات</span><b id="distFamilies">0</b></div></div>
+<section class="dist-campaign-analytics card" id="distCampaignAnalytics" aria-labelledby="distCampaignAnalyticsTitle">
+  <div class="dist-campaign-analytics-head">
+    <div><span class="dist-campaign-eyebrow">لوحة الحملة</span><h3 id="distCampaignAnalyticsTitle">مؤشرات الاستفادة حسب نوع المساعدة</h3>
+    <p>اضغط على أي نوع لعرض تفاصيله وفحص العائلة. تتحدث الرسومات تلقائياً عند تسجيل أو مزامنة توزيع.</p></div>
+    <span class="dist-campaign-live"><i></i> تحديث مباشر</span>
+  </div>
+  <div class="dist-campaign-kpis" id="distCampaignAnalyticsKpis" aria-live="polite"></div>
+  <div class="dist-campaign-chart-wrap">
+    <div class="dist-campaign-chart-title"><b>تغطية العائلات</b><span>المستفيدة مقابل المتبقية</span></div>
+    <div id="distCampaignAidChart" class="dist-campaign-aid-chart" aria-label="رسم تفاعلي لتغطية أنواع المساعدة"></div>
+  </div>
+  <div class="dist-campaign-analytics-foot"><span>الضغط على شريط يحدد نوع المساعدة في فحص الاستحقاق.</span><span id="distCampaignAnalyticsUpdated">يتم الحساب من السجلات الحالية</span></div>
+</section>
 <div class="filters no-print dist-filters"><div class="field"><label>بحث</label><input id="distQ" oninput="renderDistributions()" placeholder="اسم الطفل، رب الأسرة، نوع المساعدة..."/></div><div class="field"><label>نوع المستفيد</label><select id="distBeneficiary" onchange="renderDistributions()"><option value="">الكل</option><option value="طفل">طفل</option><option value="فرد">فرد</option><option value="عائلة">عائلة</option></select></div><div class="field"><label>نوع التوزيع</label><select id="distType" onchange="renderDistributions()"><option value="">الكل</option></select></div><div class="field"><label>من تاريخ</label><input id="distFrom" onchange="renderDistributions()" type="date"/></div><div class="field"><label>إلى تاريخ</label><input id="distTo" onchange="renderDistributions()" type="date"/></div></div>
 <div class="dist-beneficiary-panel no-print" hidden="" id="distBeneficiarySearchPanel"></div>
 <div class="dist-insight"><div><b>سجل التوزيعات</b><span>كل عملية لها رقم مرجعي وتاريخ وبيانات المستفيد والكمية والملاحظات.</span></div><span class="badge" id="distSyncState">محلي</span></div>
@@ -926,5 +995,5 @@ html[data-theme="dark"] body{background:#0b1120;color:#e5e7eb}html[data-theme="d
 
 
 
-<script src="./app.js?v=68.0"></script></body>
+<script src="./app.js?v=69.0"></script></body>
 </html>
