@@ -603,6 +603,10 @@ html[data-theme="dark"] body{background:#0b1120;color:#e5e7eb}html[data-theme="d
 <div class="chart-head"><div><h2>توزيع العائلات حسب نوع السكن الحالي</h2><p>عدد العائلات في كل نوع سكن من بيانات الأسرة المسجلة</p></div><span class="chart-chip">مرتبط بالبيانات مباشرة</span></div>
 <div id="housingTypeChart" aria-live="polite"></div>
 </div>
+<div class="chart-card chart-wide housing-chart-card original-governorate-card">
+<div class="chart-head"><div><h2>توزيع العائلات حسب المحافظة الأصلية</h2><p>إحصاء فعلي من حقل «المحافظة الأصلية» المسجل لكل أسرة</p></div><span class="chart-chip">حسب بيانات الأسرة</span></div>
+<div id="originalGovernorateChart" aria-live="polite"></div>
+</div>
 </div>
 <div class="card">
 <div class="cardhead"><h2>آخر الإضافات / التعديلات</h2><button class="btn no-print" onclick="showView('records')">فتح السجلات</button></div>
@@ -1017,5 +1021,6 @@ html[data-theme="dark"] body{background:#0b1120;color:#e5e7eb}html[data-theme="d
 
 
 
-<script src="./app.js?v=70.3"></script></body>
+<script src="./app.js?v=70.4"></script></body>
 </html>
+<style>.original-governorate-card .housing-chart-item{cursor:pointer}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-track{box-shadow:0 0 0 3px rgba(59,130,246,.18),0 4px 14px rgba(37,99,235,.13);transform:translateY(-1px)}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-fill{filter:brightness(1.16)}</style>
