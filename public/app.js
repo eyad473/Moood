@@ -1531,7 +1531,7 @@ function saveBulkDistribution(){
 }
 
 /* ================= إدارة التوزيعات — Offline First + D1 Sync ================= */
-const DIST_KEY="aboreiban_distributions_v1", DIST_SHADOW_KEY="aboreiban_dist_shadow_v1", DIST_PENDING_KEY="aboreiban_dist_pending_v1", DIST_CURSOR_KEY="aboreiban_dist_cursor_v1";
+const DIST_KEY="aboreiban_distributions_v1", DIST_SHADOW_KEY="aboreiban_dist_shadow_v1", DIST_PENDING_KEY="aboreiban_dist_pending_v1", DIST_CURSOR_KEY="aboreiban_dist_cursor_v1", DIST_REJECTED_KEY="aboreiban_dist_rejected_v1";
 let distributions=[]; let distShadow=[]; let distCursor=Number(localStorage.getItem(DIST_CURSOR_KEY)||0); let distBusy=false;
 function distId(){return "dist:"+(crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random().toString(16).slice(2));}
 function distLoad(){try{distributions=JSON.parse(localStorage.getItem(DIST_KEY)||"[]");if(!Array.isArray(distributions))distributions=[]}catch(e){distributions=[]}}
@@ -1570,17 +1570,23 @@ function distBuildChanges(){
 }
 function distSavePending(c){try{localStorage.setItem(DIST_PENDING_KEY,JSON.stringify(Array.isArray(c)?c:[]))}catch(e){console.error('تعذر حفظ طابور التوزيعات',e);throw e}distRenderPendingCenter?.()}
 function distLoadPending(){try{const x=JSON.parse(localStorage.getItem(DIST_PENDING_KEY)||'[]');return Array.isArray(x)?x:[]}catch(e){return[]}}
+function distLoadRejected(){try{const x=JSON.parse(localStorage.getItem(DIST_REJECTED_KEY)||'[]');return Array.isArray(x)?x:[]}catch(e){return[]}}
+function distSaveRejected(items){try{localStorage.setItem(DIST_REJECTED_KEY,JSON.stringify((Array.isArray(items)?items:[]).slice(-100)))}catch(e){console.warn('تعذر حفظ سجل رفض التوزيعات',e)}}
+window.dismissRejectedDistribution=function(id){const list=distLoadRejected().filter(x=>String(x.id)!==String(id));distSaveRejected(list);distRenderPendingCenter()};
 function distRenderPendingCenter(){
   const box=document.getElementById('distPendingCenter'),badge=document.getElementById('distPendingBadge');
   if(!box)return;
-  const pending=distLoadPending();if(badge)badge.textContent=String(pending.length);
+  const pending=distLoadPending(),rejected=distLoadRejected();if(badge)badge.textContent=String(pending.length+rejected.length);
   const online=navigator.onLine;
   const state=document.getElementById('distSyncState');
-  if(state){state.textContent=pending.length?(!online?'دون اتصال · '+pending.length+' معلّق': 'بانتظار المزامنة · '+pending.length):(!online?'دون اتصال · محفوظ محلياً':'متصل · تمت المزامنة');state.dataset.state=pending.length?'pending':online?'online':'offline'}
+  if(state){state.textContent=pending.length?(!online?'دون اتصال · '+pending.length+' معلّق': 'بانتظار المزامنة · '+pending.length):rejected.length?'مرفوضة للمراجعة · '+rejected.length:(!online?'دون اتصال · محفوظ محلياً':'متصل · تمت المزامنة');state.dataset.state=pending.length?'pending':rejected.length?'conflict':online?'online':'offline'}
   const body=document.getElementById('distPendingRows');if(!body)return;
-  if(!pending.length){body.innerHTML='<div class="dist-empty">لا توجد عمليات توزيع معلّقة. التغييرات المحلية متطابقة مع آخر نسخة مؤكدة.</div>';return}
+  if(!pending.length&&!rejected.length){body.innerHTML='<div class="dist-empty">لا توجد عمليات معلّقة أو عمليات مرفوضة. التغييرات المحلية متطابقة مع آخر نسخة مؤكدة.</div>';return}
   const byId=new Map(distributions.map(x=>[x.id,x]));
-  body.innerHTML=pending.map((c,i)=>{const d=byId.get(c.recordId)||c.data||{},op=c.operation==='delete'?'حذف سجل': 'حفظ / تحديث';return `<div class="dist-pending-row"><div><b>${String(d.familyName||d.beneficiaryName||c.recordId||'سجل توزيع').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}</b><small>${String(d.type||'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))} · ${op} · ${String(d.date||'').replace(/[&<>"']/g,'')}</small></div><span class="dist-pending-index">${i+1}</span></div>`}).join('');
+  const safe=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const pendingHtml=pending.map((c,i)=>{const d=byId.get(c.recordId)||c.data||{},op=c.operation==='delete'?'حذف سجل':'حفظ / تحديث';return `<div class="dist-pending-row"><div><b>${safe(d.familyName||d.beneficiaryName||c.recordId||'سجل توزيع')}</b><small>${safe(d.type||'')} · ${op} · ${safe(d.date||'')}</small></div><span class="dist-pending-index">${i+1}</span></div>`}).join('');
+  const rejectedHtml=rejected.map(x=>{const d=x.data||{},reason=safe(x.reason||'رفض الخادم العملية');return `<div class="dist-pending-row" style="border-color:#fecaca;background:#fff7f7"><div><b>${safe(d.familyName||d.beneficiaryName||'عائلة غير محددة')} — ${safe(d.type||'نوع غير محدد')}</b><small>مرفوض لمنع التكرار · ${reason}${x.duplicateReference?' · المرجع السابق: '+safe(x.duplicateReference):''}</small></div><button type="button" class="pagebtn" onclick="dismissRejectedDistribution('${safe(x.id)}')">إقرار المراجعة</button></div>`}).join('');
+  body.innerHTML=pendingHtml+rejectedHtml;
 }
 window.toggleDistPendingCenter=function(){const box=document.getElementById('distPendingPanel');if(!box)return;box.hidden=!box.hidden;if(!box.hidden)distRenderPendingCenter()};
 window.retryDistPendingSync=async function(){if(!navigator.onLine){toast('لا يوجد اتصال بالإنترنت. العمليات محفوظة على هذا الجهاز وستُرفع عند عودة الاتصال.');distRenderPendingCenter();return}try{distSavePending(distBuildChanges());await distSync();distRenderPendingCenter();const n=distLoadPending().length;toast(n?'بقيت '+n+' عملية بانتظار تأكيد الخادم':'تمت مزامنة عمليات التوزيع المعلّقة')}catch(e){distRenderPendingCenter();toast('تعذرت المزامنة؛ بقيت العمليات محفوظة محلياً')}};
@@ -1596,7 +1602,18 @@ async function distSync(){
           try{
             const r=await syncFetch('/sync/push',{method:'POST',body:JSON.stringify({deviceId:syncDeviceId(),changes:batch,scope:'distributions'})});
             const accepted=new Set([...(r.accepted||[]).map(x=>typeof x==='string'?x:x.opId)]);
-            for(const c of batch)if(!accepted.has(c.opId))remaining.push(c);
+            const conflictByOp=new Map((r.conflicts||[]).map(x=>[String(x.opId||''),x]));
+            let rejectedNow=0;const rejectedArchive=distLoadRejected();
+            for(const c of batch){
+              if(accepted.has(c.opId))continue;
+              const conflict=conflictByOp.get(String(c.opId||''));
+              if(c.operation==='upsert'&&String(c.recordId||'').startsWith('dist:')&&conflict&&/تكرار نوع المساعدة|مسجل مسبقاً/.test(String(conflict.reason||''))){
+                const prior=distributions.find(x=>x.id===c.recordId)||c.data||{};
+                rejectedArchive.push({id:c.recordId,opId:c.opId,data:structuredClone(prior),reason:String(conflict.reason||'تكرار نوع المساعدة'),duplicateRecordId:String(conflict.duplicateRecordId||''),duplicateReference:String(conflict.duplicateReference||''),rejectedAt:Date.now()});
+                distributions=distributions.filter(x=>x.id!==c.recordId);rejectedNow++;
+              }else remaining.push(c);
+            }
+            if(rejectedNow){distSaveRejected(rejectedArchive);distSave();toast('رفض الخادم '+rejectedNow+' عملية لمنع تكرار المساعدة لعائلة؛ راجع مركز العمليات.');}
             // Only acknowledge operations the server explicitly accepted.
             for(const c of batch){if(!accepted.has(c.opId))continue;const i=distShadow.findIndex(x=>x.id===c.recordId);if(c.operation==='delete'){if(i>=0)distShadow.splice(i,1)}else if(c.data){if(i>=0)distShadow[i]=structuredClone(c.data);else distShadow.push(structuredClone(c.data))}}
           }catch(e){remaining.push(...batch,...pending.slice(i+batch.length));break}
@@ -1631,7 +1648,7 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "66.0"
+const APP_RELEASE_VERSION = "67.0"
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
@@ -3185,7 +3202,7 @@ document.addEventListener("DOMContentLoaded",()=>{
 })();
 
 
-/* V66 — Campaign integrity hardening.
+/* V67 — Campaign integrity hardening.
    Distribution-only patch: safer family matching when legacy rows lack an ID,
    duplicate guard at the final save boundary, and protection against double taps. */
 (function(){
@@ -3251,3 +3268,6 @@ document.addEventListener("DOMContentLoaded",()=>{
    try{return originalBulk.apply(this,arguments)}finally{bulkBusy=false;if(button){button.disabled=false;button.textContent=oldText||'حفظ التوزيعات المحددة';}}
  };
 })();
+
+
+/* V67 — server duplicate conflicts are archived in the distribution operations center. */
