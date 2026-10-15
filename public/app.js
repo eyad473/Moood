@@ -295,24 +295,6 @@ function renderFamiliesFast(){
  renderFamiliesCore(); __familyCache={key,html:document.getElementById("familyList").innerHTML};
 }
 
-function originalGovernorateKey(value){return String(value??"").normalize("NFKC").trim().replace(/[\u064B-\u065F\u0670\u0640]/g,"").replace(/[أإآٱ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/\s+/g," ").toLowerCase()}
-function renderOriginalGovernorateChart(families){
- const el=document.getElementById("originalGovernorateChart");if(!el)return;
- const groups=new Map();let total=0,missing=0;
- families.forEach((rows)=>{
-  const ordered=[...(rows||[])].sort((a,b)=>Number(originalGovernorateKey(b["صلة القرابة"])==="رب الاسره")-Number(originalGovernorateKey(a["صلة القرابة"])==="رب الاسره"));
-  let value="";for(const r of ordered){const candidate=String(r?.["المحافظة الأصلية"]??"").trim();if(candidate){value=candidate;break}}
-  const label=value||"غير محددة",key=originalGovernorateKey(label)||"غير محددة";if(!value)missing++;
-  if(!groups.has(key))groups.set(key,{label,count:0});groups.get(key).count++;total++;
- });
- const items=[...groups.values()].sort((a,b)=>b.count-a.count||a.label.localeCompare(b.label,'ar'));
- const palette=["#2563eb","#7c3aed","#0891b2","#059669","#d97706","#db2777","#64748b","#0f766e"];
- el.innerHTML=`<div class="housing-chart-summary"><b>${total.toLocaleString('ar-EG')}</b><span>عائلة إجمالاً</span><span class="gov-chart-badge">حسب المحافظة الأصلية</span></div>`+(items.length?`<div class="housing-chart-list">${items.map((item,i)=>{const pct=total?item.count/total*100:0;return `<div class="housing-chart-item" tabindex="0" role="button" title="${svgEsc(item.label)}: ${item.count} عائلة (${pct.toLocaleString('ar-EG',{maximumFractionDigits:1})}%)"><div class="housing-chart-label"><span class="housing-chart-name"><i style="background:${palette[i%palette.length]}"></i>${svgEsc(item.label)}</span><strong>${item.count.toLocaleString('ar-EG')} <small>عائلة</small></strong></div><div class="housing-chart-track"><div class="housing-chart-fill gov-chart-fill" style="width:${Math.max(item.count?1:0,pct)}%;background:${palette[i%palette.length]}"></div></div><div class="housing-chart-percent">${pct.toLocaleString('ar-EG',{maximumFractionDigits:1})}% من العائلات</div></div>`}).join('')}</div>`:`<div class="empty">لا توجد بيانات عائلات لعرضها</div>`)+`<p class="housing-chart-note">يُحتسب كل رب أسرة مرة واحدة اعتماداً حصرياً على حقل «المحافظة الأصلية». العائلات التي لا تحتوي على قيمة مسجلة تظهر ضمن «غير محددة» (${missing.toLocaleString('ar-EG')}). يتحدّث الرسم تلقائياً مع بيانات التطبيق.</p>`;
-}
-function bindDashboardChartTouch(){document.querySelectorAll('.housing-chart-item,.health-item').forEach(item=>{if(item.dataset.chartTouchBound)return;item.dataset.chartTouchBound='1';const activate=()=>{const group=item.parentElement;group?.querySelectorAll(':scope > .housing-chart-item.is-chart-active,:scope > .health-item.is-chart-active').forEach(x=>{if(x!==item)x.classList.remove('is-chart-active')});item.classList.toggle('is-chart-active');const label=item.getAttribute('title')||item.querySelector('.housing-chart-label,.health-top')?.textContent?.trim();if(label){let tip=item.querySelector('.chart-touch-detail');if(!tip){tip=document.createElement('div');tip.className='chart-touch-detail';tip.setAttribute('aria-live','polite');item.appendChild(tip)}tip.textContent=label;tip.hidden=!item.classList.contains('is-chart-active')}};item.addEventListener('click',activate);item.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();activate()}})})}
-function showBuildVersionNotice(){const version='V70.5';try{const key='abuOreibanLastShownBuild',previous=localStorage.getItem(key);if(previous!==version){localStorage.setItem(key,version);setTimeout(()=>{if(typeof toast==='function')toast('تم التحديث — إصدار '+version);else console.info('تم التحديث — إصدار '+version)},700)}}catch(e){setTimeout(()=>{if(typeof toast==='function')toast('تم التحديث — إصدار '+version)},700)}}
-document.addEventListener('DOMContentLoaded',()=>{bindDashboardChartTouch();showBuildVersionNotice()});
-
 function renderDashboard(){
  const fm=familyMap(), inside=new Set(), complete=new Set();
  fm.forEach((rows,h)=>{const r=rows[0]||{};if(r["داخل/خارج المخيم"]==="داخل المخيم")inside.add(h);if(r["حالة اكتمال بيانات الأسرة"]==="مكتملة")complete.add(h)});
@@ -322,19 +304,25 @@ function renderDashboard(){
  document.getElementById("sComplete").textContent=fm.size?Math.round(complete.size/fm.size*100)+"%":"0%";
  chart("genderChart",[["ذكر",data.filter(x=>x["الجنس"]==="ذكر").length],["أنثى",data.filter(x=>["انثى","أنثى"].includes(x["الجنس"])).length]]);
  chart("healthChart",[["مزمن",data.filter(x=>x["مرض مزمن؟"]==="نعم").length],["إصابة",data.filter(x=>(x["إصابة؟"]||x["إصابة?"])==="نعم").length],["إعاقة",data.filter(x=>x["إعاقة؟"]==="نعم").length],["يتيم",data.filter(x=>x["يتيم/منفصل عن ذويه؟"]==="نعم").length]]);
- renderOriginalGovernorateChart(fm);bindDashboardChartTouch();
  const recent=data.slice(-6).reverse();
  document.getElementById("recent").innerHTML=recent.map(r=>`<div class="member"><span><b>${esc(r["اسم الفرد"]||"")}</b> — ${esc(r["اسم رب الأسرة"]||"")} — ${esc(r["صلة القرابة"]||"")}</span><span class="muted">${esc(r["رقم الجوال"]||"")}</span></div>`).join("")||'<div class="empty">لا توجد بيانات</div>';
 }
 function svgEsc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
-function renderGenderChart(arr){const el=document.getElementById("genderChart");if(!el)return;const total=Math.max(arr.reduce((a,x)=>a+x[1],0),1),a=arr[0][1],b=arr[1][1],p=a/total,deg=p*360;el.innerHTML=`<svg viewBox="0 0 520 225" role="img" aria-label="توزيع حسب الجنس"><defs><linearGradient id="gMale" x1="0" x2="1"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#60a5fa"/></linearGradient><linearGradient id="gFemale" x1="0" x2="1"><stop offset="0" stop-color="#7c3aed"/><stop offset="1" stop-color="#c084fc"/></linearGradient></defs><g transform="translate(110 112)"><circle r="72" fill="none" stroke="#eef2f7" stroke-width="26"/><path d="${donutArc(72,26,0,deg)}" fill="url(#gMale)"/><path d="${donutArc(72,26,deg,360)}" fill="url(#gFemale)"/></g><text x="110" y="105" text-anchor="middle" class="chart-label" font-size="24" font-weight="800" fill="#172033">${total.toLocaleString('ar-EG')}</text><text x="110" y="124" text-anchor="middle" class="chart-label" font-size="10" fill="#64748b">إجمالي الأفراد</text><g transform="translate(250 62)"><circle cx="0" cy="0" r="6" fill="#2563eb"/><text x="14" y="4" class="chart-label" font-size="12" fill="#334155">ذكر</text><text x="135" y="4" class="chart-label" font-size="13" font-weight="800" fill="#172033">${a.toLocaleString('ar-EG')}</text><circle cx="0" cy="48" r="6" fill="#7c3aed"/><text x="14" y="52" class="chart-label" font-size="12" fill="#334155">أنثى</text><text x="135" y="52" class="chart-label" font-size="13" font-weight="800" fill="#172033">${b.toLocaleString('ar-EG')}</text><text x="0" y="92" class="chart-label" font-size="10" fill="#64748b">نسبة الذكور ${Math.round(p*100)}% · الإناث ${Math.round((1-p)*100)}%</text></g></svg>`}
+function bindChartHints(root){if(!root)return;let tip=root.querySelector(".chart-tooltip");if(!tip){tip=document.createElement("div");tip.className="chart-tooltip";tip.setAttribute("aria-live","polite");root.appendChild(tip)}if(root.dataset.chartHintsBound)return;root.dataset.chartHintsBound="1";const show=target=>{if(!target)return;const label=target.getAttribute("aria-label")||target.getAttribute("title");if(!label)return;tip.textContent=label;tip.classList.add("is-visible")};root.addEventListener("pointerover",e=>{const target=e.target.closest?.(".chart-segment,.chart-bar");if(target)show(target)});root.addEventListener("focusin",e=>show(e.target.closest?.(".chart-segment,.chart-bar")));root.addEventListener("click",e=>{const target=e.target.closest?.(".chart-segment,.chart-bar");if(target){show(target);e.stopPropagation()}else tip.classList.remove("is-visible")});root.addEventListener("pointerleave",e=>{if(e.pointerType==="mouse")tip.classList.remove("is-visible")});} 
+function bindDashboardChartTouch(){document.querySelectorAll(".housing-chart-item,.health-item").forEach(item=>{if(item.dataset.chartTouchBound)return;item.dataset.chartTouchBound="1";const activate=()=>{const group=item.parentElement;group?.querySelectorAll(":scope > .housing-chart-item.is-chart-active,:scope > .health-item.is-chart-active").forEach(x=>{if(x!==item)x.classList.remove("is-chart-active")});item.classList.toggle("is-chart-active");const label=item.getAttribute("title")||item.querySelector(".housing-chart-label,.health-top")?.textContent?.trim();if(label){let tip=item.querySelector(".chart-touch-detail");if(!tip){tip=document.createElement("div");tip.className="chart-touch-detail";tip.setAttribute("aria-live","polite");item.appendChild(tip)}tip.textContent=label;tip.hidden=!item.classList.contains("is-chart-active")}};item.addEventListener("click",activate);item.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();activate()}})})}
+function showBuildVersionNotice(){const version="V70.4";try{const key="abuOreibanLastShownBuild",previous=localStorage.getItem(key);if(previous!==version){localStorage.setItem(key,version);setTimeout(()=>toast("تم التحديث — إصدار "+version),700)}}catch(e){setTimeout(()=>toast("تم التحديث — إصدار "+version),700)}}
+document.addEventListener("DOMContentLoaded",()=>{bindDashboardChartTouch();showBuildVersionNotice();});
+function renderGenderChart(arr){const el=document.getElementById("genderChart");if(!el)return;const total=Math.max(arr.reduce((a,x)=>a+x[1],0),1),a=arr[0][1],b=arr[1][1],p=a/total,deg=p*360;el.innerHTML=`<svg viewBox="0 0 520 225" role="img" aria-label="توزيع حسب الجنس"><defs><linearGradient id="gMale" x1="0" x2="1"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#60a5fa"/></linearGradient><linearGradient id="gFemale" x1="0" x2="1"><stop offset="0" stop-color="#7c3aed"/><stop offset="1" stop-color="#c084fc"/></linearGradient></defs><g transform="translate(110 112)"><circle r="72" fill="none" stroke="#eef2f7" stroke-width="26"/><path class="chart-segment" tabindex="0" role="img" aria-label="ذكر: ${a} فرد، ${Math.round(p*100)} بالمئة" title="ذكر: ${a.toLocaleString('ar-EG')} فرد (${Math.round(p*100)}%)" d="${donutArc(72,26,0,deg)}" fill="url(#gMale)"/><path class="chart-segment" tabindex="0" role="img" aria-label="أنثى: ${b} فرد، ${Math.round((1-p)*100)} بالمئة" title="أنثى: ${b.toLocaleString('ar-EG')} فرد (${Math.round((1-p)*100)}%)" d="${donutArc(72,26,deg,360)}" fill="url(#gFemale)"/></g><text x="110" y="105" text-anchor="middle" class="chart-label" font-size="24" font-weight="800" fill="#172033">${total.toLocaleString('ar-EG')}</text><text x="110" y="124" text-anchor="middle" class="chart-label" font-size="10" fill="#64748b">إجمالي الأفراد</text><g transform="translate(250 62)"><circle cx="0" cy="0" r="6" fill="#2563eb"/><text x="14" y="4" class="chart-label" font-size="12" fill="#334155">ذكر</text><text x="135" y="4" class="chart-label" font-size="13" font-weight="800" fill="#172033">${a.toLocaleString('ar-EG')}</text><circle cx="0" cy="48" r="6" fill="#7c3aed"/><text x="14" y="52" class="chart-label" font-size="12" fill="#334155">أنثى</text><text x="135" y="52" class="chart-label" font-size="13" font-weight="800" fill="#172033">${b.toLocaleString('ar-EG')}</text><text x="0" y="92" class="chart-label" font-size="10" fill="#64748b">نسبة الذكور ${Math.round(p*100)}% · الإناث ${Math.round((1-p)*100)}%</text></g></svg>`;bindChartHints(el)}
 function donutArc(r,w,start,end){const c=(r*2);const rad=Math.PI/180;const x1=r*Math.cos((start-90)*rad),y1=r*Math.sin((start-90)*rad),x2=r*Math.cos((end-90)*rad),y2=r*Math.sin((end-90)*rad);const large=end-start>180?1:0;return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} L ${x2*(1-w/r)} ${y2*(1-w/r)} A ${r-w} ${r-w} 0 ${large} 0 ${x1*(1-w/r)} ${y1*(1-w/r)} Z`}
-function renderAgeChart(){const groups=[["0–5",0],["6–17",0],["18–35",0],["36–59",0],["60+",0]];data.forEach(r=>{const a=Number(ageOf(r));if(!Number.isFinite(a)||a<0)return;if(a<=5)groups[0][1]++;else if(a<=17)groups[1][1]++;else if(a<=35)groups[2][1]++;else if(a<=59)groups[3][1]++;else groups[4][1]++;});const el=document.getElementById("ageChart");if(!el)return;const max=Math.max(...groups.map(x=>x[1]),1);const bw=76,gap=18,base=190;let bars=groups.map((g,i)=>{const h=Math.max(4,g[1]/max*135),x=24+i*(bw+gap),y=base-h;return `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="10" fill="url(#ageGrad)"/><text x="${x+bw/2}" y="${y-7}" text-anchor="middle" class="chart-label" font-size="11" font-weight="800" fill="#172033">${g[1].toLocaleString('ar-EG')}</text><text x="${x+bw/2}" y="${base+20}" text-anchor="middle" class="chart-label" font-size="10" fill="#64748b">${g[0]}</text>`}).join("");el.innerHTML=`<svg viewBox="0 0 500 225"><defs><linearGradient id="ageGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#06b6d4"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs><text x="20" y="22" class="chart-label" font-size="12" font-weight="800" fill="#334155">الفئات العمرية</text><line x1="20" y1="190" x2="480" y2="190" stroke="#e5e7eb"/>${bars}</svg>`}
-function renderHealthBars(arr){const el=document.getElementById("healthChart");if(!el)return;const max=Math.max(...arr.map(x=>x[1]),1);el.innerHTML=arr.map(([k,n])=>`<div class="health-item"><div class="health-top"><span>${svgEsc(k)}</span><b>${n.toLocaleString('ar-EG')}</b></div><div class="health-track"><div class="health-fill" style="width:${Math.max(n/max*100,n?4:0)}%"></div></div></div>`).join("")}
+function renderAgeChart(){const groups=[["0–5",0],["6–17",0],["18–35",0],["36–59",0],["60+",0]];data.forEach(r=>{const a=Number(ageOf(r));if(!Number.isFinite(a)||a<0)return;if(a<=5)groups[0][1]++;else if(a<=17)groups[1][1]++;else if(a<=35)groups[2][1]++;else if(a<=59)groups[3][1]++;else groups[4][1]++;});const el=document.getElementById("ageChart");if(!el)return;const max=Math.max(...groups.map(x=>x[1]),1);const bw=76,gap=18,base=190;let bars=groups.map((g,i)=>{const h=Math.max(4,g[1]/max*135),x=24+i*(bw+gap),y=base-h;return `<rect class="chart-bar" tabindex="0" role="img" aria-label="الفئة العمرية ${g[0]}: ${g[1]} فرد" title="الفئة ${g[0]}: ${g[1].toLocaleString('ar-EG')} فرد" style="animation-delay:${i*75}ms" x="${x}" y="${y}" width="${bw}" height="${h}" rx="10" fill="url(#ageGrad)"/><text class="chart-label chart-bar-label" x="${x+bw/2}" y="${y-7}" text-anchor="middle" font-size="11" font-weight="800" fill="#172033">${g[1].toLocaleString('ar-EG')}</text><text x="${x+bw/2}" y="${base+20}" text-anchor="middle" class="chart-label" font-size="10" fill="#64748b">${g[0]}</text>`}).join("");el.innerHTML=`<svg viewBox="0 0 500 225" role="img" aria-label="توزيع الأفراد حسب الفئات العمرية"><defs><linearGradient id="ageGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#06b6d4"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs><text x="20" y="22" class="chart-label" font-size="12" font-weight="800" fill="#334155">الفئات العمرية</text><line x1="20" y1="190" x2="480" y2="190" stroke="#e5e7eb"/>${bars}</svg>`;bindChartHints(el)}
+function renderHealthBars(arr){const el=document.getElementById("healthChart");if(!el)return;const max=Math.max(...arr.map(x=>x[1]),1);el.innerHTML=arr.map(([k,n],i)=>`<div class="health-item" tabindex="0" style="--chart-i:${i}" title="${svgEsc(k)}: ${n.toLocaleString('ar-EG')} حالة"><div class="health-top"><span>${svgEsc(k)}</span><b>${n.toLocaleString('ar-EG')}</b></div><div class="health-track" role="img" aria-label="${svgEsc(k)}: ${n} حالة"><div class="health-fill" style="width:${Math.max(n/max*100,n?4:0)}%"></div></div></div>`).join("")}
 function renderFamilyStatusChart(counts,total){const el=document.getElementById("familyStatusChart");if(!el)return;const a=counts["مكتملة"]||0,b=counts["جزئية"]||0,c=counts["غير مكتملة"]||0,t=Math.max(total,1),p1=a/t*100,p2=b/t*100;el.innerHTML=`<div class="donut" style="background:conic-gradient(#16a34a 0 ${p1}%,#f59e0b ${p1}% ${p1+p2}%,#ef4444 ${p1+p2}% 100%)"><div class="donut-center"><b>${total.toLocaleString('ar-EG')}</b><span>إجمالي العائلات</span></div></div><div class="legend"><div class="legend-row"><span class="legend-name"><i class="legend-dot" style="background:#16a34a"></i>مكتملة</span><b>${a.toLocaleString('ar-EG')}</b></div><div class="legend-row"><span class="legend-name"><i class="legend-dot" style="background:#f59e0b"></i>جزئية</span><b>${b.toLocaleString('ar-EG')}</b></div><div class="legend-row"><span class="legend-name"><i class="legend-dot" style="background:#ef4444"></i>غير مكتملة</span><b>${c.toLocaleString('ar-EG')}</b></div></div>`}
 function chart(id,arr){
- const max=Math.max(...arr.map(x=>x[1]),1);
- document.getElementById(id).innerHTML='<div class="bars">'+arr.map(([k,n])=>`<div class="bar" style="height:${Math.max(4,n/max*145)}px"><span>${esc(k)} (${n})</span></div>`).join("")+'</div>';
+ const el=document.getElementById(id); if(!el)return;
+ const max=Math.max(...arr.map(x=>Number(x[1])||0),1);
+ const palette=[['#60a5fa','#2563eb'],['#c4b5fd','#7c3aed'],['#5eead4','#0d9488'],['#fcd34d','#d97706']];
+ el.innerHTML='<div class="bars">'+arr.map(([k,n],i)=>{const value=Number(n)||0, pct=Math.round(value/Math.max(arr.reduce((t,x)=>t+(Number(x[1])||0),0),1)*100),colors=palette[i%palette.length];return `<div class="bar chart-bar" tabindex="0" role="img" aria-label="${esc(k)}: ${value.toLocaleString('ar-EG')} (${pct} بالمئة)" title="${esc(k)}: ${value.toLocaleString('ar-EG')} — ${pct}%" style="height:${Math.max(4,value/max*145)}px;--bar-delay:${i*90}ms;--bar-start:${colors[0]};--bar-end:${colors[1]}"><span>${esc(k)} (${value.toLocaleString('ar-EG')})</span><i class="bar-glint" aria-hidden="true"></i></div>`}).join("")+'</div>';
+ bindChartHints(el);
 }
 function exportExcel(){
  const rows=filtered.length?filtered:data;
@@ -1286,9 +1274,42 @@ function renderDashboard(){
     ["أرامل",data.filter(x=>isWidowStatus(x["الحالة الاجتماعية"])).length],
     ["مطلقات",data.filter(x=>isDivorceStatus(x["الحالة الاجتماعية"])).length]
   ];
-  renderGenderChart(gender); renderAgeChart(); renderHealthBars(health); renderFamilyStatusChart(counts,fm.size);
+  renderGenderChart(gender); renderAgeChart(); renderHealthBars(health); renderFamilyStatusChart(counts,fm.size); renderHousingChart(fm); renderOriginalGovernorateChart(fm); bindDashboardChartTouch();
   const recent=data.slice(-6).reverse();
   document.getElementById("recent").innerHTML=recent.map(r=>`<div class="member"><span><b>${esc(r["اسم الفرد"]||"")}</b> — ${esc(r["اسم رب الأسرة"]||"")} — ${esc(r["صلة القرابة"]||"")}</span><span>${statusBadge(familyStatus(familyMap().get(r["اسم رب الأسرة"])||[]).status)}</span></div>`).join("")||'<div class="empty">لا توجد بيانات</div>';
+}
+
+function housingTypeKey(value){return String(value??"").normalize("NFKC").trim().replace(/[\u064B-\u065F\u0670\u0640]/g,"").replace(/[أإآٱ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/\s+/g," ").toLowerCase()}
+function renderHousingChart(families){
+ const el=document.getElementById("housingTypeChart");if(!el)return;
+ const groups=new Map();let total=0;
+ families.forEach((rows,head)=>{
+  const ordered=[...(rows||[])].sort((a,b)=>Number(housingTypeKey(b["صلة القرابة"])==="رب الاسره")-Number(housingTypeKey(a["صلة القرابة"])==="رب الاسره"));
+  let value="";
+  for(const r of ordered){const candidate=String(r?.["نوع السكن الحالي"]??"").trim();if(candidate){value=candidate;break}}
+  const label=value||"غير محدد";const key=housingTypeKey(label)||"غير محدد";
+  if(!groups.has(key))groups.set(key,{label,count:0});groups.get(key).count++;total++;
+ });
+ const items=[...groups.values()].sort((a,b)=>b.count-a.count||a.label.localeCompare(b.label,"ar"));
+ const max=Math.max(1,...items.map(x=>x.count));
+ const palette=["#2563eb","#0d9488","#7c3aed","#d97706","#db2777","#0891b2","#65a30d","#64748b"];
+ el.innerHTML=`<div class="housing-chart-summary"><b>${total.toLocaleString('ar-EG')}</b><span>إجمالي العائلات المصنفة حسب نوع السكن</span></div>`+(items.length?`<div class="housing-chart-list">${items.map((item,i)=>{const pct=total?item.count/total*100:0;return `<div class="housing-chart-item" tabindex="0" style="--chart-i:${i}" title="${svgEsc(item.label)}: ${item.count.toLocaleString('ar-EG')} عائلة (${pct.toFixed(1)}%)"><div class="housing-chart-label"><span class="housing-chart-name"><i style="background:${palette[i%palette.length]}"></i>${svgEsc(item.label)}</span><strong>${item.count.toLocaleString('ar-EG')} <small>عائلة</small></strong></div><div class="housing-chart-track"><div class="housing-chart-fill" style="width:${Math.max(item.count?1:0,pct)}%;background:${palette[i%palette.length]}"></div></div><div class="housing-chart-percent">${pct.toLocaleString('ar-EG',{maximumFractionDigits:1})}% من العائلات</div></div>`}).join("")}</div>`:`<div class="empty">لا توجد بيانات عائلات لعرضها</div>`)+`<p class="housing-chart-note">الإحصاء يحتسب كل رب أسرة مرة واحدة، ويُحدّث تلقائياً عند إضافة أو تعديل بيانات «نوع السكن الحالي». العائلات التي لا تحتوي على نوع سكن تظهر ضمن «غير محدد».</p>`;
+}
+
+function originalGovernorateKey(value){return String(value??"").normalize("NFKC").trim().replace(/[\u064B-\u065F\u0670\u0640]/g,"").replace(/[أإآٱ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/\s+/g," ").toLowerCase()}
+function renderOriginalGovernorateChart(families){
+ const el=document.getElementById("originalGovernorateChart");if(!el)return;
+ const groups=new Map();let total=0,missing=0;
+ families.forEach((rows)=>{
+  const ordered=[...(rows||[])].sort((a,b)=>Number(originalGovernorateKey(b["صلة القرابة"])==="رب الاسره")-Number(originalGovernorateKey(a["صلة القرابة"])==="رب الاسره"));
+  let value="";for(const r of ordered){const candidate=String(r?.["المحافظة الأصلية"]??"").trim();if(candidate){value=candidate;break}}
+  const label=value||"غير محددة";const key=originalGovernorateKey(label)||"غير محددة";
+  if(!value)missing++;if(!groups.has(key))groups.set(key,{label,count:0});groups.get(key).count++;total++;
+ });
+ const items=[...groups.values()].sort((a,b)=>b.count-a.count||a.label.localeCompare(b.label,"ar"));
+ const palette=["#2563eb","#0d9488","#7c3aed","#d97706","#db2777","#0891b2","#65a30d","#64748b","#be123c","#4f46e5"];
+ el.innerHTML=`<div class="housing-chart-summary"><b>${total.toLocaleString('ar-EG')}</b><span>إجمالي العائلات التي جرى احتسابها مرة واحدة</span></div>`+(items.length?`<div class="housing-chart-list">${items.map((item,i)=>{const pct=total?item.count/total*100:0;const color=palette[i%palette.length];return `<div class="housing-chart-item" tabindex="0" role="button" aria-label="${svgEsc(item.label)}: ${item.count.toLocaleString('ar-EG')} عائلة، ${pct.toFixed(1)} بالمئة" style="--chart-i:${i}" title="${svgEsc(item.label)}: ${item.count.toLocaleString('ar-EG')} عائلة (${pct.toFixed(1)}%)"><div class="housing-chart-label"><span class="housing-chart-name"><i style="background:${color}"></i>${svgEsc(item.label)}</span><strong>${item.count.toLocaleString('ar-EG')} <small>عائلة</small></strong></div><div class="housing-chart-track" role="img" aria-label="${svgEsc(item.label)} ${item.count} عائلة"><div class="housing-chart-fill" style="width:${Math.max(item.count?1:0,pct)}%;background:${color}"></div></div><div class="housing-chart-percent">${pct.toLocaleString('ar-EG',{maximumFractionDigits:1})}% من العائلات</div></div>`}).join('')}</div>`:`<div class="empty">لا توجد بيانات عائلات لعرضها</div>`)+`<p class="housing-chart-note">هذا الرسم يعتمد حصرياً على حقل «المحافظة الأصلية» المسجل في بيانات الأسرة، ويحتسب كل عائلة مرة واحدة. القيم الفارغة تظهر ضمن «غير محددة»، ويُحدّث الرسم تلقائياً عند تعديل البيانات.</p>`;
+ bindDashboardChartTouch();
 }
 
 function conditionFieldOptions(){
@@ -1650,7 +1671,7 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "70.5"
+const APP_RELEASE_VERSION = "68.0"
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
@@ -3269,4 +3290,375 @@ document.addEventListener("DOMContentLoaded",()=>{
    if(button){button.disabled=true;button.textContent='جارٍ التحقق والحفظ…';}
    try{return originalBulk.apply(this,arguments)}finally{bulkBusy=false;if(button){button.disabled=false;button.textContent=oldText||'حفظ التوزيعات المحددة';}}
  };
+})();
+
+/* V67 — Campaign integrity hardening.
+   Distribution-only patch: safer family matching when legacy rows lack an ID,
+   duplicate guard at the final save boundary, and protection against double taps. */
+(function(){
+ 'use strict';
+ const norm=v=>String(v??'').normalize('NFKC').normalize('NFD')
+   .replace(/[\u0300-\u036f]/g,'').replace(/[ًٌٍَُِّْـٰ]/g,'')
+   .replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+   .replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+   .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+   .replace(/[ـ\u200e\u200f\u202a-\u202e]/g,'')
+   .replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim().toLowerCase();
+ const idNorm=v=>String(v??'').normalize('NFKC')
+   .replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+   .replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+   .replace(/[^\p{L}\p{N}]/gu,'').toLowerCase();
+ const cancelled=r=>['ملغي','ملغى','ملغاه','الغاء','canceled','cancelled'].includes(norm(r?.workflowStatus||r?.statusLabel||''));
+ function familyBits(record){
+   const r={...(record||{})};
+   let fid=idNorm(r.familyId), name=norm(r.familyName||(r.beneficiaryType==='عائلة'?r.beneficiaryName:''));
+   if(!fid || !name){
+     const pid=idNorm(r.personId), beneficiary=norm(r.beneficiaryName);
+     const rows=Array.isArray(data)?data:[]; let row=null;
+     if(name&&pid)row=rows.find(x=>norm(x['اسم رب الأسرة'])===name&&idNorm(x['رقم هوية الفرد'])===pid);
+     if(!row&&fid)row=rows.find(x=>idNorm(x['رقم هوية الأسرة'])===fid);
+     if(!row&&name)row=rows.find(x=>norm(x['اسم رب الأسرة'])===name);
+     if(!row&&pid)row=rows.find(x=>idNorm(x['رقم هوية الفرد'])===pid);
+     if(!row&&r.beneficiaryType==='عائلة'&&beneficiary)row=rows.find(x=>norm(x['اسم رب الأسرة'])===beneficiary);
+     if(row){fid=fid||idNorm(row['رقم هوية الأسرة']);name=name||norm(row['اسم رب الأسرة']);}
+   }
+   return {fid,name};
+ }
+ function sameFamily(a,b){
+   const x=familyBits(a),y=familyBits(b);
+   if(x.fid&&y.fid)return x.fid===y.fid;
+   return !!x.name&&!!y.name&&x.name===y.name;
+ }
+ function findCampaignDuplicate(candidate,excludeId=''){
+   const type=norm(candidate?.type); if(!type)return null;
+   const f=familyBits(candidate); if(!f.fid&&!f.name)return null;
+   return (Array.isArray(distributions)?distributions:[]).find(d=>d.id!==excludeId&&!cancelled(d)&&norm(d.type)===type&&sameFamily(candidate,d))||null;
+ }
+ window.distCampaignFindDuplicate=findCampaignDuplicate;
+ // Final-boundary check also protects the single-registration form, including legacy rows.
+ const originalSave=window.saveDistribution;
+ let singleBusy=false;
+ if(typeof originalSave==='function')window.saveDistribution=function(){
+   if(singleBusy)return;
+   const button=document.querySelector('#distModal .modalfoot button.primary');
+   const id=document.getElementById('distId')?.value||'';
+   const candidate={id,beneficiaryType:document.getElementById('distBeneficiaryForm')?.value||'',beneficiaryName:document.getElementById('distName')?.value||'',personId:document.getElementById('distPersonId')?.value||'',familyId:document.getElementById('distFamilyId')?.value||'',familyName:document.getElementById('distFamilyName')?.value||'',type:document.getElementById('distTypeForm')?.value||''};
+   const dup=findCampaignDuplicate(candidate,id);
+   if(dup){const type=String(candidate.type||'').trim();toast('تم إيقاف العملية لمنع تكرار «'+type+'» لهذه العائلة. المرجع السابق: '+(dup.reference||'غير مسجل'));return;}
+   singleBusy=true;const oldText=button?.textContent;if(button){button.disabled=true;button.textContent='جارٍ حفظ التسليم…';}
+   try{return originalSave.apply(this,arguments)}finally{singleBusy=false;if(button){button.disabled=false;button.textContent=oldText||'تسجيل واعتماد وتسليم';}}
+ };
+ // Prevent repeated taps from submitting a bulk campaign twice.
+ const originalBulk=window.saveBulkRegisterDistribution;
+ let bulkBusy=false;
+ if(typeof originalBulk==='function')window.saveBulkRegisterDistribution=function(){
+   if(bulkBusy)return;
+   bulkBusy=true;const button=document.querySelector('#distBulkRegisterModal .modalfoot button.primary');const oldText=button?.textContent;
+   if(button){button.disabled=true;button.textContent='جارٍ التحقق والحفظ…';}
+   try{return originalBulk.apply(this,arguments)}finally{bulkBusy=false;if(button){button.disabled=false;button.textContent=oldText||'حفظ التوزيعات المحددة';}}
+ };
+})();
+
+
+/* V67 — server duplicate conflicts are archived in the distribution operations center. */
+
+
+/* V69 — Interactive campaign analytics + awaited submit locks.
+   Scope: current distribution campaign only. No family records, storage keys, sync endpoints,
+   D1 schema, or repository layout are changed. */
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const safe = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const normalize = v => String(v ?? '').normalize('NFKC').normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'').replace(/[ًٌٍَُِّْـٰ]/g,'')
+    .replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+    .replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+    .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+    .replace(/[ـ\u200e\u200f\u202a-\u202e]/g,'')
+    .replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim().toLowerCase();
+  const idNorm = v => String(v ?? '').normalize('NFKC')
+    .replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+    .replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+    .replace(/[^\p{L}\p{N}]/gu,'').toLowerCase();
+  const cancelled = d => ['ملغي','ملغى','ملغاه','الغاء','canceled','cancelled'].includes(normalize(d?.workflowStatus || d?.statusLabel || ''));
+  function familyList(){
+    const rows = Array.isArray(data) ? data : [];
+    const groups = new Map();
+    for(const r of rows){
+      const id = idNorm(r?.['رقم هوية الأسرة']);
+      const name = normalize(r?.['اسم رب الأسرة']);
+      const key = id ? 'id:'+id : name ? 'name:'+name : '';
+      if(!key) continue;
+      if(!groups.has(key)) groups.set(key,{key,id,name:String(r?.['اسم رب الأسرة']||'').trim(),rows:[]});
+      groups.get(key).rows.push(r);
+    }
+    return [...groups.values()].filter(f=>f.name);
+  }
+  function distributionFamilyKey(d){
+    const id=idNorm(d?.familyId);
+    if(id) return 'id:'+id;
+    const name=normalize(d?.familyName || (d?.beneficiaryType==='عائلة'?d?.beneficiaryName:''));
+    return name?'name:'+name:'';
+  }
+  function renderAnalytics(){
+    const host=$('distCampaignAidChart'),kpi=$('distCampaignAnalyticsKpis');
+    if(!host||!kpi)return;
+    const families=familyList();
+    const records=(Array.isArray(distributions)?distributions:[]).filter(d=>!cancelled(d));
+    const types=new Set();
+    $('distCampaignAidType')?.querySelectorAll('option')?.forEach(o=>{if(o.value.trim())types.add(o.value.trim())});
+    records.forEach(d=>{if(String(d.type||'').trim())types.add(String(d.type).trim())});
+    const aidTypes=[...types].sort((a,b)=>a.localeCompare(b,'ar'));
+    const famKeys=new Set(families.map(f=>f.key));
+    const familyRecordKeys=new Map();
+    for(const d of records){
+      const type=String(d.type||'').trim();
+      const did=idNorm(d?.familyId);
+      const dname=normalize(d?.familyName || (d?.beneficiaryType==='عائلة'?d?.beneficiaryName:''));
+      if(!type||(!did&&!dname))continue;
+      const matched=families.find(f=>(did&&f.id&&idNorm(f.id)===did)||((!did||!f.id)&&dname&&normalize(f.name)===dname));
+      if(!matched)continue; // Ignore legacy distribution rows that cannot be matched to a registered family.
+      if(!familyRecordKeys.has(type))familyRecordKeys.set(type,new Set());
+      familyRecordKeys.get(type).add(matched.key);
+    }
+    const metrics=aidTypes.map(type=>{
+      const receivedSet=familyRecordKeys.get(type)||new Set();
+      const got=receivedSet.size;
+      return {type,total:families.length,got,left:Math.max(0,families.length-got),pct:families.length?Math.round(got*100/families.length):0};
+    });
+    const totalTypes=metrics.length;
+    const selected=$('distCampaignAidType')?.value||'';
+    const chosen=metrics.find(x=>normalize(x.type)===normalize(selected));
+    const totalReceipts=records.length;
+    const totalCoveredTypes=metrics.reduce((n,x)=>n+x.got,0);
+    const eligibleSlots=metrics.reduce((n,x)=>n+x.total,0);
+    const overallPct=eligibleSlots?Math.round(totalCoveredTypes*100/eligibleSlots):0;
+    const current=chosen?chosen.pct:overallPct;
+    const kpisData=[
+      {label:selected?'تغطية النوع المحدد':'تغطية الحملة',value:current+'%',note:selected?`${chosen.got} من ${chosen.total} عائلة`: `${totalCoveredTypes.toLocaleString('ar')} استفادة عائلية عبر الأنواع`},
+      {label:'أنواع المساعدة',value:totalTypes.toLocaleString('ar'),note:'أنواع متاحة أو مسجلة في الحملة'},
+      {label:'سجلات التسليم',value:totalReceipts.toLocaleString('ar'),note:'السجلات غير الملغاة حالياً'}
+    ];
+    kpi.innerHTML=kpisData.map((x,i)=>`<div class="dist-campaign-kpi"><span>${safe(x.label)}</span><strong data-count-index="${i}">${safe(x.value)}</strong><small>${safe(x.note)}</small></div>`).join('');
+    if(!families.length){
+      host.innerHTML='<div class="dist-empty">لا توجد عائلات مسجلة لاحتساب التغطية.</div>';
+    }else if(!metrics.length){
+      host.innerHTML='<div class="dist-empty">لا توجد أنواع مساعدة بعد. أضف نوعاً من فحص الاستحقاق أو سجّل أول توزيع.</div>';
+    }else{
+      host.innerHTML=metrics.map(m=>{
+        const pressed=normalize(m.type)===normalize(selected);
+        const gotWidth=m.total?Math.min(100,m.got/m.total*100):0;
+        return `<button type="button" class="dist-campaign-aid-row" data-campaign-aid="${safe(m.type)}" aria-pressed="${pressed}" aria-label="اختيار ${safe(m.type)}: استفادت ${m.got} عائلة من أصل ${m.total}">
+          <span class="dist-campaign-aid-name">${safe(m.type)}<small>${m.got.toLocaleString('ar')} مستفيدة · ${m.left.toLocaleString('ar')} متبقية</small></span>
+          <span class="dist-campaign-track" aria-hidden="true"><span class="dist-campaign-got" style="width:${gotWidth}%"></span><span class="dist-campaign-left" style="width:${Math.max(0,100-gotWidth)}%"></span></span>
+          <span class="dist-campaign-aid-meta"><b>${m.pct.toLocaleString('ar')}٪</b><small>${m.got}/${m.total}</small></span>
+        </button>`;
+      }).join('')+'<div class="dist-campaign-legend"><span><i class="got"></i> استفادت من النوع</span><span><i class="left"></i> لم تستفد بعد</span></div>';
+      host.querySelectorAll('[data-campaign-aid]').forEach(btn=>btn.addEventListener('click',()=>{
+        const type=$('distCampaignAidType');
+        if(!type)return;
+        type.value=btn.dataset.campaignAid||'';
+        type.dispatchEvent(new Event('change',{bubbles:true}));
+        renderAnalytics();
+        $('distCampaignQuickCheck')?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'nearest'});
+      }));
+    }
+    const updated=$('distCampaignAnalyticsUpdated');
+    if(updated)updated.textContent='آخر احتساب: '+new Date().toLocaleTimeString('ar',{hour:'2-digit',minute:'2-digit'});
+  }
+  let renderQueued=false;
+  function queueRender(){
+    if(renderQueued)return;renderQueued=true;
+    requestAnimationFrame(()=>{renderQueued=false;try{renderAnalytics()}catch(e){console.warn('V69 campaign analytics',e)}});
+  }
+  const oldRender=window.renderDistributions;
+  if(typeof oldRender==='function')window.renderDistributions=function(){
+    const result=oldRender.apply(this,arguments);queueRender();return result;
+  };
+  const oldCoverage=window.renderDistributionCoverage;
+  if(typeof oldCoverage==='function')window.renderDistributionCoverage=function(){
+    const result=oldCoverage.apply(this,arguments);queueRender();return result;
+  };
+  document.addEventListener('change',e=>{
+    if(e.target?.id==='distCampaignAidType')queueRender();
+  });
+  window.addEventListener('online',queueRender);
+  window.addEventListener('offline',queueRender);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',queueRender,{once:true});else queueRender();
+
+  // Fix double-submit protection to stay locked until asynchronous save finishes.
+  const originalSave=window.saveDistribution;
+  let singleBusy=false;
+  if(typeof originalSave==='function')window.saveDistribution=async function(){
+    if(singleBusy)return;
+    const button=document.querySelector('#distModal .modalfoot button.primary');
+    const id=$('distId')?.value||'';
+    const candidate={id,beneficiaryType:$('distBeneficiaryForm')?.value||'',beneficiaryName:$('distName')?.value||'',personId:$('distPersonId')?.value||'',familyId:$('distFamilyId')?.value||'',familyName:$('distFamilyName')?.value||'',type:$('distTypeForm')?.value||''};
+    const dup=window.distCampaignFindDuplicate?.(candidate,id);
+    if(dup){toast('تم إيقاف العملية لمنع تكرار «'+String(candidate.type||'').trim()+'» لهذه العائلة. المرجع السابق: '+(dup.reference||'غير مسجل'));return;}
+    singleBusy=true;const oldText=button?.textContent;
+    if(button){button.disabled=true;button.textContent='جارٍ التحقق والتسجيل والتسليم…';}
+    try{return await originalSave.apply(this,arguments)}
+    finally{singleBusy=false;if(button){button.disabled=false;button.textContent=oldText||'تسجيل واعتماد وتسليم';}queueRender();}
+  };
+  const originalBulk=window.saveBulkRegisterDistribution;
+  let bulkBusy=false;
+  if(typeof originalBulk==='function')window.saveBulkRegisterDistribution=async function(){
+    if(bulkBusy)return;
+    bulkBusy=true;const button=document.querySelector('#distBulkRegisterModal .modalfoot button.primary');const oldText=button?.textContent;
+    if(button){button.disabled=true;button.textContent='جارٍ التحقق والحفظ…';}
+    try{return await originalBulk.apply(this,arguments)}
+    finally{bulkBusy=false;if(button){button.disabled=false;button.textContent=oldText||'حفظ التوزيعات المحددة';}queueRender();}
+  };
+})();
+
+/* V69 — Interactive campaign analytics + awaited submit locks.
+   Scope: current distribution campaign only. No family records, storage keys, sync endpoints,
+   D1 schema, or repository layout are changed. */
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const safe = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const normalize = v => String(v ?? '').normalize('NFKC').normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'').replace(/[ًٌٍَُِّْـٰ]/g,'')
+    .replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+    .replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+    .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
+    .replace(/[ـ\u200e\u200f\u202a-\u202e]/g,'')
+    .replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim().toLowerCase();
+  const idNorm = v => String(v ?? '').normalize('NFKC')
+    .replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+    .replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+    .replace(/[^\p{L}\p{N}]/gu,'').toLowerCase();
+  const cancelled = d => ['ملغي','ملغى','ملغاه','الغاء','canceled','cancelled'].includes(normalize(d?.workflowStatus || d?.statusLabel || ''));
+  function familyList(){
+    const rows = Array.isArray(data) ? data : [];
+    const groups = new Map();
+    for(const r of rows){
+      const id = idNorm(r?.['رقم هوية الأسرة']);
+      const name = normalize(r?.['اسم رب الأسرة']);
+      const key = id ? 'id:'+id : name ? 'name:'+name : '';
+      if(!key) continue;
+      if(!groups.has(key)) groups.set(key,{key,id,name:String(r?.['اسم رب الأسرة']||'').trim(),rows:[]});
+      groups.get(key).rows.push(r);
+    }
+    return [...groups.values()].filter(f=>f.name);
+  }
+  function distributionFamilyKey(d){
+    const id=idNorm(d?.familyId);
+    if(id) return 'id:'+id;
+    const name=normalize(d?.familyName || (d?.beneficiaryType==='عائلة'?d?.beneficiaryName:''));
+    return name?'name:'+name:'';
+  }
+  function renderAnalytics(){
+    const host=$('distCampaignAidChart'),kpi=$('distCampaignAnalyticsKpis');
+    if(!host||!kpi)return;
+    const families=familyList();
+    const records=(Array.isArray(distributions)?distributions:[]).filter(d=>!cancelled(d));
+    const types=new Set();
+    $('distCampaignAidType')?.querySelectorAll('option')?.forEach(o=>{if(o.value.trim())types.add(o.value.trim())});
+    records.forEach(d=>{if(String(d.type||'').trim())types.add(String(d.type).trim())});
+    const aidTypes=[...types].sort((a,b)=>a.localeCompare(b,'ar'));
+    const famKeys=new Set(families.map(f=>f.key));
+    const familyRecordKeys=new Map();
+    for(const d of records){
+      const type=String(d.type||'').trim();
+      const did=idNorm(d?.familyId);
+      const dname=normalize(d?.familyName || (d?.beneficiaryType==='عائلة'?d?.beneficiaryName:''));
+      if(!type||(!did&&!dname))continue;
+      const matched=families.find(f=>(did&&f.id&&idNorm(f.id)===did)||((!did||!f.id)&&dname&&normalize(f.name)===dname));
+      if(!matched)continue; // Ignore legacy distribution rows that cannot be matched to a registered family.
+      if(!familyRecordKeys.has(type))familyRecordKeys.set(type,new Set());
+      familyRecordKeys.get(type).add(matched.key);
+    }
+    const metrics=aidTypes.map(type=>{
+      const receivedSet=familyRecordKeys.get(type)||new Set();
+      const got=receivedSet.size;
+      return {type,total:families.length,got,left:Math.max(0,families.length-got),pct:families.length?Math.round(got*100/families.length):0};
+    });
+    const totalTypes=metrics.length;
+    const selected=$('distCampaignAidType')?.value||'';
+    const chosen=metrics.find(x=>normalize(x.type)===normalize(selected));
+    const totalReceipts=records.length;
+    const totalCoveredTypes=metrics.reduce((n,x)=>n+x.got,0);
+    const eligibleSlots=metrics.reduce((n,x)=>n+x.total,0);
+    const overallPct=eligibleSlots?Math.round(totalCoveredTypes*100/eligibleSlots):0;
+    const current=chosen?chosen.pct:overallPct;
+    const kpisData=[
+      {label:selected?'تغطية النوع المحدد':'تغطية الحملة',value:current+'%',note:selected?`${chosen.got} من ${chosen.total} عائلة`: `${totalCoveredTypes.toLocaleString('ar')} استفادة عائلية عبر الأنواع`},
+      {label:'أنواع المساعدة',value:totalTypes.toLocaleString('ar'),note:'أنواع متاحة أو مسجلة في الحملة'},
+      {label:'سجلات التسليم',value:totalReceipts.toLocaleString('ar'),note:'السجلات غير الملغاة حالياً'}
+    ];
+    kpi.innerHTML=kpisData.map((x,i)=>`<div class="dist-campaign-kpi"><span>${safe(x.label)}</span><strong data-count-index="${i}">${safe(x.value)}</strong><small>${safe(x.note)}</small></div>`).join('');
+    if(!families.length){
+      host.innerHTML='<div class="dist-empty">لا توجد عائلات مسجلة لاحتساب التغطية.</div>';
+    }else if(!metrics.length){
+      host.innerHTML='<div class="dist-empty">لا توجد أنواع مساعدة بعد. أضف نوعاً من فحص الاستحقاق أو سجّل أول توزيع.</div>';
+    }else{
+      host.innerHTML=metrics.map(m=>{
+        const pressed=normalize(m.type)===normalize(selected);
+        const gotWidth=m.total?Math.min(100,m.got/m.total*100):0;
+        return `<button type="button" class="dist-campaign-aid-row" data-campaign-aid="${safe(m.type)}" aria-pressed="${pressed}" aria-label="اختيار ${safe(m.type)}: استفادت ${m.got} عائلة من أصل ${m.total}">
+          <span class="dist-campaign-aid-name">${safe(m.type)}<small>${m.got.toLocaleString('ar')} مستفيدة · ${m.left.toLocaleString('ar')} متبقية</small></span>
+          <span class="dist-campaign-track" aria-hidden="true"><span class="dist-campaign-got" style="width:${gotWidth}%"></span><span class="dist-campaign-left" style="width:${Math.max(0,100-gotWidth)}%"></span></span>
+          <span class="dist-campaign-aid-meta"><b>${m.pct.toLocaleString('ar')}٪</b><small>${m.got}/${m.total}</small></span>
+        </button>`;
+      }).join('')+'<div class="dist-campaign-legend"><span><i class="got"></i> استفادت من النوع</span><span><i class="left"></i> لم تستفد بعد</span></div>';
+      host.querySelectorAll('[data-campaign-aid]').forEach(btn=>btn.addEventListener('click',()=>{
+        const type=$('distCampaignAidType');
+        if(!type)return;
+        type.value=btn.dataset.campaignAid||'';
+        type.dispatchEvent(new Event('change',{bubbles:true}));
+        renderAnalytics();
+        $('distCampaignQuickCheck')?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'nearest'});
+      }));
+    }
+    const updated=$('distCampaignAnalyticsUpdated');
+    if(updated)updated.textContent='آخر احتساب: '+new Date().toLocaleTimeString('ar',{hour:'2-digit',minute:'2-digit'});
+  }
+  let renderQueued=false;
+  function queueRender(){
+    if(renderQueued)return;renderQueued=true;
+    requestAnimationFrame(()=>{renderQueued=false;try{renderAnalytics()}catch(e){console.warn('V69 campaign analytics',e)}});
+  }
+  const oldRender=window.renderDistributions;
+  if(typeof oldRender==='function')window.renderDistributions=function(){
+    const result=oldRender.apply(this,arguments);queueRender();return result;
+  };
+  const oldCoverage=window.renderDistributionCoverage;
+  if(typeof oldCoverage==='function')window.renderDistributionCoverage=function(){
+    const result=oldCoverage.apply(this,arguments);queueRender();return result;
+  };
+  document.addEventListener('change',e=>{
+    if(e.target?.id==='distCampaignAidType')queueRender();
+  });
+  window.addEventListener('online',queueRender);
+  window.addEventListener('offline',queueRender);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',queueRender,{once:true});else queueRender();
+
+  // Fix double-submit protection to stay locked until asynchronous save finishes.
+  const originalSave=window.saveDistribution;
+  let singleBusy=false;
+  if(typeof originalSave==='function')window.saveDistribution=async function(){
+    if(singleBusy)return;
+    const button=document.querySelector('#distModal .modalfoot button.primary');
+    const id=$('distId')?.value||'';
+    const candidate={id,beneficiaryType:$('distBeneficiaryForm')?.value||'',beneficiaryName:$('distName')?.value||'',personId:$('distPersonId')?.value||'',familyId:$('distFamilyId')?.value||'',familyName:$('distFamilyName')?.value||'',type:$('distTypeForm')?.value||''};
+    const dup=window.distCampaignFindDuplicate?.(candidate,id);
+    if(dup){toast('تم إيقاف العملية لمنع تكرار «'+String(candidate.type||'').trim()+'» لهذه العائلة. المرجع السابق: '+(dup.reference||'غير مسجل'));return;}
+    singleBusy=true;const oldText=button?.textContent;
+    if(button){button.disabled=true;button.textContent='جارٍ التحقق والتسجيل والتسليم…';}
+    try{return await originalSave.apply(this,arguments)}
+    finally{singleBusy=false;if(button){button.disabled=false;button.textContent=oldText||'تسجيل واعتماد وتسليم';}queueRender();}
+  };
+  const originalBulk=window.saveBulkRegisterDistribution;
+  let bulkBusy=false;
+  if(typeof originalBulk==='function')window.saveBulkRegisterDistribution=async function(){
+    if(bulkBusy)return;
+    bulkBusy=true;const button=document.querySelector('#distBulkRegisterModal .modalfoot button.primary');const oldText=button?.textContent;
+    if(button){button.disabled=true;button.textContent='جارٍ التحقق والحفظ…';}
+    try{return await originalBulk.apply(this,arguments)}
+    finally{bulkBusy=false;if(button){button.disabled=false;button.textContent=oldText||'حفظ التوزيعات المحددة';}queueRender();}
+  };
 })();
