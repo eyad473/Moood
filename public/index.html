@@ -167,13 +167,17 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
 .housing-chart-item{cursor:default}
 .housing-chart-item:hover .housing-chart-fill{filter:brightness(1.1)}
 
-/* V70.2 — moving sheen on the exact chart bars shown in the dashboard */
-.housing-chart-track,.health-track{position:relative;isolation:isolate;overflow:hidden;cursor:pointer;transition:box-shadow .22s ease,transform .22s ease}
+/* V70.3 — visible animated sheen + touch feedback on dashboard charts */
+.housing-chart-track,.health-track{position:relative;isolation:isolate;overflow:hidden;cursor:pointer;transition:box-shadow .22s ease,transform .22s ease;touch-action:manipulation}
 .housing-chart-fill,.health-fill{position:relative;overflow:hidden;min-width:0}
-.housing-chart-fill::after,.health-fill::after{content:"";position:absolute;inset:-30% auto -30% -45%;width:34%;border-radius:inherit;background:linear-gradient(105deg,transparent 0%,rgba(255,255,255,.05) 25%,rgba(255,255,255,.72) 50%,rgba(255,255,255,.12) 72%,transparent 100%);transform:skewX(-18deg);animation:chartShimmer 3.1s ease-in-out infinite;animation-delay:calc(var(--chart-i,0) * 110ms);pointer-events:none}
-.housing-chart-item:hover .housing-chart-track,.housing-chart-item:focus-within .housing-chart-track,.health-item:hover .health-track,.health-item:focus-within .health-track{box-shadow:0 0 0 3px rgba(59,130,246,.10);transform:translateY(-1px)}
-.housing-chart-item:active .housing-chart-fill,.health-item:active .health-fill{filter:brightness(1.12)}
-@keyframes chartShimmer{0%,12%{left:-45%;opacity:0}22%{opacity:.85}55%{left:115%;opacity:.65}65%,100%{left:115%;opacity:0}}
+.housing-chart-fill::after,.health-fill::after{content:"";position:absolute;top:-35%;bottom:-35%;left:-55%;width:42%;border-radius:inherit;background:linear-gradient(105deg,transparent 0%,rgba(255,255,255,.16) 28%,rgba(255,255,255,.92) 50%,rgba(255,255,255,.2) 72%,transparent 100%);transform:skewX(-18deg);animation:chartShimmer 2.6s linear infinite;animation-delay:calc(var(--chart-i,0) * 120ms);pointer-events:none;will-change:left,opacity}
+.housing-chart-item:hover .housing-chart-track,.housing-chart-item:focus-within .housing-chart-track,.housing-chart-item.is-chart-active .housing-chart-track,.health-item:hover .health-track,.health-item:focus-within .health-track,.health-item.is-chart-active .health-track{box-shadow:0 0 0 3px rgba(59,130,246,.16),0 4px 14px rgba(37,99,235,.12);transform:translateY(-1px)}
+.housing-chart-item:active .housing-chart-fill,.health-item:active .health-fill,.housing-chart-item.is-chart-active .housing-chart-fill,.health-item.is-chart-active .health-fill{filter:brightness(1.16)}
+.housing-chart-item,.health-item{cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent}
+.chart-touch-detail{margin-top:7px;padding:7px 10px;border-radius:9px;background:rgba(37,99,235,.08);color:var(--text,#172033);font-size:11px;font-weight:700;line-height:1.6;animation:chartItemIn .2s ease both}.chart-touch-detail[hidden]{display:none}
+.housing-chart-item:focus-visible,.health-item:focus-visible{outline:2px solid #60a5fa;outline-offset:5px;border-radius:10px}
+@keyframes chartShimmer{0%{left:-55%;opacity:0}12%{opacity:.95}68%{left:115%;opacity:.8}78%,100%{left:115%;opacity:0}}
+@media(prefers-reduced-motion:reduce){.housing-chart-fill::after,.health-fill::after{animation:none!important}.housing-chart-item,.health-item{transition:none!important}}
 @keyframes chartBarRise{from{transform:scaleY(.05);opacity:.45}to{transform:scaleY(1);opacity:1}}
 @keyframes chartLabelIn{to{opacity:1}}
 @keyframes chartItemIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
@@ -1013,5 +1017,5 @@ html[data-theme="dark"] body{background:#0b1120;color:#e5e7eb}html[data-theme="d
 
 
 
-<script src="./app.js?v=70.2"></script></body>
+<script src="./app.js?v=70.3"></script></body>
 </html>
