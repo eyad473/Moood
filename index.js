@@ -298,6 +298,46 @@ async function push(request, env) {
   const skipped = [];
   const statements = [];
 
+  // V67: server-side guard for the active campaign rule (one aid type per family).
+  // This is additive: it uses existing dist:* records and does not change the D1 schema.
+  const hasDistributionChanges = incoming.some(x => String(x?.recordId || '').startsWith('dist:'));
+  const campaignNorm = value => String(value ?? '').normalize('NFKC').normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').replace(/[ًٌٍَُِّْـٰ]/g, '')
+    .replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+    .replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+    .replace(/[إأآٱ]/g, 'ا').replace(/[ى]/g, 'ي').replace(/[ة]/g, 'ه')
+    .replace(/[ـ\u200e\u200f\u202a-\u202e]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  const campaignIdNorm = value => String(value ?? '').normalize('NFKC')
+    .replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+    .replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+    .replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
+  const campaignFamily = record => ({
+    id: campaignIdNorm(record?.familyId),
+    name: campaignNorm(record?.familyName || (record?.beneficiaryType === 'عائلة' ? record?.beneficiaryName : ''))
+  });
+  const campaignSameFamily = (a, b) => {
+    const x = campaignFamily(a), y = campaignFamily(b);
+    if (x.id && y.id) return x.id === y.id;
+    return !!x.name && !!y.name && x.name === y.name;
+  };
+  const campaignCancelled = record => {
+    const status = campaignNorm(record?.workflowStatus || record?.statusLabel || '');
+    return ['ملغي', 'ملغاه', 'الغاء', 'cancelled', 'canceled'].includes(status);
+  };
+  const campaignActive = new Map();
+  if (hasDistributionChanges) {
+    const stored = await env.DB.prepare(
+      "SELECT record_id, data_json FROM sync_records WHERE record_id LIKE 'dist:%' AND deleted = 0"
+    ).all();
+    for (const row of (stored.results || [])) {
+      try {
+        const value = row.data_json ? JSON.parse(row.data_json) : null;
+        if (value && !campaignCancelled(value)) campaignActive.set(String(row.record_id), value);
+      } catch { /* Ignore malformed legacy records; they remain untouched. */ }
+    }
+  }
+
   for (const item of incoming) {
     if (!validRecord(item)) {
       skipped.push({ opId: item?.opId || null, reason: "recordId/updatedAt غير صالح" });
@@ -369,6 +409,32 @@ async function push(request, env) {
       continue;
     }
 
+    // Check only campaign distribution records; family data and all other sync scopes
+    // keep their existing behavior. Exclude this record while editing it.
+    if (recordId.startsWith('dist:') && operation !== 'delete' && !campaignCancelled(data)) {
+      const candidateType = campaignNorm(data?.type);
+      const candidateFamily = campaignFamily(data);
+      if (candidateType && (candidateFamily.id || candidateFamily.name)) {
+        let duplicate = null;
+        for (const [otherId, other] of campaignActive) {
+          if (otherId === recordId || campaignCancelled(other)) continue;
+          if (campaignNorm(other?.type) === candidateType && campaignSameFamily(data, other)) {
+            duplicate = { id: otherId, reference: String(other?.reference || '') };
+            break;
+          }
+        }
+        if (duplicate) {
+          conflicts.push({
+            opId, recordId,
+            reason: 'مرفوض: نوع المساعدة مسجل مسبقاً لهذه العائلة',
+            duplicateRecordId: duplicate.id,
+            duplicateReference: duplicate.reference
+          });
+          continue;
+        }
+      }
+    }
+
     const nextVersion = current ? Number(current.version) + 1 : 1;
     const createdAt = now();
     const dataJson = operation === "delete" ? null : JSON.stringify(data);
@@ -410,6 +476,10 @@ async function push(request, env) {
     );
 
     accepted.push({ opId, recordId, version: nextVersion, updatedAt, operation });
+    if (recordId.startsWith('dist:')) {
+      if (operation === 'delete' || campaignCancelled(data)) campaignActive.delete(recordId);
+      else campaignActive.set(recordId, data);
+    }
   }
 
   if (statements.length) {
