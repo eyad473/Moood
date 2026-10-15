@@ -1,4 +1,4 @@
-const CACHE = "abu-areiban-v70-animated-charts-r2";
+const CACHE = "abu-areiban-v70-animated-charts-r3";
 const APP_SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
