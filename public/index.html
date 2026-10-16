@@ -650,6 +650,14 @@ html[data-theme="dark"] :focus-visible{outline-color:#8abaff!important}
 @media(max-width:760px){#dashboard>.grid.stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}#dashboard>.grid.stats .stat{padding:13px;border-radius:14px}#dashboard .chart-head{flex-wrap:wrap}}
 @media(max-width:380px){#dashboard>.grid.stats{gap:7px}#dashboard>.grid.stats .stat{padding:10px}#dashboard>.grid.stats .num{font-size:23px}}
 </style>
+
+<style id="offline-camp-map-styles">
+.campmap-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}.campmap-board{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#f1f5f2;position:relative}.campmap-board-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 14px;background:var(--card);border-bottom:1px solid var(--line)}.campmap-svg{display:block;width:100%;height:auto;min-height:340px;touch-action:manipulation;cursor:crosshair}.campmap-tools{display:grid;gap:12px}.campmap-panel{border:1px solid var(--line);border-radius:16px;background:var(--card);padding:14px}.campmap-panel h3{margin:0 0 10px;font-size:14px}.campmap-form{display:grid;gap:9px}.campmap-form label{font-size:12px;font-weight:800}.campmap-form input,.campmap-form select,.campmap-form textarea{width:100%;min-height:42px;border:1px solid var(--line);border-radius:10px;padding:9px 10px;background:var(--bg);color:var(--text);font:inherit;font-size:13px}.campmap-form textarea{min-height:68px;resize:vertical}.campmap-legend{display:grid;grid-template-columns:1fr 1fr;gap:8px}.campmap-legend span{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted)}.campmap-dot{width:12px;height:12px;border-radius:50%;display:inline-block;border:2px solid #fff;box-shadow:0 0 0 1px #94a3b8}.campmap-list{display:grid;gap:7px;max-height:260px;overflow:auto}.campmap-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px;border:1px solid var(--line);border-radius:11px}.campmap-item b{font-size:12px}.campmap-item small{display:block;color:var(--muted);font-size:10px;margin-top:2px}.campmap-empty{color:var(--muted);font-size:12px;line-height:1.8;padding:8px 2px}.campmap-warning{font-size:11px;line-height:1.8;color:var(--muted);margin:0}.campmap-board svg text{font-family:Cairo,Tajawal,Arial,sans-serif}.campmap-pin{cursor:pointer}.campmap-pin:focus{outline:none}.campmap-pin:focus circle{stroke:#0f172a;stroke-width:5}
+@media(max-width:850px){.campmap-layout{grid-template-columns:1fr}.campmap-tools{grid-template-columns:1fr 1fr}.campmap-tools .campmap-panel:last-child{grid-column:1/-1}.campmap-svg{min-height:260px}}
+@media(max-width:520px){.campmap-tools{grid-template-columns:1fr}.campmap-tools .campmap-panel:last-child{grid-column:auto}.campmap-board-head .actions{width:100%;display:grid;grid-template-columns:1fr 1fr}.campmap-board-head .btn{min-height:42px}.campmap-svg{min-height:230px}}
+body.dark .campmap-board{background:#172333}body.dark .campmap-board-head{background:#111c2b}body.dark .campmap-form input,body.dark .campmap-form select,body.dark .campmap-form textarea{background:#101a29;color:#e5edf7;border-color:#344256}
+</style>
+
 </head>
 <body>
 <div class="app">
@@ -670,6 +678,7 @@ html[data-theme="dark"] :focus-visible{outline-color:#8abaff!important}
 <button class="tab" data-view="familySearch">🔎 بحث العائلات</button>
 <button class="tab" data-view="families">إدارة العائلات</button>
 <button class="tab" data-view="sectors">🧭 قواطع المخيم</button>
+<button class="tab" data-view="campMap">🗺️ خريطة المخيم</button>
 <button class="tab" data-view="distributions">إدارة التوزيعات</button>
 <button class="tab" data-view="records">السجلات</button>
 <button class="tab" data-view="classified">الكشوفات المصنفة</button>
@@ -811,6 +820,33 @@ html[data-theme="dark"] :focus-visible{outline-color:#8abaff!important}
       </div>
     </div>
   </div>
+</section>
+<section class="view" id="campMap">
+ <div class="section-head"><div><h2>خريطة مخيم أبو عريبان</h2><p class="muted">مخطط ميداني محلي قابل للتعديل، وتُحفظ العلامات على هذا الجهاز دون تغيير بيانات العائلات أو التوزيعات.</p></div></div>
+ <div class="campmap-layout">
+  <div class="campmap-board">
+   <div class="campmap-board-head"><div><b>المخطط الداخلي</b><div class="muted" style="font-size:11px">اضغط على المخطط لإضافة الموقع المحدد من لوحة الأدوات</div></div><div class="actions"><button class="btn" type="button" onclick="exportOfflineCampMap()">تصدير نسخة احتياطية</button><button class="btn" type="button" onclick="document.getElementById('campMapImportFile').click()">استيراد نسخة</button><input id="campMapImportFile" type="file" accept="application/json,.json" hidden onchange="importOfflineCampMap(event)"></div></div>
+   <svg id="campMapSvg" class="campmap-svg" viewBox="0 0 1000 700" role="img" aria-label="مخطط تخطيطي للمخيم قابل لإضافة مواقع عليه">
+    <rect width="1000" height="700" fill="#e9f0e9"/>
+    <path d="M0 92 L1000 92 M0 310 L1000 310 M0 540 L1000 540 M165 0 L165 700 M420 0 L420 700 M700 0 L700 700 M875 0 L875 700" stroke="#fff" stroke-width="30" fill="none"/>
+    <path d="M0 92 L1000 92 M0 310 L1000 310 M0 540 L1000 540 M165 0 L165 700 M420 0 L420 700 M700 0 L700 700 M875 0 L875 700" stroke="#c8d3ce" stroke-width="2" stroke-dasharray="10 8" fill="none"/>
+    <rect x="185" y="115" width="215" height="175" rx="14" fill="#dbeafe" stroke="#93c5fd" stroke-width="2"/><rect x="440" y="115" width="245" height="175" rx="14" fill="#dcfce7" stroke="#86efac" stroke-width="2"/><rect x="185" y="335" width="215" height="185" rx="14" fill="#fef3c7" stroke="#fcd34d" stroke-width="2"/><rect x="440" y="335" width="245" height="185" rx="14" fill="#f3e8ff" stroke="#d8b4fe" stroke-width="2"/>
+    <text x="292" y="142" text-anchor="middle" font-size="20" font-weight="800" fill="#1e40af">منطقة / قطاع A</text><text x="562" y="142" text-anchor="middle" font-size="20" font-weight="800" fill="#166534">منطقة / قطاع B</text><text x="292" y="362" text-anchor="middle" font-size="20" font-weight="800" fill="#92400e">منطقة / قطاع C</text><text x="562" y="362" text-anchor="middle" font-size="20" font-weight="800" fill="#6b21a8">منطقة / قطاع D</text>
+    <text x="500" y="665" text-anchor="middle" font-size="17" fill="#475569">مخطط توضيحي — عدّل مواقع القطاعات حسب الرفع الميداني</text>
+    <g id="campMapMarkers"></g>
+   </svg>
+  </div>
+  <aside class="campmap-tools">
+   <div class="campmap-panel"><h3>إضافة موقع على الخريطة</h3><div class="campmap-form">
+    <label for="campMapType">نوع الموقع</label><select id="campMapType"><option value="tent">خيمة / مأوى</option><option value="water">نقطة مياه</option><option value="service">خدمة / مرفق</option><option value="sector">قطاع / منطقة</option><option value="need">موقع يحتاج تدخل</option></select>
+    <label for="campMapLabel">اسم الموقع أو رقمه</label><input id="campMapLabel" maxlength="70" placeholder="مثال: خيمة 24 أو نقطة مياه 1"/>
+    <label for="campMapNote">ملاحظة (اختياري)</label><textarea id="campMapNote" maxlength="240" placeholder="تفاصيل مختصرة عن الموقع"></textarea>
+    <button class="btn primary" type="button" onclick="armOfflineCampMapAdd()">＋ تحديد الموقع على المخطط</button><p class="campmap-warning" id="campMapStatus">اختر النوع والاسم، ثم اضغط الزر واضغط على المكان المناسب في المخطط.</p>
+   </div></div>
+   <div class="campmap-panel"><h3>دليل الرموز</h3><div class="campmap-legend"><span><i class="campmap-dot" style="background:#2563eb"></i>الخيام</span><span><i class="campmap-dot" style="background:#0891b2"></i>نقاط المياه</span><span><i class="campmap-dot" style="background:#16a34a"></i>الخدمات</span><span><i class="campmap-dot" style="background:#7c3aed"></i>القطاعات</span><span><i class="campmap-dot" style="background:#dc2626"></i>احتياج / تدخل</span></div></div>
+   <div class="campmap-panel"><h3>المواقع المسجلة <span id="campMapCount">0</span></h3><div id="campMapList" class="campmap-list"><div class="campmap-empty">لم تتم إضافة مواقع بعد. اضغط على المخطط لتسجيل أول موقع.</div></div><p class="campmap-warning" style="margin-top:9px">الحذف من الخريطة يحذف العلامة المحلية فقط، ولا يحذف أي سجل عائلة.</p></div>
+  </aside>
+ </div>
 </section>
 <section class="view" id="distributions">
 <div class="card">
@@ -1190,6 +1226,7 @@ html[data-theme="dark"] :focus-visible{outline-color:#8abaff!important}
    <button data-drawer-view="familySearch"><span>⌕</span>البحث</button>
    <button data-drawer-view="families"><span>♧</span>العائلات</button>
    <button data-drawer-view="sectors"><span>⌖</span>القواطع</button>
+   <button data-drawer-view="campMap"><span>🗺</span>خريطة المخيم</button>
    <button data-drawer-view="records"><span>▤</span>السجلات</button>
    <button data-drawer-view="classified"><span>▥</span>الكشوفات</button>
    <button data-drawer-view="distributions"><span>◫</span>التوزيعات</button>
@@ -1215,6 +1252,6 @@ html[data-theme="dark"] :focus-visible{outline-color:#8abaff!important}
 <style id="mobile-drawer-final-overrides">
 @media(max-width:700px){.mobile-bottom-nav{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;padding:7px 12px max(7px,env(safe-area-inset-bottom))!important}.mobile-bottom-nav button{height:52px!important;min-height:52px!important;border-radius:14px!important}.mobile-bottom-nav button small{font-size:11px!important;line-height:14px!important}}
 </style>
-<script src="./app.js?v=70.9-export-fix"></script></body>
+<script src="./app.js?v=70.16-offline-camp-map"></script></body>
 </html>
 <style>.original-governorate-card .housing-chart-item{cursor:pointer}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-track{box-shadow:0 0 0 3px rgba(59,130,246,.18),0 4px 14px rgba(37,99,235,.13);transform:translateY(-1px)}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-fill{filter:brightness(1.16)}</style>
