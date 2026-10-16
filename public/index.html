@@ -1078,10 +1078,21 @@ html[data-theme="dark"] .sector-stat,html[data-theme="dark"] .sector-side,html[d
    <button data-drawer-view="syncCenter"><span>☁</span>السحابة</button>
    <button data-drawer-view="settings"><span>⚙</span>الإعدادات</button>
   </div>
+  <div class="drawer-copyright" aria-label="حقوق الملكية">
+   <div class="drawer-copyright-year">© 2026</div>
+   <div>جميع الحقوق محفوظة لدى</div>
+   <strong>أبو عمر البيك</strong>
+  </div>
  </aside>
 </div>
 
-
+<style id="copyright-footer-styles">
+.drawer-copyright{margin-top:auto;padding:18px 8px 6px;text-align:center;border-top:1px solid var(--line,#e5e7eb);color:var(--muted,#64748b);font-size:11px;line-height:1.8;flex-shrink:0}
+.drawer-copyright-year{font-size:11px;letter-spacing:.4px;opacity:.85}
+.drawer-copyright strong{display:block;color:var(--text,#334155);font-size:13px;font-weight:800;margin-top:2px}
+@media(min-width:701px){.drawer-copyright{margin-top:24px}}
+@media(prefers-reduced-motion:reduce){.drawer-panel{transition:none}}
+</style>
 
 <style id="mobile-drawer-final-overrides">
 @media(max-width:700px){.mobile-bottom-nav{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;padding:7px 12px max(7px,env(safe-area-inset-bottom))!important}.mobile-bottom-nav button{height:52px!important;min-height:52px!important;border-radius:14px!important}.mobile-bottom-nav button small{font-size:11px!important;line-height:14px!important}}
