@@ -1,4 +1,4 @@
-const CACHE = "abu-oreiban-v70.16-offline-camp-map";
+const CACHE = "abu-oreiban-v70.17-real-boundary";
 const APP_SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
