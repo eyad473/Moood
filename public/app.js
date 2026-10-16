@@ -3685,7 +3685,7 @@ function renderCampSectors(){
   if(!document.getElementById("sectors"))return;
   const summary=document.getElementById("sectorSummary"),cards=document.getElementById("sectorCards"),families=campSectorFamilies(),assignments=campSectorAssignmentMap();
   const assignedCount=families.filter(f=>assignments.has(f.key)).length,counts={};CAMP_SECTOR_NAMES.forEach(s=>counts[s]=families.filter(f=>assignments.get(f.key)===s).length);
-  if(summary)summary.innerHTML=`<div class="sector-stat"><span>إجمالي العائلات المسجلة</span><b>${families.length.toLocaleString("ar-EG")}</b></div>${CAMP_SECTOR_NAMES.map(s=>`<div class="sector-stat"><span>عائلات القاطع ${s}</span><b>${counts[s].toLocaleString("ar-EG")}</b></div>`).join("")}<div class="sector-stat"><span>عائلات لم تُوزّع على قاطع</span><b>${Math.max(0,families.length-assignedCount).toLocaleString("ar-EG")}</b></div>`;
+  if(summary)summary.innerHTML=`<div class="sector-stat"><span>إجمالي العائلات المسجلة في القواطع</span><b>${assignedCount.toLocaleString("ar-EG")}</b></div>${CAMP_SECTOR_NAMES.map(s=>`<div class="sector-stat"><span>عائلات القاطع ${s}</span><b>${counts[s].toLocaleString("ar-EG")}</b></div>`).join("")}`;
   if(cards)cards.innerHTML=CAMP_SECTOR_NAMES.map(s=>`<button type="button" class="sector-choice ${selectedCampSector===s?"active":""}" onclick="selectCampSector('${s}')" aria-pressed="${selectedCampSector===s}"><span class="sector-letter">${s}</span><span class="sector-choice-copy"><b>القاطع ${s}</b><small>تجمّع عائلات</small></span><span class="sector-choice-count">${counts[s].toLocaleString("ar-EG")}</span></button>`).join("");
   const title=document.getElementById("sectorCurrentTitle"),meta=document.getElementById("sectorCurrentMeta"),count=document.getElementById("sectorFamilyCount"),current=families.filter(f=>assignments.get(f.key)===selectedCampSector).sort((a,b)=>a.name.localeCompare(b.name,"ar"));
   if(title)title.textContent="القاطع "+selectedCampSector;if(meta)meta.textContent=`${current.length.toLocaleString("ar-EG")} عائلة مرتبطة بسجلات التطبيق`;if(count)count.textContent=current.length.toLocaleString("ar-EG");
@@ -3714,3 +3714,19 @@ function printSector(){
   const body=document.body;body.classList.add("sector-printing");const oldTitle=document.title;document.title=`كشف عائلات القاطع ${selectedCampSector} - مخيم أبو عريبان`;const cleanup=()=>{body.classList.remove("sector-printing");document.title=oldTitle;window.removeEventListener("afterprint",cleanup)};window.addEventListener("afterprint",cleanup);window.print();setTimeout(cleanup,1500);
 }
 window.addEventListener("storage",e=>{if(e.key===CAMP_SECTORS_STORAGE_KEY&&document.getElementById("sectors")?.classList.contains("active"))renderCampSectors()});
+
+
+/* Mobile Drawer Menu: closes automatically after choosing a section. */
+(function initMobileDrawer(){
+ const backdrop=document.getElementById("mobileDrawerBackdrop"),openBtn=document.getElementById("mobileDrawerOpen"),closeBtn=document.getElementById("mobileDrawerClose");
+ if(!backdrop||!openBtn||!closeBtn)return;
+ function close(){backdrop.classList.remove("open");backdrop.setAttribute("aria-hidden","true");openBtn.setAttribute("aria-expanded","false")}
+ function open(){backdrop.classList.add("open");backdrop.setAttribute("aria-hidden","false");openBtn.setAttribute("aria-expanded","true")}
+ openBtn.addEventListener("click",open);closeBtn.addEventListener("click",close);
+ backdrop.addEventListener("click",e=>{if(e.target===backdrop)close()});
+ document.addEventListener("keydown",e=>{if(e.key==="Escape")close()});
+ backdrop.querySelectorAll("[data-drawer-view]").forEach(btn=>btn.addEventListener("click",()=>{const view=btn.dataset.drawerView;if(typeof showView==="function")showView(view);close()}));
+ document.addEventListener("click",e=>{const view=e.target.closest("[data-drawer-view]")?.dataset.drawerView;if(view){backdrop.querySelectorAll("[data-drawer-view]").forEach(b=>b.classList.toggle("active",b.dataset.drawerView===view))}});
+ const originalShowView=window.showView;
+ if(typeof originalShowView==="function")window.showView=function(id){originalShowView(id);close();backdrop.querySelectorAll("[data-drawer-view]").forEach(b=>b.classList.toggle("active",b.dataset.drawerView===id))};
+})();
