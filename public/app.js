@@ -89,6 +89,7 @@ function showView(id){
  requestAnimationFrame(()=>{document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.view===id));const target=document.getElementById(id);if(target)target.classList.add("active");
   if(id==="records")requestAnimationFrame(renderTable);
   else if(id==="families")requestAnimationFrame(renderFamiliesFast);
+  else if(id==="sectors")requestAnimationFrame(renderCampSectors);
   else if(id==="classified")requestAnimationFrame(renderClassified);
   else if(id==="distributions")requestAnimationFrame(renderDistributions);
   else if(id==="familySearch")setTimeout(()=>document.getElementById("familySearchInput")?.focus(),50);
@@ -394,14 +395,14 @@ function downloadXLSX(matrix,name,opts={}){
  const bytes=zipStore(files);const blob=new Blob([bytes],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});downloadBlob(blob,name);
 }
 function backup(){
- const payload={app:"إدارة وكشف المخيمات",version:1,createdAt:new Date().toISOString(),columns:COLUMNS,data};
+ const payload={app:"إدارة وكشف المخيمات",version:2,createdAt:new Date().toISOString(),columns:COLUMNS,data,sectors:loadCampSectors()};
  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json;charset=utf-8"});
  downloadBlob(blob,`نسخة-احتياطية-المخيم-${dateStamp()}.json`);toast("تم إنشاء النسخة الاحتياطية");
 }
 function restoreBackup(e){
  const f=e.target.files[0];if(!f)return;const reader=new FileReader();
  reader.onload=()=>{try{const p=JSON.parse(reader.result), rows=Array.isArray(p)?p:p.data;if(!Array.isArray(rows))throw Error();
- if(confirm(`سيتم استبدال البيانات الحالية بـ ${rows.length} سجل. هل تريد المتابعة؟`)){data=rows;renumber();autoSave();rebuildFilters();renderAll();toast("تمت استعادة النسخة الاحتياطية")}
+ if(confirm(`سيتم استبدال البيانات الحالية بـ ${rows.length} سجل. هل تريد المتابعة؟`)){data=rows;renumber();autoSave();if(p&&p.sectors&&typeof p.sectors==="object")saveCampSectors(p.sectors);rebuildFilters();renderAll();renderCampSectors();toast("تمت استعادة النسخة الاحتياطية")}
  }catch(err){alert("ملف النسخة الاحتياطية غير صالح")}};
  reader.readAsText(f);e.target.value="";
 }
@@ -1744,7 +1745,7 @@ function initDisplayLoginFocusGuard(){
 }
 function displayHideLogin(){const ov=document.getElementById("displayLoginOverlay");if(ov)ov.hidden=true;displayAuthUnlock()}
 function displayWelcome(name){const old=document.getElementById("displayWelcomeBox");if(old)old.remove();const box=document.createElement("div");box.id="displayWelcomeBox";box.className="display-welcome";box.innerHTML=`<div>مرحباً</div><b>${esc(name||"مستخدم جهاز العرض")}</b><small>تم تسجيل الدخول إلى جهاز العرض بنجاح</small>`;document.body.appendChild(box);setTimeout(()=>box.remove(),2600)}
-function applyDisplayPermissions(){if(appReadOnly!==true)return;const p=displayPermissions||{};const map={families:['families','familySearch'],people:['people','records'],search:['search','familySearch'],reports:['reports','classified'],distributions:['distributions','distributions']};const tabs=[...document.querySelectorAll('.tab[data-view]')];for(const t of tabs){const v=t.dataset.view;let allowed=true;if(v==='dashboard')allowed=p.dashboard!==false;else if(v==='families')allowed=p.families!==false;else if(v==='familySearch')allowed=p.search!==false&&p.families!==false;else if(v==='records')allowed=p.people!==false;else if(v==='classified')allowed=p.reports!==false;else if(v==='distributions')allowed=p.distributions!==false;else if(v==='syncCenter'||v==='settings')allowed=false;t.style.display=allowed?'':'none'}for(const [perm,views] of Object.entries(map)){if(p[perm]===false){for(const v of views){document.querySelectorAll(`[data-view="${v}"]`).forEach(el=>el.style.display='none')}}}if(p.dashboard===false){try{showView('familySearch')}catch(e){}}} 
+function applyDisplayPermissions(){if(appReadOnly!==true)return;const p=displayPermissions||{};const map={families:['families','familySearch'],people:['people','records'],search:['search','familySearch'],reports:['reports','classified'],distributions:['distributions','distributions']};const tabs=[...document.querySelectorAll('.tab[data-view]')];for(const t of tabs){const v=t.dataset.view;let allowed=true;if(v==='dashboard')allowed=p.dashboard!==false;else if(v==='families')allowed=p.families!==false;else if(v==='sectors')allowed=p.families!==false;else if(v==='familySearch')allowed=p.search!==false&&p.families!==false;else if(v==='records')allowed=p.people!==false;else if(v==='classified')allowed=p.reports!==false;else if(v==='distributions')allowed=p.distributions!==false;else if(v==='syncCenter'||v==='settings')allowed=false;t.style.display=allowed?'':'none'}for(const [perm,views] of Object.entries(map)){if(p[perm]===false){for(const v of views){document.querySelectorAll(`[data-view="${v}"]`).forEach(el=>el.style.display='none')}}}document.querySelectorAll('[data-mobile-view="sectors"]').forEach(el=>el.style.display=p.families===false?'none':'');if(p.dashboard===false){try{showView('familySearch')}catch(e){}}} 
 async function displayLoginSubmit(e){
   e.preventDefault();
   const u=document.getElementById("displayLoginUsername")?.value.trim()||"";
@@ -3662,3 +3663,54 @@ document.addEventListener("DOMContentLoaded",()=>{
     finally{bulkBusy=false;if(button){button.disabled=false;button.textContent=oldText||'حفظ التوزيعات المحددة';}queueRender();}
   };
 })();
+
+/* ===== Camp sectors (A-D): independent metadata linked to existing family records. ===== */
+const CAMP_SECTORS_STORAGE_KEY = "abu_oreiban_camp_sectors_v1";
+const CAMP_SECTOR_NAMES = ["A","B","C","D"];
+let selectedCampSector = "A";
+function loadCampSectors(){
+  try{const parsed=JSON.parse(localStorage.getItem(CAMP_SECTORS_STORAGE_KEY)||"{}");const clean={};CAMP_SECTOR_NAMES.forEach(k=>clean[k]=Array.isArray(parsed?.[k])?[...new Set(parsed[k].filter(x=>typeof x==="string"&&x))]:[]);return clean;}catch(_){return {A:[],B:[],C:[],D:[]}}
+}
+function saveCampSectors(value){
+  const clean={};CAMP_SECTOR_NAMES.forEach(k=>clean[k]=Array.isArray(value?.[k])?[...new Set(value[k].filter(x=>typeof x==="string"&&x))]:[]);
+  try{localStorage.setItem(CAMP_SECTORS_STORAGE_KEY,JSON.stringify(clean));return true}catch(e){toast("تعذر حفظ القواطع محلياً؛ مساحة التخزين ممتلئة");return false}
+}
+function campSectorNorm(value){return String(value??"").trim().toLowerCase().replace(/[أإآٱ]/g,"ا").replace(/ة/g,"ه").replace(/ى/g,"ي").replace(/[ًٌٍَُِّْـ]/g,"").replace(/\s+/g," ")}
+function campSectorFamilyKey(name){const rows=(typeof familyMap==="function"?familyMap().get(name):null)||[];const first=rows[0]||{};const id=String(first["رقم هوية الأسرة"]||"").trim();return id?"id:"+id:"name:"+campSectorNorm(name)}
+function campSectorFamilies(){const names=typeof familyNames==="function"?familyNames():[];return names.map(name=>{const rows=(typeof familyMap==="function"?familyMap().get(name):null)||[];const first=rows[0]||{};return {key:campSectorFamilyKey(name),name,id:String(first["رقم هوية الأسرة"]||"").trim(),phone:String(first["رقم الجوال"]||"").trim(),address:String(first["العنوان"]||"").trim(),members:rows.length,rows}})}
+function campSectorAssignmentMap(){const sectors=loadCampSectors(),map=new Map();CAMP_SECTOR_NAMES.forEach(s=>sectors[s].forEach(key=>{if(!map.has(key))map.set(key,s)}));return map}
+function campSectorEsc(value){return typeof esc==="function"?esc(value):String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function campSectorCanEdit(){if(typeof appReadOnly!=="undefined"&&appReadOnly===true){toast("هذا الجهاز للعرض فقط — إدارة القواطع مسموحة من الجهاز الرئيسي");return false}return true}
+function renderCampSectors(){
+  if(!document.getElementById("sectors"))return;
+  const summary=document.getElementById("sectorSummary"),cards=document.getElementById("sectorCards"),families=campSectorFamilies(),assignments=campSectorAssignmentMap();
+  const assignedCount=families.filter(f=>assignments.has(f.key)).length,counts={};CAMP_SECTOR_NAMES.forEach(s=>counts[s]=families.filter(f=>assignments.get(f.key)===s).length);
+  if(summary)summary.innerHTML=`<div class="sector-stat"><span>إجمالي العائلات المسجلة</span><b>${families.length.toLocaleString("ar-EG")}</b></div>${CAMP_SECTOR_NAMES.map(s=>`<div class="sector-stat"><span>عائلات القاطع ${s}</span><b>${counts[s].toLocaleString("ar-EG")}</b></div>`).join("")}<div class="sector-stat"><span>عائلات لم تُوزّع على قاطع</span><b>${Math.max(0,families.length-assignedCount).toLocaleString("ar-EG")}</b></div>`;
+  if(cards)cards.innerHTML=CAMP_SECTOR_NAMES.map(s=>`<button type="button" class="sector-choice ${selectedCampSector===s?"active":""}" onclick="selectCampSector('${s}')" aria-pressed="${selectedCampSector===s}"><span class="sector-letter">${s}</span><span class="sector-choice-copy"><b>القاطع ${s}</b><small>تجمّع عائلات</small></span><span class="sector-choice-count">${counts[s].toLocaleString("ar-EG")}</span></button>`).join("");
+  const title=document.getElementById("sectorCurrentTitle"),meta=document.getElementById("sectorCurrentMeta"),count=document.getElementById("sectorFamilyCount"),current=families.filter(f=>assignments.get(f.key)===selectedCampSector).sort((a,b)=>a.name.localeCompare(b.name,"ar"));
+  if(title)title.textContent="القاطع "+selectedCampSector;if(meta)meta.textContent=`${current.length.toLocaleString("ar-EG")} عائلة مرتبطة بسجلات التطبيق`;if(count)count.textContent=current.length.toLocaleString("ar-EG");
+  const list=document.getElementById("sectorFamilyList");if(list)list.innerHTML=current.length?current.map(f=>`<div class="sector-family-item"><div class="sector-family-copy"><b>${campSectorEsc(f.name)}</b><small>${f.id?"هوية الأسرة: "+campSectorEsc(f.id)+" · ":""}${f.phone?"الجوال: "+campSectorEsc(f.phone)+" · ":""}عدد الأفراد: ${f.members.toLocaleString("ar-EG")}</small></div><button type="button" class="btn danger sector-remove" onclick="removeCampFamilyFromSector('${encodeURIComponent(f.key)}')">إزالة من القاطع</button></div>`).join(""):'<div class="sector-empty">لا توجد عائلات مضافة لهذا القاطع حتى الآن.<br>استخدم البحث أعلاه واختر العائلات من السجلات الموجودة.</div>';
+  renderSectorSearch();
+}
+function selectCampSector(sector){if(!CAMP_SECTOR_NAMES.includes(sector))return;selectedCampSector=sector;renderCampSectors()}
+function renderSectorSearch(){
+  const out=document.getElementById("sectorSearchResults");if(!out)return;const q=campSectorNorm(document.getElementById("sectorSearch")?.value||"");
+  if(!q){out.innerHTML='<div class="sector-empty">اكتب اسم رب الأسرة أو رقم الهوية لعرض العائلات المطابقة.</div>';return}
+  const assignments=campSectorAssignmentMap(),matches=campSectorFamilies().filter(f=>campSectorNorm([f.name,f.id,f.phone,f.address].join(" ")).includes(q)).slice(0,30);
+  if(!matches.length){out.innerHTML='<div class="sector-empty">لا توجد عائلة مطابقة في السجلات الحالية.</div>';return}
+  out.innerHTML=matches.map(f=>{const assigned=assignments.get(f.key)||"",same=assigned===selectedCampSector;const status=same?'<span class="sector-result-badge current">موجودة في هذا القاطع</span>':assigned?`<span class="sector-result-badge assigned">موجودة في القاطع ${assigned}</span>`:'<span class="sector-result-badge">غير موزّعة</span>';const action=same?'<button type="button" class="btn" disabled>مضافة</button>':`<button type="button" class="btn primary" onclick="addCampFamilyToSector('${encodeURIComponent(f.key)}')">${assigned?"نقل إلى القاطع "+selectedCampSector:"＋ إضافة"}</button>`;return `<div class="sector-search-result"><div class="sector-result-copy"><b>${campSectorEsc(f.name)}</b><small>${f.id?"الهوية: "+campSectorEsc(f.id)+" · ":""}عدد الأفراد: ${f.members.toLocaleString("ar-EG")}</small></div><div class="sector-result-actions">${status}${action}</div></div>`}).join("");
+}
+function addCampFamilyToSector(encodedKey){
+  if(!campSectorCanEdit())return;let key;try{key=decodeURIComponent(encodedKey)}catch(_){key=encodedKey}const family=campSectorFamilies().find(f=>f.key===key);if(!family){toast("لم تعد العائلة موجودة في السجلات الحالية");renderCampSectors();return}
+  const sectors=loadCampSectors();let previous="";CAMP_SECTOR_NAMES.forEach(s=>{if(sectors[s].includes(key))previous=s});if(previous===selectedCampSector){toast("العائلة مضافة بالفعل لهذا القاطع");return}if(previous&&!confirm(`العائلة «${family.name}» موجودة في القاطع ${previous}. هل تريد نقلها إلى القاطع ${selectedCampSector}؟`))return;
+  CAMP_SECTOR_NAMES.forEach(s=>{sectors[s]=sectors[s].filter(k=>k!==key)});sectors[selectedCampSector].push(key);if(!saveCampSectors(sectors))return;renderCampSectors();toast(previous?`تم نقل العائلة إلى القاطع ${selectedCampSector}`:`تمت إضافة العائلة إلى القاطع ${selectedCampSector}`);
+}
+function removeCampFamilyFromSector(encodedKey){
+  if(!campSectorCanEdit())return;let key;try{key=decodeURIComponent(encodedKey)}catch(_){key=encodedKey}const family=campSectorFamilies().find(f=>f.key===key);if(!family)return;if(!confirm(`إزالة «${family.name}» من القاطع ${selectedCampSector} فقط؟\nلن يتم حذف العائلة أو أي فرد من بيانات التطبيق.`))return;
+  const sectors=loadCampSectors();sectors[selectedCampSector]=sectors[selectedCampSector].filter(k=>k!==key);if(saveCampSectors(sectors)){renderCampSectors();toast("تمت إزالة العائلة من القاطع دون حذف بياناتها")}
+}
+function printSector(){
+  const current=campSectorFamilies().filter(f=>campSectorAssignmentMap().get(f.key)===selectedCampSector).sort((a,b)=>a.name.localeCompare(b.name,"ar"));if(!current.length){toast("لا توجد عائلات في هذا القاطع للطباعة");return}
+  const body=document.body;body.classList.add("sector-printing");const oldTitle=document.title;document.title=`كشف عائلات القاطع ${selectedCampSector} - مخيم أبو عريبان`;const cleanup=()=>{body.classList.remove("sector-printing");document.title=oldTitle;window.removeEventListener("afterprint",cleanup)};window.addEventListener("afterprint",cleanup);window.print();setTimeout(cleanup,1500);
+}
+window.addEventListener("storage",e=>{if(e.key===CAMP_SECTORS_STORAGE_KEY&&document.getElementById("sectors")?.classList.contains("active"))renderCampSectors()});

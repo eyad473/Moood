@@ -492,6 +492,16 @@ html[data-theme="dark"] body{background:#0b1120;color:#e5e7eb}html[data-theme="d
 @media(max-width:650px){.dist-campaign-analytics{padding:12px}.dist-campaign-kpis{gap:6px}.dist-campaign-kpi{padding:9px}.dist-campaign-kpi strong{font-size:20px}.dist-campaign-aid-row{grid-template-columns:minmax(80px,112px) minmax(45px,1fr) 58px;gap:7px;padding:8px 5px}.dist-campaign-aid-name{font-size:11px}.dist-campaign-aid-meta b{font-size:11px}.dist-campaign-track{height:11px}.dist-campaign-chart-wrap{padding:9px}}
 @media(prefers-reduced-motion:reduce){.dist-campaign-live i,.dist-campaign-got,.dist-campaign-left,.dist-campaign-aid-row{animation:none!important;transition:none!important}}
 </style>
+
+<style>
+/* Camp sectors: isolated presentation layer; household records remain untouched. */
+.sector-page{overflow:hidden}.sector-hero{display:flex;gap:15px;align-items:center;padding:8px 2px 20px;border-bottom:1px solid var(--border,#e5e7eb)}.sector-hero-icon{width:58px;height:58px;flex:0 0 58px;display:grid;place-items:center;border-radius:18px;background:linear-gradient(135deg,#dbeafe,#ede9fe);color:#3730a3;font-size:34px}.sector-hero h2{margin:4px 0 6px;font-size:clamp(20px,3vw,27px)}.sector-hero p{margin:0;color:var(--muted,#64748b);font-size:12px;line-height:1.8}.sector-eyebrow{font-size:10px;font-weight:800;color:#2563eb;letter-spacing:.3px}.sector-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;margin:16px 0}.sector-stat{padding:12px;border:1px solid var(--border,#e5e7eb);border-radius:14px;background:var(--card,#fff);min-width:0}.sector-stat span{display:block;color:var(--muted,#64748b);font-size:11px}.sector-stat b{display:block;font-size:23px;margin-top:4px;overflow-wrap:anywhere}.sector-workspace{display:grid;grid-template-columns:minmax(210px,.75fr) minmax(0,2fr);gap:15px;align-items:start}.sector-side,.sector-main{min-width:0;border:1px solid var(--border,#e5e7eb);border-radius:17px;padding:15px;background:var(--card,#fff)}.sector-side h3,.sector-current-head h3,.sector-family-head h3{margin:0}.sector-cards{display:grid;gap:9px;margin-top:13px}.sector-choice{display:flex;align-items:center;gap:10px;width:100%;text-align:start;padding:12px;border:1px solid var(--border,#e5e7eb);border-radius:13px;background:var(--bg,#f8fafc);color:var(--text,inherit);cursor:pointer}.sector-choice.active{border-color:#2563eb;background:#eff6ff;box-shadow:0 0 0 2px #2563eb12}.sector-letter{width:40px;height:40px;display:grid;place-items:center;border-radius:12px;background:#dbeafe;color:#1d4ed8;font-size:19px;font-weight:900;flex-shrink:0}.sector-choice-copy{flex:1;min-width:0}.sector-choice-copy b,.sector-choice-copy small{display:block}.sector-choice-copy small{color:var(--muted,#64748b);font-size:10px;margin-top:3px}.sector-choice-count{font-weight:800;font-variant-numeric:tabular-nums}.sector-tip{display:flex;gap:8px;margin-top:14px;padding:11px;border-radius:12px;background:#f0f9ff;color:#075985;font-size:11px;line-height:1.8}.sector-tip b{white-space:nowrap}.sector-current-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-bottom:13px;border-bottom:1px solid var(--border,#e5e7eb)}.sector-current-head h3{font-size:22px;margin:3px 0}.sector-current-head p{margin:0;color:var(--muted,#64748b);font-size:11px}.sector-search-box{margin-top:15px;padding:13px;border:1px solid #bfdbfe;border-radius:14px;background:linear-gradient(135deg,#f8fbff,#f5f3ff)}.sector-search-box label{display:block;font-size:12px;font-weight:800;margin-bottom:8px}.sector-search-box input{width:100%;box-sizing:border-box;border:1px solid var(--border,#cbd5e1);border-radius:11px;padding:12px;background:var(--card,#fff);color:var(--text,#111827);font:inherit;outline:none}.sector-search-box input:focus{border-color:#2563eb;box-shadow:0 0 0 3px #2563eb1c}.sector-search-box small{display:block;color:var(--muted,#64748b);font-size:10px;margin-top:7px}.sector-search-results{display:grid;gap:7px;margin-top:9px}.sector-search-result,.sector-family-item{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:11px;border:1px solid var(--border,#e5e7eb);border-radius:12px;min-width:0}.sector-result-copy,.sector-family-copy{min-width:0;overflow-wrap:anywhere}.sector-result-copy b,.sector-result-copy small,.sector-family-copy b,.sector-family-copy small{display:block}.sector-result-copy small,.sector-family-copy small{font-size:10px;color:var(--muted,#64748b);margin-top:4px}.sector-result-actions{display:flex;gap:6px;flex-shrink:0}.sector-count{display:inline-grid;place-items:center;min-width:29px;height:29px;padding:0 7px;border-radius:10px;background:#dbeafe;color:#1d4ed8;font-weight:900}.sector-family-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:19px 0 10px}.sector-family-list{display:grid;gap:8px}.sector-empty{padding:18px 12px;text-align:center;color:var(--muted,#64748b);border:1px dashed var(--border,#cbd5e1);border-radius:12px;font-size:12px;line-height:1.8}.sector-remove{white-space:nowrap}.sector-result-badge{font-size:10px;color:#64748b;white-space:nowrap}.sector-result-badge.assigned{color:#b45309}.sector-result-badge.current{color:#047857}.sector-btn-disabled{opacity:.5;pointer-events:none}
+html[data-theme="dark"] .sector-stat,html[data-theme="dark"] .sector-side,html[data-theme="dark"] .sector-main,html[data-theme="dark"] .sector-choice,html[data-theme="dark"] .sector-family-item,html[data-theme="dark"] .sector-search-result{background:var(--card,#111827);color:var(--text,#e5e7eb);border-color:var(--line,#293548)}html[data-theme="dark"] .sector-choice.active{background:#172554;border-color:#60a5fa}html[data-theme="dark"] .sector-search-box{background:#0f172a;border-color:#1e40af}html[data-theme="dark"] .sector-search-box input{background:#0b1120;color:#e5e7eb}html[data-theme="dark"] .sector-tip{background:#0c2638;color:#bae6fd}
+@media(max-width:800px){.sector-workspace{grid-template-columns:1fr}.sector-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.sector-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.sector-stat:last-child{grid-column:span 2}.sector-side,.sector-main{padding:12px}}
+@media(max-width:420px){.sector-choice{padding:9px;gap:7px}.sector-letter{width:34px;height:34px}.sector-choice-count{font-size:12px}.sector-result-actions{flex-direction:column}.sector-current-head .btn{width:100%}.sector-family-item{align-items:flex-start}.sector-remove{padding:8px!important}}
+@media print{body.sector-printing *{visibility:hidden!important}body.sector-printing #sectors,body.sector-printing #sectors *{visibility:visible!important}body.sector-printing #sectors{display:block!important;position:absolute;inset:0;width:100%}body.sector-printing .sector-side,body.sector-printing .sector-search-box,body.sector-printing #sectorSearchResults,body.sector-printing .no-print{display:none!important}body.sector-printing .sector-workspace{display:block}body.sector-printing .sector-main{border:0;padding:0}body.sector-printing .sector-family-item{break-inside:avoid}}
+
+</style>
 </head>
 <body>
 <div class="app">
@@ -511,6 +521,7 @@ html[data-theme="dark"] body{background:#0b1120;color:#e5e7eb}html[data-theme="d
 <button class="tab active" data-view="dashboard">لوحة القيادة</button>
 <button class="tab" data-view="familySearch">🔎 بحث العائلات</button>
 <button class="tab" data-view="families">إدارة العائلات</button>
+<button class="tab" data-view="sectors">🧭 قواطع المخيم</button>
 <button class="tab" data-view="distributions">إدارة التوزيعات</button>
 <button class="tab" data-view="records">السجلات</button>
 <button class="tab" data-view="classified">الكشوفات المصنفة</button>
@@ -642,6 +653,29 @@ html[data-theme="dark"] body{background:#0b1120;color:#e5e7eb}html[data-theme="d
 <div class="notice no-print" style="margin-top:10px">الأخضر = مكتملة، الأصفر = جزئية، الأحمر = ناقصة. الحالة تُحسب تلقائياً من البيانات الفعلية ويمكن أن تتغير فور التعديل.</div>
 <div id="familyList"></div>
 </div>
+</section>
+<section class="view" id="sectors">
+  <div class="card sector-page">
+    <div class="sector-hero">
+      <div class="sector-hero-icon">⌖</div>
+      <div><div class="sector-eyebrow">التنظيم المكاني للمخيم</div><h2>قواطع مخيم أبو عريبان</h2><p>قسّم العائلات المسجلة فعلياً إلى أربعة قواطع. اختيار العائلة هنا مرتبط بسجلها الأصلي ولا ينشئ نسخة جديدة منها.</p></div>
+    </div>
+    <div class="sector-summary" id="sectorSummary"></div>
+    <div class="sector-workspace">
+      <aside class="sector-side">
+        <h3>اختر القاطع</h3>
+        <div id="sectorCards" class="sector-cards"></div>
+        <div class="sector-tip"><b>مهم</b><span>إزالة العائلة من القاطع لا تحذفها من التطبيق. ويمكن أن تتبع العائلة قاطعاً واحداً فقط في الوقت نفسه.</span></div>
+      </aside>
+      <div class="sector-main">
+        <div class="sector-current-head"><div><span class="sector-eyebrow">القاطع المحدد</span><h3 id="sectorCurrentTitle">القاطع A</h3><p id="sectorCurrentMeta">0 عائلة</p></div><button type="button" class="btn" onclick="printSector()">🖨 طباعة القاطع</button></div>
+        <div class="sector-search-box"><label for="sectorSearch">إضافة عائلة من السجلات الموجودة</label><input id="sectorSearch" type="search" autocomplete="off" placeholder="ابحث باسم رب الأسرة أو الهوية أو الجوال..." oninput="renderSectorSearch()"><small>اختر من نتائج البحث لإضافة العائلة إلى القاطع الحالي.</small></div>
+        <div id="sectorSearchResults" class="sector-search-results"></div>
+        <div class="sector-family-head"><h3>العائلات في هذا القاطع</h3><span id="sectorFamilyCount" class="sector-count">0</span></div>
+        <div id="sectorFamilyList" class="sector-family-list"></div>
+      </div>
+    </div>
+  </div>
 </section>
 <section class="view" id="distributions">
 <div class="card">
@@ -1012,6 +1046,7 @@ html[data-theme="dark"] body{background:#0b1120;color:#e5e7eb}html[data-theme="d
 <button data-mobile-view="dashboard" type="button"><span>⌂</span><small>الرئيسية</small></button>
 <button data-mobile-view="familySearch" type="button"><span>⌕</span><small>البحث</small></button>
 <button data-mobile-view="families" type="button"><span>👨‍👩‍👧</span><small>العائلات</small></button>
+<button data-mobile-view="sectors" type="button"><span>⌖</span><small>القواطع</small></button>
 <button data-mobile-view="records" type="button"><span>▤</span><small>السجلات</small></button>
 <button data-mobile-view="classified" type="button"><span>▥</span><small>الكشوفات</small></button>
 <button data-mobile-view="distributions" type="button"><span>◫</span><small>التوزيعات</small></button>
@@ -1021,6 +1056,6 @@ html[data-theme="dark"] body{background:#0b1120;color:#e5e7eb}html[data-theme="d
 
 
 
-<script src="./app.js?v=70.4"></script></body>
+<script src="./app.js?v=70.5-sectors"></script></body>
 </html>
 <style>.original-governorate-card .housing-chart-item{cursor:pointer}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-track{box-shadow:0 0 0 3px rgba(59,130,246,.18),0 4px 14px rgba(37,99,235,.13);transform:translateY(-1px)}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-fill{filter:brightness(1.16)}</style>

@@ -1,4 +1,4 @@
-const CACHE = "abu-areiban-v70.4-original-governorate-chart";
+const CACHE = "abu-areiban-v70.5-camp-sectors";
 const APP_SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
