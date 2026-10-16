@@ -1,4 +1,4 @@
-const CACHE = "abu-areiban-v70.6-drawer-sectors";
+const CACHE = "abu-areiban-v70.7-sector-excel";
 const APP_SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {

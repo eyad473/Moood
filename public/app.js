@@ -3730,3 +3730,64 @@ window.addEventListener("storage",e=>{if(e.key===CAMP_SECTORS_STORAGE_KEY&&docum
  const originalShowView=window.showView;
  if(typeof originalShowView==="function")window.showView=function(id){originalShowView(id);close();backdrop.querySelectorAll("[data-drawer-view]").forEach(b=>b.classList.toggle("active",b.dataset.drawerView===id))};
 })();
+
+
+/* V70.7 — professional Excel exports for one or all camp sectors. */
+function campSectorExcelRows(sector){
+  const assignments=campSectorAssignmentMap();
+  return campSectorFamilies().filter(f=>assignments.get(f.key)===sector)
+    .sort((a,b)=>a.name.localeCompare(b.name,"ar"))
+    .map((f,i)=>({"م":""+(i+1),"القاطع":"القاطع "+sector,"اسم رب الأسرة":f.name,"رقم هوية الأسرة":f.id,"رقم الجوال":f.phone,"العنوان":f.address,"عدد أفراد الأسرة":f.members}));
+}
+function campSectorExcelSheet(rows, title){
+  // Use the same report structure and visual language as the app's native exportExcel():
+  // report heading, title, export timestamp, count, blank spacer, then column headers.
+  const columns=Object.keys(rows[0]||{"م":"","القاطع":"","اسم رب الأسرة":"","رقم هوية الأسرة":"","رقم الجوال":"","العنوان":"","عدد أفراد الأسرة":""});
+  const matrix=[
+    ["إدارة وكشف المخيمات — إدارة مخيم أبو عريبان"],
+    [title],
+    [`تاريخ التصدير: ${new Date().toLocaleString('ar-EG')}`],
+    [`عدد العائلات: ${rows.length}`],
+    [],
+    columns,
+    ...rows.map(row=>columns.map(k=>row[k]??""))
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(matrix);
+  const maxCols=columns.length, lastRow=matrix.length;
+  ws["!merges"]=[{s:{r:0,c:0},e:{r:0,c:maxCols-1}},{s:{r:1,c:0},e:{r:1,c:maxCols-1}},{s:{r:2,c:0},e:{r:2,c:maxCols-1}},{s:{r:3,c:0},e:{r:3,c:maxCols-1}}];
+  for(let r=0;r<lastRow;r++)for(let c=0;c<maxCols;c++){
+    const cell=ws[XLSX.utils.encode_cell({r,c})]; if(!cell)continue;
+    let font={name:"Arial",sz:10},fill;
+    if(r===0)font={name:"Arial",sz:16,bold:true};
+    else if(r===5){font={name:"Arial",sz:11,bold:true};fill={patternType:"solid",fgColor:{rgb:"E8EEF7"}}}
+    else if(r===1||r===2)font={name:"Arial",sz:11,bold:true};
+    cell.s={font,...(fill?{fill}:{}),alignment:{horizontal:"center",vertical:"center",wrapText:true,readingOrder:2},border:{left:{style:"thin",color:{rgb:"B7C9D6"}},right:{style:"thin",color:{rgb:"B7C9D6"}},top:{style:"thin",color:{rgb:"B7C9D6"}},bottom:{style:"thin",color:{rgb:"B7C9D6"}}}};
+  }
+  ws["!cols"]=[{wch:7},{wch:15},{wch:30},{wch:20},{wch:18},{wch:28},{wch:16}];
+  ws["!rows"]=[{hpt:30},{hpt:24},{hpt:22},{hpt:22},{hpt:8},{hpt:34},...rows.map(()=>({hpt:26}))];
+  ws["!views"]=[{rightToLeft:true,state:"frozen",ySplit:6,topLeftCell:"A7"}];
+  ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:5,c:0},e:{r:5,c:maxCols-1}})};
+  ws["!pageSetup"]={paperSize:9,orientation:"landscape",fitToWidth:1,fitToHeight:0};
+  ws["!pageMargins"]={left:.25,right:.25,top:.45,bottom:.45,header:.15,footer:.15};
+  return ws;
+}
+function exportCampSectorExcel(){
+  try{
+    const sector=selectedCampSector,rows=campSectorExcelRows(sector);
+    if(!rows.length){toast("لا توجد عائلات في القاطع "+sector+" لتصديرها");return}
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,campSectorExcelSheet(rows,"كشف عائلات القاطع "+sector),("القاطع "+sector).slice(0,31));
+    XLSX.writeFile(wb,`كشف_عائلات_القاطع_${sector}_${dateStamp()}.xlsx`,{bookType:"xlsx",cellStyles:true});toast("تم تصدير كشف Excel احترافي للقاطع "+sector+" ("+rows.length+" عائلة)");
+  }catch(e){console.error("Camp sector Excel export",e);toast("تعذر تصدير Excel: "+(e?.message||"خطأ غير معروف"))}
+}
+function exportAllCampSectorsExcel(){
+  try{
+    const wb=XLSX.utils.book_new(),summary=[{"القاطع":"القاطع A","عدد العائلات":campSectorExcelRows("A").length},{"القاطع":"القاطع B","عدد العائلات":campSectorExcelRows("B").length},{"القاطع":"القاطع C","عدد العائلات":campSectorExcelRows("C").length},{"القاطع":"القاطع D","عدد العائلات":campSectorExcelRows("D").length}];
+    const total=summary.reduce((n,r)=>n+r["عدد العائلات"],0);
+    const sumMatrix=[["مخيم أبو عريبان — ملخص القواطع"],["تاريخ التصدير",new Date().toLocaleString("ar-EG")],["إجمالي العائلات الموزعة على القواطع",total],[],["القاطع","عدد العائلات"],...summary.map(r=>[r["القاطع"],r["عدد العائلات"]])];
+    const sw=XLSX.utils.aoa_to_sheet(sumMatrix);sw["!cols"]=[{wch:38},{wch:22}];sw["!merges"]=[{s:{r:0,c:0},e:{r:0,c:1}}];
+    for(let r=0;r<=sumMatrix.length-1;r++)for(let c=0;c<2;c++){const cell=sw[XLSX.utils.encode_cell({r,c})];if(!cell)continue;const header=r===4,title=r===0;cell.s={font:{name:"Arial",sz:title?15:10,bold:title||header,color:title?{rgb:"FFFFFF"}:header?{rgb:"FFFFFF"}:{rgb:"222222"}},fill:title?{patternType:"solid",fgColor:{rgb:"17365D"}}:header?{patternType:"solid",fgColor:{rgb:"4472C4"}}:undefined,alignment:{horizontal:"center",vertical:"center",wrapText:true},border:{top:{style:"thin",color:{rgb:"B7C9D6"}},bottom:{style:"thin",color:{rgb:"B7C9D6"}},left:{style:"thin",color:{rgb:"B7C9D6"}},right:{style:"thin",color:{rgb:"B7C9D6"}}}}}
+    sw["!rows"]=[{hpt:30},{hpt:22},{hpt:24},{hpt:8},{hpt:34},{hpt:26},{hpt:26},{hpt:26},{hpt:26}];sw["!views"]=[{rightToLeft:true,state:"frozen",ySplit:5,topLeftCell:"A6"}];sw["!autofilter"]={ref:"A5:B9"};XLSX.utils.book_append_sheet(wb,sw,"ملخص القواطع");
+    for(const sector of CAMP_SECTOR_NAMES){const rows=campSectorExcelRows(sector);XLSX.utils.book_append_sheet(wb,campSectorExcelSheet(rows,"كشف عائلات القاطع "+sector),("القاطع "+sector).slice(0,31))}
+    XLSX.writeFile(wb,`كشف_جميع_قواطع_مخيم_أبو_عريبان_${dateStamp()}.xlsx`,{bookType:"xlsx",cellStyles:true});toast("تم تصدير جميع القواطع في ملف Excel واحد مع ملخص مستقل");
+  }catch(e){console.error("All camp sectors Excel export",e);toast("تعذر تصدير Excel: "+(e?.message||"خطأ غير معروف"))}
+}
