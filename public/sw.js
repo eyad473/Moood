@@ -1,4 +1,4 @@
-const CACHE = "abu-areiban-v70.13-dashboard-governorates-dark";
+const CACHE = "abu-areiban-v70.14-fixed-from-v12";
 const APP_SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
