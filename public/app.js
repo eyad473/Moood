@@ -222,7 +222,7 @@ function openFamilyModal(name=null){
  document.getElementById("familyModalTitle").textContent=name?"تعديل عائلة":"إضافة عائلة";
  if(name){
   const r=familyMap().get(name)?.[0];if(r){
-   setv("f_head",r["اسم رب الأسرة"]);setv("f_id",r["رقم هوية الأسرة"]);setv("f_phone",r["رقم الجوال"]);setv("f_alt",r["رقم جوال بديل"]);setv("f_inside",r["داخل/خارج المخيم"]);setv("f_complete",r["حالة اكتمال بيانات الأسرة"]);setv("f_gov",r["المحافظة الأصلية"]);setv("f_home",r["حالة المسكن الأصلي"]);setv("f_current",r["نوع السكن الحالي"]);setv("f_address",r["العنوان"]);setv("f_notes",r["ملاحظات الأسرة"]);
+   setv("f_head",r["اسم رب الأسرة"]);setv("f_id",r["رقم هوية الأسرة"]);setv("f_phone",r["رقم الجوال"]);setv("f_alt",r["رقم جوال بديل"]);setv("f_inside",r["داخل/خارج المخيم"]);setv("f_complete",r["حالة اكتمال بيانات الأسرة"]);setv("f_gov",canonicalGovernorate(r["المحافظة الأصلية"]));setv("f_home",r["حالة المسكن الأصلي"]);setv("f_current",r["نوع السكن الحالي"]);setv("f_address",r["العنوان"]);setv("f_notes",r["ملاحظات الأسرة"]);
   }
  }
  document.getElementById("familyModal").classList.add("show");
@@ -230,7 +230,7 @@ function openFamilyModal(name=null){
 function saveFamily(e){
  e.preventDefault();const old=document.getElementById("f_original").value, h=document.getElementById("f_head").value.trim();
  if(!h)return;
- const vals={"اسم رب الأسرة":h,"رقم هوية الأسرة":v("f_id"),"رقم الجوال":v("f_phone"),"رقم جوال بديل":v("f_alt"),"داخل/خارج المخيم":v("f_inside"),"حالة اكتمال بيانات الأسرة":v("f_complete"),"المحافظة الأصلية":v("f_gov"),"حالة المسكن الأصلي":v("f_home"),"نوع السكن الحالي":v("f_current"),"العنوان":v("f_address"),"ملاحظات الأسرة":v("f_notes")};
+ const vals={"اسم رب الأسرة":h,"رقم هوية الأسرة":v("f_id"),"رقم الجوال":v("f_phone"),"رقم جوال بديل":v("f_alt"),"داخل/خارج المخيم":v("f_inside"),"حالة اكتمال بيانات الأسرة":v("f_complete"),"المحافظة الأصلية":canonicalGovernorate(v("f_gov")),"حالة المسكن الأصلي":v("f_home"),"نوع السكن الحالي":v("f_current"),"العنوان":v("f_address"),"ملاحظات الأسرة":v("f_notes")};
  if(old){
   data.forEach(r=>{if(r["اسم رب الأسرة"]===old)Object.assign(r,vals)});
  }else{
@@ -1298,18 +1298,21 @@ function renderHousingChart(families){
 }
 
 function originalGovernorateKey(value){return String(value??"").normalize("NFKC").trim().replace(/[\u064B-\u065F\u0670\u0640]/g,"").replace(/[أإآٱ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/\s+/g," ").toLowerCase()}
+const OFFICIAL_GOVERNORATES=["محافظة شمال غزة","محافظة غزة","محافظة الوسطى","محافظة خانيونس","محافظة رفح"];
+function canonicalGovernorate(value){const key=originalGovernorateKey(value);if(!key)return "";if(key.includes("شمال")||key==="شمال غزه"||key==="محافظه شمال غزه")return OFFICIAL_GOVERNORATES[0];if(key==="غزه"||key==="محافظه غزه")return OFFICIAL_GOVERNORATES[1];if(key.includes("وسط")||key==="الوسطي")return OFFICIAL_GOVERNORATES[2];if(key.includes("خان يونس")||key.includes("خانيونس"))return OFFICIAL_GOVERNORATES[3];if(key.includes("رفح"))return OFFICIAL_GOVERNORATES[4];return OFFICIAL_GOVERNORATES.find(x=>originalGovernorateKey(x)===key)||"";}
 function renderOriginalGovernorateChart(families){
  const el=document.getElementById("originalGovernorateChart");if(!el)return;
  const groups=new Map();let total=0,missing=0;
  families.forEach((rows)=>{
   const ordered=[...(rows||[])].sort((a,b)=>Number(originalGovernorateKey(b["صلة القرابة"])==="رب الاسره")-Number(originalGovernorateKey(a["صلة القرابة"])==="رب الاسره"));
   let value="";for(const r of ordered){const candidate=String(r?.["المحافظة الأصلية"]??"").trim();if(candidate){value=candidate;break}}
-  const label=value||"غير محددة";const key=originalGovernorateKey(label)||"غير محددة";
+  const normalized=canonicalGovernorate(value);const label=normalized||"غير محددة";const key=originalGovernorateKey(label)||"غير محددة";
   if(!value)missing++;if(!groups.has(key))groups.set(key,{label,count:0});groups.get(key).count++;total++;
  });
- const items=[...groups.values()].sort((a,b)=>b.count-a.count||a.label.localeCompare(b.label,"ar"));
- const palette=["#2563eb","#0d9488","#7c3aed","#d97706","#db2777","#0891b2","#65a30d","#64748b","#be123c","#4f46e5"];
- el.innerHTML=`<div class="housing-chart-summary"><b>${total.toLocaleString('ar-EG')}</b><span>إجمالي العائلات التي جرى احتسابها مرة واحدة</span></div>`+(items.length?`<div class="housing-chart-list">${items.map((item,i)=>{const pct=total?item.count/total*100:0;const color=palette[i%palette.length];return `<div class="housing-chart-item" tabindex="0" role="button" aria-label="${svgEsc(item.label)}: ${item.count.toLocaleString('ar-EG')} عائلة، ${pct.toFixed(1)} بالمئة" style="--chart-i:${i}" title="${svgEsc(item.label)}: ${item.count.toLocaleString('ar-EG')} عائلة (${pct.toFixed(1)}%)"><div class="housing-chart-label"><span class="housing-chart-name"><i style="background:${color}"></i>${svgEsc(item.label)}</span><strong>${item.count.toLocaleString('ar-EG')} <small>عائلة</small></strong></div><div class="housing-chart-track" role="img" aria-label="${svgEsc(item.label)} ${item.count} عائلة"><div class="housing-chart-fill" style="width:${Math.max(item.count?1:0,pct)}%;background:${color}"></div></div><div class="housing-chart-percent">${pct.toLocaleString('ar-EG',{maximumFractionDigits:1})}% من العائلات</div></div>`}).join('')}</div>`:`<div class="empty">لا توجد بيانات عائلات لعرضها</div>`)+`<p class="housing-chart-note">هذا الرسم يعتمد حصرياً على حقل «المحافظة الأصلية» المسجل في بيانات الأسرة، ويحتسب كل عائلة مرة واحدة. القيم الفارغة تظهر ضمن «غير محددة»، ويُحدّث الرسم تلقائياً عند تعديل البيانات.</p>`;
+ for(const label of OFFICIAL_GOVERNORATES){const key=originalGovernorateKey(label);if(!groups.has(key))groups.set(key,{label,count:0});}
+ const items=[...groups.values()].sort((a,b)=>{const ai=OFFICIAL_GOVERNORATES.indexOf(a.label),bi=OFFICIAL_GOVERNORATES.indexOf(b.label);if(ai>=0&&bi>=0)return ai-bi;if(ai>=0)return -1;if(bi>=0)return 1;return b.count-a.count||a.label.localeCompare(b.label,"ar")});
+ const palette=["#3979d6","#168f83","#8b6bd6","#c58a35","#c95c79","#0891b2","#65a30d","#64748b","#be123c","#4f46e5"];
+ el.innerHTML=`<div class="housing-chart-summary"><b>${total.toLocaleString('ar-EG')}</b><span>إجمالي العائلات التي جرى احتسابها مرة واحدة</span></div>`+(items.length?`<div class="housing-chart-list">${items.map((item,i)=>{const pct=total?item.count/total*100:0;const color=palette[i%palette.length];return `<div class="housing-chart-item" tabindex="0" role="button" aria-label="${svgEsc(item.label)}: ${item.count.toLocaleString('ar-EG')} عائلة، ${pct.toFixed(1)} بالمئة" style="--chart-i:${i}" title="${svgEsc(item.label)}: ${item.count.toLocaleString('ar-EG')} عائلة (${pct.toFixed(1)}%)"><div class="housing-chart-label"><span class="housing-chart-name"><i style="background:${color}"></i>${svgEsc(item.label)}</span><strong>${item.count.toLocaleString('ar-EG')} <small>عائلة</small></strong></div><div class="housing-chart-track" role="img" aria-label="${svgEsc(item.label)} ${item.count} عائلة"><div class="housing-chart-fill" style="width:${Math.max(item.count?1:0,pct)}%;background:${color}"></div></div><div class="housing-chart-percent">${pct.toLocaleString('ar-EG',{maximumFractionDigits:1})}% من العائلات</div></div>`}).join('')}</div>`:`<div class="empty">لا توجد بيانات عائلات لعرضها</div>`)+`<p class="housing-chart-note">هذا الرسم يحتسب كل عائلة مرة واحدة، ويوحّد القيم القديمة مثل «الوسطى» و«محافظة الوسطى» ضمن «محافظة الوسطى». المحافظات الخمس الرسمية تظهر بأسمائها الموحدة، والقيم الفارغة ضمن «غير محددة».</p>`;
  bindDashboardChartTouch();
 }
 
