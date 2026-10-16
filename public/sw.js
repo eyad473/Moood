@@ -1,4 +1,4 @@
-const CACHE = "abu-areiban-v70.7-sector-excel";
+const CACHE = "abu-areiban-v70.11-premium-header";
 const APP_SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
