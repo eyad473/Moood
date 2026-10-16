@@ -1,4 +1,4 @@
-const CACHE = "abu-areiban-v70.14-fixed-from-v12";
+const CACHE = "abu-areiban-v70.15-family-layout-manual-aid-types";
 const APP_SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {

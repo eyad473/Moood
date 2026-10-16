@@ -722,8 +722,6 @@ html[data-theme="dark"] :focus-visible{outline-color:#8abaff!important}
 <div class="stat"><div class="label">داخل المخيم</div><div class="num" id="sInside">0</div><div class="sub">عائلات داخل المخيم</div></div>
 <div class="stat"><div class="label">اكتمال البيانات</div><div class="num" id="sComplete">0%</div><div class="sub">نسبة العائلات المكتملة</div></div>
 </div>
-<div class="lottie-box"><div class="lottie-art" id="lottieCloud"></div><div class="lottie-copy"><h3>المزامنة السحابية</h3><p>التعديلات المحلية تبقى محفوظة وتتم مزامنتها عند توفر الاتصال.</p></div></div>
-</div>
 <div class="quality-banner ok" id="qualityBanner">
 <span id="qualityBannerText">جاري فحص جودة البيانات...</span>
 <button class="btn no-print" onclick="openQualityModal()">فحص التفاصيل</button>
@@ -822,7 +820,7 @@ html[data-theme="dark"] :focus-visible{outline-color:#8abaff!important}
   <div class="dist-campaign-check-head"><div><h3>فحص استحقاق العائلة</h3><p>ابحث باسم رب الأسرة أو رقم هوية الأسرة، ثم افحص نوع المساعدة قبل التسليم.</p></div><span class="dist-campaign-mark">خطوة قبل التسليم</span></div>
   <div class="dist-campaign-check-fields">
     <div class="field"><label for="distCampaignFamilySearch">العائلة</label><input id="distCampaignFamilySearch" type="search" autocomplete="off" placeholder="اسم رب الأسرة أو رقم هوية الأسرة" aria-describedby="distCampaignSearchHint"/><small id="distCampaignSearchHint">اختَر العائلة من النتائج التي تظهر أسفل الحقل.</small></div>
-    <div class="field"><label for="distCampaignAidType">نوع المساعدة</label><select id="distCampaignAidType"><option value="">اختر نوع المساعدة</option><option value="سلة غذائية">سلة غذائية</option><option value="طرد صحي">طرد صحي</option><option value="حقيبة مدرسية">حقيبة مدرسية</option><option value="مساعدة نقدية">مساعدة نقدية</option><option value="مياه">مياه</option><option value="ملابس">ملابس</option><option value="مستلزمات أطفال">مستلزمات أطفال</option><option value="مستلزمات طبية">مستلزمات طبية</option></select></div>
+    <div class="field"><label for="distCampaignAidType">نوع المساعدة</label><select id="distCampaignAidType"><option value="">اختر نوع المساعدة من السجلات المسجلة</option></select></div>
     <button class="btn primary dist-campaign-check-btn" id="distCampaignCheckBtn" type="button">فحص الاستحقاق</button>
   </div>
   <div id="distCampaignFamilyMatches" class="dist-campaign-matches" aria-live="polite"></div>
