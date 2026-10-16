@@ -825,18 +825,28 @@ body.dark .campmap-board{background:#172333}body.dark .campmap-board-head{backgr
  <div class="section-head"><div><h2>خريطة مخيم أبو عريبان</h2><p class="muted">مخطط ميداني محلي قابل للتعديل، وتُحفظ العلامات على هذا الجهاز دون تغيير بيانات العائلات أو التوزيعات.</p></div></div>
  <div class="campmap-layout">
   <div class="campmap-board">
-   <div class="campmap-board-head"><div><b>حدود المخيم حسب الإحداثيات</b><div class="muted" style="font-size:11px">اضغط داخل الحدود لتسجيل الموقع المحدد من لوحة الأدوات</div></div><div class="actions"><button class="btn" type="button" onclick="exportOfflineCampMap()">تصدير نسخة احتياطية</button><button class="btn" type="button" onclick="document.getElementById('campMapImportFile').click()">استيراد نسخة</button><input id="campMapImportFile" type="file" accept="application/json,.json" hidden onchange="importOfflineCampMap(event)"></div></div>
+   <div class="campmap-board-head"><div><b>لوحة الرسم اليدوي</b><div class="muted" style="font-size:11px">اختر أداة ثم ارسم مباشرة على المخطط. تُحفظ الرسومات محليًا.</div></div><div class="actions"><button class="btn" type="button" onclick="exportOfflineCampMap()">تصدير نسخة احتياطية</button><button class="btn" type="button" onclick="document.getElementById('campMapImportFile').click()">استيراد نسخة</button><input id="campMapImportFile" type="file" accept="application/json,.json" hidden onchange="importOfflineCampMap(event)"></div></div>
    <svg id="campMapSvg" class="campmap-svg" viewBox="0 0 1000 700" role="img" aria-label="حدود مخيم أبو عريبان حسب الإحداثيات المرسلة">
     <rect width="1000" height="700" fill="#eef2f0"/>
     <path d="M0 100 H1000 M0 250 H1000 M0 400 H1000 M0 550 H1000 M100 0 V700 M300 0 V700 M500 0 V700 M700 0 V700 M900 0 V700" stroke="#d8e0dc" stroke-width="1" fill="none" stroke-dasharray="5 8"/>
-    <polygon points="900.0,325.0 292.8,100.0 100.0,459.6 571.3,600.0" fill="#60a5fa" fill-opacity="0.22" stroke="#1d4ed8" stroke-width="5" stroke-linejoin="round"/>
+    <polygon id="campMapOldBoundary" points="900.0,325.0 292.8,100.0 100.0,459.6 571.3,600.0" fill="#60a5fa" fill-opacity="0.22" stroke="#1d4ed8" stroke-width="5" stroke-linejoin="round"/>
     <g><circle cx="900.0" cy="325.0" r="8" fill="#dc2626" stroke="#fff" stroke-width="3"/><text x="913.0" y="313.0" font-size="17" font-weight="800" fill="#991b1b">نقطة 1</text></g><g><circle cx="292.8" cy="100.0" r="8" fill="#dc2626" stroke="#fff" stroke-width="3"/><text x="305.8" y="88.0" font-size="17" font-weight="800" fill="#991b1b">نقطة 2</text></g><g><circle cx="100.0" cy="459.6" r="8" fill="#dc2626" stroke="#fff" stroke-width="3"/><text x="113.0" y="447.6" font-size="17" font-weight="800" fill="#991b1b">نقطة 3</text></g><g><circle cx="571.3" cy="600.0" r="8" fill="#dc2626" stroke="#fff" stroke-width="3"/><text x="584.3" y="588.0" font-size="17" font-weight="800" fill="#991b1b">نقطة 4</text></g>
     <text x="500" y="48" text-anchor="middle" font-size="23" font-weight="900" fill="#1e3a8a">حدود مخيم أبو عريبان — حسب الإحداثيات المرسلة</text>
     <text x="500" y="665" text-anchor="middle" font-size="17" fill="#475569">الحدود مرسومة بالإحداثيات؛ الخلفية ليست صورة أقمار صناعية، والتفاصيل الداخلية تحتاج تحديدًا ميدانيًا</text>
+    <g id="campMapSketches"></g>
     <g id="campMapMarkers"></g>
    </svg>
   </div>
   <aside class="campmap-tools">
+   <div class="campmap-panel"><h3>أدوات الرسم اليدوي</h3><div class="campmap-form">
+    <label for="campMapDrawMode">اختر أداة الرسم</label><select id="campMapDrawMode" onchange="setCampMapDrawMode(this.value)"><option value="select">تحديد / إضافة علامة</option><option value="boundary">رسم حدود المخيم</option><option value="road">رسم شارع أو ممر</option><option value="area">رسم قطاع أو منطقة</option><option value="note">كتابة اسم على المخطط</option></select>
+    <label for="campMapDrawLabel">اسم الرسم (للحدود/الشارع/القطاع)</label><input id="campMapDrawLabel" maxlength="70" placeholder="مثال: شارع السوق أو القطاع الشرقي"/>
+    <div class="actions" style="display:grid;grid-template-columns:1fr 1fr;gap:7px"><button class="btn primary" type="button" onclick="finishCampMapDrawing()">إنهاء الرسم</button><button class="btn" type="button" onclick="undoCampMapDrawing()">تراجع</button><button class="btn" type="button" onclick="cancelCampMapDrawing()">إلغاء الحالي</button><button class="btn danger" type="button" onclick="clearCampMapDrawings()">مسح الرسومات</button></div>
+    <label style="display:flex;align-items:center;gap:8px"><input id="campMapShowOldBoundary" type="checkbox" checked onchange="toggleCampMapOldBoundary(this.checked)" style="width:auto;min-height:0"/> إظهار الحدود السابقة</label>
+    <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" checked onchange="document.getElementById('campMapMarkers').style.display=this.checked?'':'none'" style="width:auto;min-height:0"/> إظهار / إخفاء العلامات</label>
+    <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" checked onchange="document.getElementById('campMapSketches').style.display=this.checked?'':'none'" style="width:auto;min-height:0"/> إظهار / إخفاء الرسومات اليدوية</label>
+    <p class="campmap-warning" id="campMapDrawStatus">للرسم: اختر الأداة، ثم اضغط نقاطًا متتابعة على المخطط. اضغط «إنهاء الرسم» عند الانتهاء. للحدود والقطاعات أغلق الشكل تلقائيًا.</p>
+   </div></div>
    <div class="campmap-panel"><h3>إضافة موقع على الخريطة</h3><div class="campmap-form">
     <label for="campMapType">نوع الموقع</label><select id="campMapType"><option value="tent">خيمة / مأوى</option><option value="water">نقطة مياه</option><option value="service">خدمة / مرفق</option><option value="sector">قطاع / منطقة</option><option value="need">موقع يحتاج تدخل</option></select>
     <label for="campMapLabel">اسم الموقع أو رقمه</label><input id="campMapLabel" maxlength="70" placeholder="مثال: خيمة 24 أو نقطة مياه 1"/>
@@ -1252,6 +1262,6 @@ body.dark .campmap-board{background:#172333}body.dark .campmap-board-head{backgr
 <style id="mobile-drawer-final-overrides">
 @media(max-width:700px){.mobile-bottom-nav{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;padding:7px 12px max(7px,env(safe-area-inset-bottom))!important}.mobile-bottom-nav button{height:52px!important;min-height:52px!important;border-radius:14px!important}.mobile-bottom-nav button small{font-size:11px!important;line-height:14px!important}}
 </style>
-<script src="./app.js?v=70.16-offline-camp-map"></script></body>
+<script src="./app.js?v=70.18-manual-drawing"></script></body>
 </html>
 <style>.original-governorate-card .housing-chart-item{cursor:pointer}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-track{box-shadow:0 0 0 3px rgba(59,130,246,.18),0 4px 14px rgba(37,99,235,.13);transform:translateY(-1px)}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-fill{filter:brightness(1.16)}</style>

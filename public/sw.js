@@ -1,4 +1,4 @@
-const CACHE = "abu-oreiban-v70.17-real-boundary";
+const CACHE = "abu-oreiban-v70.18-manual-drawing";
 const APP_SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
