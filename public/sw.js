@@ -1,4 +1,4 @@
-const CACHE = "abu-areiban-v70.14-recovery";
+const CACHE = "abu-areiban-v70.11-premium-header";
 const APP_SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
