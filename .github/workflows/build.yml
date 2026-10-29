@@ -5,14 +5,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Setup JDK
+        uses: actions/setup-java@v4
         with:
-          node-version: 20
-      - run: npm i -g @bubblewrap/cli
-      - run: |
-          echo '{"packageId":"com.abuareban.camp","host":"moood.eyad2000515.workers.dev","name":"مخيم ابو عريبان","launcherName":"ابو عريبان","display":"standalone","themeColor":"#0f172a","navigationColor":"#0f172a","backgroundColor":"#ffffff","startUrl":"/","iconUrl":"https://moood.eyad2000515.workers.dev/icon.png","webManifestUrl":"https://moood.eyad2000515.workers.dev/manifest.json","fullScopeUrl":"https://moood.eyad2000515.workers.dev/","appVersion":"1.0.0"}' > twa-manifest.json
-          npx @bubblewrap/cli build --skipPwaValidation
+          distribution: temurin
+          java-version: 17
+      - name: Build WebView APK
+        run: |
+          mkdir -p app/src/main/java/com/abuareban/camp
+          mkdir -p app/src/main/res
+          cat > app/build.gradle <<'GR'
+          plugins { id 'com.android.application' }
+          android { compileSdk 34; defaultConfig { applicationId "com.abuareban.camp"; minSdk 21; targetSdk 34; versionCode 1; versionName "1.0" }; compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 } }
+          dependencies { implementation 'androidx.appcompat:appcompat:1.6.1' }
+          GR
+          cat > app/src/main/java/com/abuareban/camp/MainActivity.java <<'JAVA'
+          package com.abuareban.camp;
+          import android.os.Bundle; import android.webkit.WebView; import android.webkit.WebViewClient; import androidx.appcompat.app.AppCompatActivity;
+          public class MainActivity extends AppCompatActivity {
+            protected void onCreate(Bundle b){ super.onCreate(b);
+              WebView w=new WebView(this); w.getSettings().setJavaScriptEnabled(true); w.getSettings().setDomStorageEnabled(true);
+              w.setWebViewClient(new WebViewClient()); w.loadUrl("https://moood.eyad2000515.workers.dev/");
+              setContentView(w);
+            }
+          }
+          JAVA
+          cat > app/src/main/AndroidManifest.xml <<'MAN'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.INTERNET"/><application android:label="مخيم ابو عريبان" android:theme="@android:style/Theme.NoTitleBar"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>
+          MAN
+          echo "include ':app'" > settings.gradle
+          gradle :app:assembleDebug
       - uses: actions/upload-artifact@v4
         with:
-          name: apk
-          path: app-release-signed.apk
+          name: AbuAreban-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
