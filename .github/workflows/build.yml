@@ -3,14 +3,23 @@ on: workflow_dispatch
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: mingc/android-build-box
     steps:
       - uses: actions/checkout@v4
+      
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Build APK
         run: |
-          rm -rf app
+          rm -rf app build.gradle settings.gradle gradlew gradle
           mkdir -p app/src/main/java/com/mokhayam/app
           echo "include ':app'" > settings.gradle
+          
           cat > app/build.gradle <<'ENDG'
           plugins { id 'com.android.application' }
           android {
@@ -23,15 +32,18 @@ jobs:
                   versionCode 1
                   versionName "1.0"
               }
-          }
-          dependencies {
-              implementation 'androidx.appcompat:appcompat:1.6.1'
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
           }
           ENDG
+          
           cat > app/src/main/AndroidManifest.xml <<'ENDM'
+          <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
             <uses-permission android:name="android.permission.INTERNET"/>
-            <application android:label="مخيم ابو عريبان">
+            <application android:label="مخيم ابو عريبان" android:usesCleartextTraffic="true">
               <activity android:name=".MainActivity" android:exported="true">
                 <intent-filter>
                   <action android:name="android.intent.action.MAIN"/>
@@ -41,28 +53,35 @@ jobs:
             </application>
           </manifest>
           ENDM
+          
           cat > app/src/main/java/com/mokhayam/app/MainActivity.java <<'ENDJ'
           package com.mokhayam.app;
           import android.os.Bundle;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
-          import androidx.appcompat.app.AppCompatActivity;
-          public class MainActivity extends AppCompatActivity {
+          import android.app.Activity;
+          public class MainActivity extends Activity {
+              WebView w;
               protected void onCreate(Bundle b){
                   super.onCreate(b);
-                  WebView w=new WebView(this);
+                  w=new WebView(this);
                   w.getSettings().setJavaScriptEnabled(true);
                   w.getSettings().setDomStorageEnabled(true);
-                  w.setWebViewClient(new WebViewClient(){
-                    public boolean shouldOverrideUrlLoading(WebView v, String url){ v.loadUrl(url); return true; }
-                  });
+                  w.setWebViewClient(new WebViewClient());
                   w.loadUrl("https://moood.eyad2000515.workers.dev/");
                   setContentView(w);
               }
-              public void onBackPressed(){ WebView w=(WebView)findViewById(android.R.id.content).getRootView(); if(w!=null && w.canGoBack()) w.goBack(); else super.onBackPressed(); }
+              public void onBackPressed(){ if(w.canGoBack()) w.goBack(); else super.onBackPressed(); }
           }
           ENDJ
-          gradle :app:assembleDebug
+          
+          # تثبيت gradle وبناء المشروع
+          sudo apt-get update -y
+          sudo apt-get install -y gradle
+          gradle wrapper --gradle-version 8.4
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --no-daemon
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
