@@ -1,0 +1,18 @@
+name: Build APK
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm i -g @bubblewrap/cli
+      - run: |
+          echo '{"packageId":"com.abuareban.camp","host":"moood.eyad2000515.workers.dev","name":"مخيم ابو عريبان","launcherName":"ابو عريبان","display":"standalone","themeColor":"#0f172a","navigationColor":"#0f172a","backgroundColor":"#ffffff","startUrl":"/","iconUrl":"https://moood.eyad2000515.workers.dev/icon.png","webManifestUrl":"https://moood.eyad2000515.workers.dev/manifest.json","fullScopeUrl":"https://moood.eyad2000515.workers.dev/","appVersion":"1.0.0"}' > twa-manifest.json
+          npx @bubblewrap/cli build --skipPwaValidation
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: app-release-signed.apk
