@@ -1,48 +1,34 @@
-name: Build Clean APK
+name: Build APK Now
 on: workflow_dispatch
 jobs:
   build:
     runs-on: ubuntu-latest
+    container: mingc/android-build-box
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Build Clean APK
+      - name: Build APK
         run: |
           rm -rf app
-          mkdir -p app/src/main/java/com/abuareban/camp
-          cat > settings.gradle <<'EOF'
-          include ':app'
-          EOF
-          cat > app/build.gradle <<'EOF'
-          plugins {
-              id 'com.android.application' version '8.1.4'
-          }
+          mkdir -p app/src/main/java/com/mokhayam/app
+          echo "include ':app'" > settings.gradle
+          cat > app/build.gradle <<'ENDG'
+          plugins { id 'com.android.application' }
           android {
-              namespace 'com.abuareban.camp'
+              namespace 'com.mokhayam.app'
               compileSdk 33
               defaultConfig {
-                  applicationId "com.abuareban.camp"
+                  applicationId "com.mokhayam.app"
                   minSdk 21
                   targetSdk 33
                   versionCode 1
                   versionName "1.0"
               }
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_17
-                  targetCompatibility JavaVersion.VERSION_17
-              }
           }
           dependencies {
               implementation 'androidx.appcompat:appcompat:1.6.1'
           }
-          EOF
-          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          ENDG
+          cat > app/src/main/AndroidManifest.xml <<'ENDM'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
             <uses-permission android:name="android.permission.INTERNET"/>
             <application android:label="مخيم ابو عريبان">
@@ -54,9 +40,9 @@ jobs:
               </activity>
             </application>
           </manifest>
-          EOF
-          cat > app/src/main/java/com/abuareban/camp/MainActivity.java <<'EOF'
-          package com.abuareban.camp;
+          ENDM
+          cat > app/src/main/java/com/mokhayam/app/MainActivity.java <<'ENDJ'
+          package com.mokhayam.app;
           import android.os.Bundle;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
@@ -67,16 +53,18 @@ jobs:
                   WebView w=new WebView(this);
                   w.getSettings().setJavaScriptEnabled(true);
                   w.getSettings().setDomStorageEnabled(true);
-                  w.setWebViewClient(new WebViewClient());
+                  w.setWebViewClient(new WebViewClient(){
+                    public boolean shouldOverrideUrlLoading(WebView v, String url){ v.loadUrl(url); return true; }
+                  });
                   w.loadUrl("https://moood.eyad2000515.workers.dev/");
                   setContentView(w);
               }
+              public void onBackPressed(){ WebView w=(WebView)findViewById(android.R.id.content).getRootView(); if(w!=null && w.canGoBack()) w.goBack(); else super.onBackPressed(); }
           }
-          EOF
-          gradle :app:assembleDebug --no-daemon
-
+          ENDJ
+          gradle :app:assembleDebug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Mokhayam-Clean-APK
+          name: Mokhayam-APK-Jahez
           path: app/build/outputs/apk/debug/app-debug.apk
