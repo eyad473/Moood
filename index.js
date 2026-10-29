@@ -659,7 +659,6 @@ async function bootstrap(request, env) {
   });
 }
 
-
 /* Abu Oreiban Support Portal API — additive endpoints; existing sync routes/schema remain unchanged. */
 async function ensureSupportSchema(env) {
   await ensureSchema(env);
@@ -813,10 +812,28 @@ async function supportSubmit(request, env) {
   const subject=cleanString(b.subject,160), message=cleanString(b.message,2500), changes=cleanString(b.requestedChanges,2000);
   if(!['استفسار','شكوى','طلب تحديث بيانات'].includes(type)) return json({ok:false,error:'نوع الطلب غير صحيح'},400);
   if(familyName.length<3 || phone.length<8 || subject.length<3 || message.length<5) return json({ok:false,error:'يرجى استكمال عنوان الطلب وتفاصيله'},400);
-  const id=crypto.randomUUID(), ticketNo='ABO-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+crypto.randomUUID().slice(0,6).toUpperCase(), t=now();
-  await env.DB.prepare(`INSERT INTO support_requests(id,ticket_no,request_type,family_name,family_id,phone,subject,message,requested_changes,status,staff_reply,created_at,updated_at,device_hint) VALUES(?,?,?,?,?,?,?,?,?,'جديد','',?,?,?)`)
-    .bind(id,ticketNo,type,familyName,familyId,phone,subject,message,changes,t,t,cleanString(request.headers.get('X-Device-Id'),120)).run();
-  return json({ok:true,ticketNo,message:'تم استلام طلبك وحفظه لدى إدارة المخيم. احتفظ برقم المتابعة.'},201);
+  const id=crypto.randomUUID(), t=now();
+  // New requests use a simple six-digit code. The existing UNIQUE constraint
+  // protects old and new ticket numbers without changing any stored records.
+  let ticketNo='', saved=false;
+  for(let attempt=0;attempt<12&&!saved;attempt++){
+    const bytes=new Uint32Array(1); crypto.getRandomValues(bytes);
+    ticketNo=String(100000+(bytes[0]%900000));
+    const exists=await env.DB.prepare(`SELECT 1 AS found FROM support_requests WHERE ticket_no=? LIMIT 1`).bind(ticketNo).first();
+    if(exists) continue;
+    try{
+      await env.DB.prepare(`INSERT INTO support_requests(id,ticket_no,request_type,family_name,family_id,phone,subject,message,requested_changes,status,staff_reply,created_at,updated_at,device_hint) VALUES(?,?,?,?,?,?,?,?,?,'جديد','',?,?,?)`)
+        .bind(id,ticketNo,type,familyName,familyId,phone,subject,message,changes,t,t,cleanString(request.headers.get('X-Device-Id'),120)).run();
+      saved=true;
+    }catch(err){
+      // A simultaneous request may claim the same six-digit number; retry only
+      // if that code now exists, otherwise propagate the actual database error.
+      const collision=await env.DB.prepare(`SELECT 1 AS found FROM support_requests WHERE ticket_no=? LIMIT 1`).bind(ticketNo).first();
+      if(!collision) throw err;
+    }
+  }
+  if(!saved) return json({ok:false,error:'تعذر إنشاء رقم متابعة الآن. يرجى المحاولة مرة أخرى.'},503);
+  return json({ok:true,ticketNo,status:'قيد المتابعة',message:'تم استلام طلبك وحفظه لدى إدارة المخيم. احتفظ برقم المتابعة المكوّن من 6 أرقام.'},201);
 }
 async function supportStatus(request, env) {
   await ensureSupportSchema(env);
