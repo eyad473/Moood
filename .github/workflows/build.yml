@@ -5,36 +5,68 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup JDK
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: 17
-      - name: Build WebView APK
+          distribution: 'temurin'
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v3
+      - name: Create Project
         run: |
+          rm -rf app
           mkdir -p app/src/main/java/com/abuareban/camp
-          mkdir -p app/src/main/res
-          cat > app/build.gradle <<'GR'
+          cat > settings.gradle <<'EOF'
+          include ':app'
+          EOF
+          cat > app/build.gradle <<'EOF'
           plugins { id 'com.android.application' }
-          android { compileSdk 34; defaultConfig { applicationId "com.abuareban.camp"; minSdk 21; targetSdk 34; versionCode 1; versionName "1.0" }; compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 } }
-          dependencies { implementation 'androidx.appcompat:appcompat:1.6.1' }
-          GR
-          cat > app/src/main/java/com/abuareban/camp/MainActivity.java <<'JAVA'
+          android {
+            namespace 'com.abuareban.camp'
+            compileSdk 34
+            defaultConfig {
+              applicationId "com.abuareban.camp"
+              minSdk 21
+              targetSdk 34
+              versionCode 1
+              versionName "1.0"
+            }
+          }
+          dependencies {
+            implementation 'androidx.appcompat:appcompat:1.6.1'
+          }
+          EOF
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="android.permission.INTERNET"/>
+            <application android:label="مخيم ابو عريبان">
+              <activity android:name=".MainActivity" android:exported="true">
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN"/>
+                  <category android:name="android.intent.category.LAUNCHER"/>
+                </intent-filter>
+              </activity>
+            </application>
+          </manifest>
+          EOF
+          cat > app/src/main/java/com/abuareban/camp/MainActivity.java <<'EOF'
           package com.abuareban.camp;
-          import android.os.Bundle; import android.webkit.WebView; import android.webkit.WebViewClient; import androidx.appcompat.app.AppCompatActivity;
+          import android.os.Bundle;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import androidx.appcompat.app.AppCompatActivity;
           public class MainActivity extends AppCompatActivity {
-            protected void onCreate(Bundle b){ super.onCreate(b);
-              WebView w=new WebView(this); w.getSettings().setJavaScriptEnabled(true); w.getSettings().setDomStorageEnabled(true);
-              w.setWebViewClient(new WebViewClient()); w.loadUrl("https://moood.eyad2000515.workers.dev/");
+            protected void onCreate(Bundle b){
+              super.onCreate(b);
+              WebView w=new WebView(this);
+              w.getSettings().setJavaScriptEnabled(true);
+              w.getSettings().setDomStorageEnabled(true);
+              w.setWebViewClient(new WebViewClient());
+              w.loadUrl("https://moood.eyad2000515.workers.dev/");
               setContentView(w);
             }
           }
-          JAVA
-          cat > app/src/main/AndroidManifest.xml <<'MAN'
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.INTERNET"/><application android:label="مخيم ابو عريبان" android:theme="@android:style/Theme.NoTitleBar"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>
-          MAN
-          echo "include ':app'" > settings.gradle
-          gradle :app:assembleDebug
+          EOF
+      - name: Build APK
+        run: gradle :app:assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: AbuAreban-APK
