@@ -12,7 +12,7 @@ function json(data, status = 200, extra = {}) {
       ...JSON_HEADERS,
       "access-control-allow-origin": ALLOWED_ORIGIN,
       "access-control-allow-methods": "GET,POST,OPTIONS",
-      "access-control-allow-headers": "Content-Type, Authorization, X-Device-Id",
+      "access-control-allow-headers": "Content-Type, Authorization, X-Device-Id, X-Support-Session",
       ...extra
     }
   });
@@ -659,6 +659,201 @@ async function bootstrap(request, env) {
   });
 }
 
+
+/* Abu Oreiban Support Portal API — additive endpoints; existing sync routes/schema remain unchanged. */
+async function ensureSupportSchema(env) {
+  await ensureSchema(env);
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS support_requests (
+      id TEXT PRIMARY KEY, ticket_no TEXT NOT NULL UNIQUE, request_type TEXT NOT NULL,
+      family_name TEXT NOT NULL, family_id TEXT NOT NULL, phone TEXT NOT NULL,
+      subject TEXT NOT NULL, message TEXT NOT NULL, requested_changes TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'جديد', staff_reply TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, device_hint TEXT NOT NULL DEFAULT ''
+    )`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_support_requests_created ON support_requests(created_at DESC)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_support_requests_status ON support_requests(status,created_at DESC)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS support_challenges (
+      challenge_id TEXT PRIMARY KEY, family_id TEXT NOT NULL, challenge_json TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0, expires_at INTEGER NOT NULL, created_at INTEGER NOT NULL
+    )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS support_sessions (
+      token TEXT PRIMARY KEY, family_id TEXT NOT NULL, expires_at INTEGER NOT NULL, created_at INTEGER NOT NULL
+    )`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_support_challenges_expiry ON support_challenges(expires_at)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_support_sessions_expiry ON support_sessions(expires_at)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS support_failures (
+      family_id TEXT PRIMARY KEY, failed_count INTEGER NOT NULL DEFAULT 0,
+      window_start INTEGER NOT NULL, blocked_until INTEGER NOT NULL DEFAULT 0
+    )`)
+  ]);
+}
+function supportNorm(v) {
+  return String(v ?? '').normalize('NFKC')
+    .replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+    .replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+    .replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي')
+    .replace(/[^\p{L}\p{N}]/gu,'').toLowerCase();
+}
+function supportPhone(v) { return String(v ?? '').replace(/[^\d٠-٩۰-۹]/g,'').replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))); }
+function supportPublicRecord(r) {
+  const allow = ["اسم رب الأسرة","رقم هوية الأسرة","رقم الجوال","رقم جوال بديل","العنوان","داخل/خارج المخيم","حالة اكتمال بيانات الأسرة","المحافظة الأصلية","حالة المسكن الأصلي","نوع السكن الحالي","اسم الفرد","صلة القرابة","الجنس","الحالة الاجتماعية","تاريخ الميلاد","العمر التقريبي","رقم هوية الفرد","مرض مزمن؟","نوع المرض","إصابة؟","إصابة?","سبب الإصابة","تفاصيل الإصابة","إعاقة؟","نوع الإعاقة","يتيم/منفصل عن ذويه؟","حامل؟","مرضعة؟","ملاحظات الفرد","ملاحظات الأسرة"];
+  const out={};
+  for(const k of allow) if(r && r[k] !== undefined && r[k] !== null && String(r[k]).trim() !== "") out[k]=r[k];
+  return out;
+}
+function supportYear(v) {
+  const s=String(v ?? '').trim();
+  const matches=s.match(/(?:19|20)\d{2}/g);
+  if(matches && matches.length) return matches[matches.length-1];
+  const digits=s.replace(/[^0-9٠-٩۰-۹]/g,'').replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+  if(digits.length===4 && Number(digits)>=1900 && Number(digits)<=2035) return digits;
+  return '';
+}
+async function supportRowsForFamily(env, familyId) {
+  const result=await env.DB.prepare(`SELECT record_id,data_json FROM sync_records WHERE deleted=0 AND record_id LIKE 'r-%' ORDER BY record_id ASC LIMIT 5000`).all();
+  const rows=[];
+  for(const item of (result.results||[])) {
+    try { const r=JSON.parse(item.data_json||'{}'); if(supportNorm(r['رقم هوية الأسرة'])===supportNorm(familyId)) rows.push(r); } catch {}
+  }
+  return rows;
+}
+function supportChallengeCandidates(rows) {
+  const candidates=[];
+  const wife=rows.find(r=>{const rel=supportNorm(r['صلة القرابة']);return rel.includes(supportNorm('زوجة')) || rel===supportNorm('الزوجة');});
+  if(wife) { const y=supportYear(wife['تاريخ الميلاد']||wife['سنة الميلاد']); if(y) candidates.push({key:'a'+candidates.length,label:'ما سنة ميلاد الزوجة المسجّلة؟',answer:y,kind:'year'}); }
+  const children=rows.filter(r=>{const rel=supportNorm(r['صلة القرابة']);return rel.includes(supportNorm('ابن'))||rel.includes(supportNorm('بنت'))||rel.includes(supportNorm('طفل'))||rel.includes(supportNorm('طفلة'));});
+  for(const child of children) { const y=supportYear(child['تاريخ الميلاد']||child['سنة الميلاد']); if(y) { const childName=String(child['اسم الفرد']||'').trim(); candidates.push({key:'a'+candidates.length,label:childName ? `ما سنة ميلاد ${childName} المسجّل/ة في الكشف؟` : 'ما سنة ميلاد أحد الأبناء المسجّلين؟',answer:y,kind:'year'}); } }
+  const first=rows.find(r=>supportPhone(r['رقم الجوال']).length>=8);
+  if(first) { const p=supportPhone(first['رقم الجوال']); candidates.push({key:'a'+candidates.length,label:'ما آخر أربعة أرقام من رقم الجوال المعتمد؟',answer:p.slice(-4),kind:'last4'}); }
+  // Prefer two different kinds of evidence; don't repeat the same generic child question twice.
+  const picked=[];
+  const wifeCandidate=candidates.find(c=>c.label.includes('الزوجة'));
+  const childCandidate=candidates.find(c=>c.label.includes('الأبناء'));
+  const phoneCandidate=candidates.find(c=>c.kind==='last4');
+  if(wifeCandidate) picked.push(wifeCandidate);
+  if(childCandidate && picked.length<2) picked.push(childCandidate);
+  if(picked.length<2 && phoneCandidate && !picked.includes(phoneCandidate)) picked.push(phoneCandidate);
+  if(picked.length<2) for(const c of candidates) if(!picked.includes(c) && picked.length<2) picked.push(c);
+  return picked.map((c,i)=>({...c,key:'a'+i}));
+}
+async function supportChallenge(request, env) {
+  await ensureSupportSchema(env);
+  let body; try { body=await request.json(); } catch { return json({ok:false,error:'البيانات المرسلة غير صالحة'},400); }
+  const familyId=supportNorm(body.familyId);
+  if(familyId.length<5) return json({ok:false,error:'أدخل رقم هوية رب الأسرة بشكل صحيح'},400);
+  const t0=now();
+  const failure=await env.DB.prepare('SELECT failed_count,window_start,blocked_until FROM support_failures WHERE family_id=? LIMIT 1').bind(familyId).first();
+  if(failure && Number(failure.blocked_until)>t0) return json({ok:false,error:'تم إيقاف التحقق مؤقتًا بسبب محاولات غير صحيحة. حاول لاحقًا أو تواصل مع مندوب المنطقة.'},429);
+  const rows=await supportRowsForFamily(env,familyId);
+  if(!rows.length) return json({ok:false,error:'تعذّر بدء التحقق بهذه البيانات. تأكد من رقم الهوية أو تواصل مع مندوب المنطقة.'},404);
+  const questions=supportChallengeCandidates(rows);
+  if(questions.length<2) return json({ok:false,error:'لا تتوفر بيانات تحقق كافية لهذه الأسرة في السجل. يرجى مراجعة مندوب المنطقة لتحديث البيانات.'},409);
+  const challengeId=crypto.randomUUID(), t=now();
+  await env.DB.prepare('INSERT INTO support_challenges(challenge_id,family_id,challenge_json,attempts,expires_at,created_at) VALUES(?,?,?,0,?,?)').bind(challengeId,familyId,JSON.stringify(questions),t+5*60*1000,t).run();
+  return json({ok:true,challengeId,questions:questions.map(q=>({key:q.key,label:q.label})),expiresInSeconds:300});
+}
+async function supportVerify(request, env) {
+  await ensureSupportSchema(env);
+  let body; try { body=await request.json(); } catch { return json({ok:false,error:'البيانات المرسلة غير صالحة'},400); }
+  const challengeId=cleanString(body.challengeId,80);
+  const row=await env.DB.prepare('SELECT challenge_id,family_id,challenge_json,attempts,expires_at FROM support_challenges WHERE challenge_id=? LIMIT 1').bind(challengeId).first();
+  if(!row || Number(row.expires_at)<now()) return json({ok:false,error:'انتهت صلاحية أسئلة التحقق. ابدأ من جديد.'},410);
+  if(Number(row.attempts)>=3) return json({ok:false,error:'تم إيقاف المحاولة بعد إجابات غير صحيحة. ابدأ تحققًا جديدًا أو تواصل مع مندوب المنطقة.'},429);
+  let qs=[]; try { qs=JSON.parse(row.challenge_json||'[]'); } catch {}
+  const answers=body.answers||{};
+  const ok=qs.length>=2 && qs.every(q=>{
+    const given=String(answers[q.key]??'');
+    return q.kind==='last4' ? supportPhone(given).slice(-4)===q.answer : supportYear(given)===q.answer;
+  });
+  if(!ok) {
+    const attempts=Number(row.attempts)+1, t=now();
+    await env.DB.prepare('UPDATE support_challenges SET attempts=? WHERE challenge_id=?').bind(attempts,challengeId).run();
+    const prior=await env.DB.prepare('SELECT failed_count,window_start FROM support_failures WHERE family_id=? LIMIT 1').bind(row.family_id).first();
+    const count=prior && t-Number(prior.window_start)<15*60*1000 ? Number(prior.failed_count)+1 : 1;
+    const windowStart=prior && t-Number(prior.window_start)<15*60*1000 ? Number(prior.window_start) : t;
+    const blockedUntil=count>=5 ? t+15*60*1000 : 0;
+    await env.DB.prepare('INSERT INTO support_failures(family_id,failed_count,window_start,blocked_until) VALUES(?,?,?,?) ON CONFLICT(family_id) DO UPDATE SET failed_count=excluded.failed_count,window_start=excluded.window_start,blocked_until=excluded.blocked_until').bind(row.family_id,count,windowStart,blockedUntil).run();
+    const error=blockedUntil ? 'تكررت الإجابات غير الصحيحة. تم إيقاف التحقق مؤقتًا لمدة 15 دقيقة.' : attempts>=3 ? 'الإجابات غير صحيحة. انتهت هذه المحاولة؛ ابدأ تحققًا جديدًا أو تواصل مع مندوب المنطقة.' : 'الإجابات غير صحيحة. راجع البيانات وحاول مجددًا.';
+    return json({ok:false,error},403);
+  }
+  await env.DB.prepare('DELETE FROM support_failures WHERE family_id=?').bind(row.family_id).run();
+  const token=crypto.randomUUID()+crypto.randomUUID().replace(/-/g,''), t=now();
+  await env.DB.prepare('INSERT INTO support_sessions(token,family_id,expires_at,created_at) VALUES(?,?,?,?)').bind(token,row.family_id,t+30*60*1000,t).run();
+  await env.DB.prepare('DELETE FROM support_challenges WHERE challenge_id=?').bind(challengeId).run();
+  return json({ok:true,sessionToken:token,expiresInSeconds:1800,message:'تم التحقق بنجاح.'});
+}
+async function supportSession(env, token) {
+  if(!token) return null;
+  const row=await env.DB.prepare('SELECT family_id,expires_at FROM support_sessions WHERE token=? LIMIT 1').bind(token).first();
+  if(!row || Number(row.expires_at)<now()) { if(row) await env.DB.prepare('DELETE FROM support_sessions WHERE token=?').bind(token).run(); return null; }
+  return row;
+}
+async function supportLookup(request, env) {
+  await ensureSupportSchema(env);
+  const token=cleanString(request.headers.get('X-Support-Session')||'',200);
+  const session=await supportSession(env,token);
+  if(!session) return json({ok:false,error:'انتهت جلسة التحقق أو لم يتم التحقق من الهوية. أعد التحقق من بيانات الأسرة.'},401);
+  const rows=await supportRowsForFamily(env,session.family_id);
+  if(!rows.length) return json({ok:false,error:'تعذر العثور على بيانات الأسرة في السجل.'},404);
+  const first=rows.find(r=>supportNorm(r['صلة القرابة'])===supportNorm('رب الأسرة'))||rows[0];
+  const familyName=String(first['اسم رب الأسرة']||rows[0]['اسم رب الأسرة']||'');
+  return json({ok:true,family:{name:familyName,fields:supportPublicRecord(first),members:rows.map(supportPublicRecord),count:rows.length}});
+}
+async function supportSubmit(request, env) {
+  await ensureSupportSchema(env);
+  let b; try { b=await request.json(); } catch { return json({ok:false,error:'البيانات المرسلة غير صالحة'},400); }
+  const token=cleanString(request.headers.get('X-Support-Session')||b.sessionToken||'',200);
+  const session=await supportSession(env,token);
+  if(!session) return json({ok:false,error:'انتهت جلسة التحقق. أعد التحقق من بيانات الأسرة قبل إرسال الطلب.'},401);
+  const rows=await supportRowsForFamily(env,session.family_id);
+  if(!rows.length) return json({ok:false,error:'تعذر العثور على بيانات الأسرة في السجل.'},404);
+  const first=rows.find(r=>supportNorm(r['صلة القرابة'])===supportNorm('رب الأسرة'))||rows[0];
+  const type=cleanString(b.requestType,40), familyName=cleanString(first['اسم رب الأسرة']||rows[0]['اسم رب الأسرة']||'',200), familyId=String(session.family_id), phone=supportPhone(first['رقم الجوال']);
+  const subject=cleanString(b.subject,160), message=cleanString(b.message,2500), changes=cleanString(b.requestedChanges,2000);
+  if(!['استفسار','شكوى','طلب تحديث بيانات'].includes(type)) return json({ok:false,error:'نوع الطلب غير صحيح'},400);
+  if(familyName.length<3 || phone.length<8 || subject.length<3 || message.length<5) return json({ok:false,error:'يرجى استكمال عنوان الطلب وتفاصيله'},400);
+  const id=crypto.randomUUID(), ticketNo='ABO-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+crypto.randomUUID().slice(0,6).toUpperCase(), t=now();
+  await env.DB.prepare(`INSERT INTO support_requests(id,ticket_no,request_type,family_name,family_id,phone,subject,message,requested_changes,status,staff_reply,created_at,updated_at,device_hint) VALUES(?,?,?,?,?,?,?,?,?,'جديد','',?,?,?)`)
+    .bind(id,ticketNo,type,familyName,familyId,phone,subject,message,changes,t,t,cleanString(request.headers.get('X-Device-Id'),120)).run();
+  return json({ok:true,ticketNo,message:'تم استلام طلبك وحفظه لدى إدارة المخيم. احتفظ برقم المتابعة.'},201);
+}
+async function supportStatus(request, env) {
+  await ensureSupportSchema(env);
+  let b; try { b=await request.json(); } catch { return json({ok:false,error:"البيانات المرسلة غير صالحة"},400); }
+  const ticket=cleanString(b.ticketNo,80), phone=supportPhone(b.phone);
+  if(!ticket || phone.length<8) return json({ok:false,error:"أدخل رقم الطلب ورقم الجوال المسجل"},400);
+  const row=await env.DB.prepare(`SELECT ticket_no,request_type,subject,status,staff_reply,created_at,updated_at FROM support_requests WHERE ticket_no=? AND phone=? LIMIT 1`).bind(ticket,phone).first();
+  if(!row) return json({ok:false,error:"لم يتم العثور على الطلب بهذه البيانات"},404);
+  return json({ok:true,request:{ticketNo:row.ticket_no,requestType:row.request_type,subject:row.subject,status:row.status,staffReply:row.staff_reply,createdAt:Number(row.created_at),updatedAt:Number(row.updated_at)}});
+}
+async function supportList(request, env) {
+  const auth=await requirePrimaryDevice(request,env);
+  if(!auth.ok) return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);
+  await ensureSupportSchema(env);
+  const url=new URL(request.url), status=cleanString(url.searchParams.get("status"),40), q=cleanString(url.searchParams.get("q"),120);
+  let sql=`SELECT id,ticket_no,request_type,family_name,family_id,phone,subject,message,requested_changes,status,staff_reply,created_at,updated_at FROM support_requests`;
+  const where=[], vals=[];
+  if(status){where.push("status=?");vals.push(status)}
+  if(q){where.push("(family_name LIKE ? OR ticket_no LIKE ? OR family_id LIKE ? OR subject LIKE ?)");vals.push("%"+q+"%","%"+q+"%","%"+q+"%","%"+q+"%")}
+  if(where.length)sql+=" WHERE "+where.join(" AND ");
+  sql+=" ORDER BY created_at DESC LIMIT 300";
+  const stmt=env.DB.prepare(sql);
+  const res=await (vals.length?stmt.bind(...vals):stmt).all();
+  return json({ok:true,items:(res.results||[]).map(r=>({id:r.id,ticketNo:r.ticket_no,requestType:r.request_type,familyName:r.family_name,familyId:r.family_id,phone:r.phone,subject:r.subject,message:r.message,requestedChanges:r.requested_changes,status:r.status,staffReply:r.staff_reply,createdAt:Number(r.created_at),updatedAt:Number(r.updated_at)}))});
+}
+async function supportUpdate(request, env) {
+  const auth=await requirePrimaryDevice(request,env);
+  if(!auth.ok) return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);
+  await ensureSupportSchema(env);
+  let b; try { b=await request.json(); } catch { return json({ok:false,error:"البيانات المرسلة غير صالحة"},400); }
+  const ticket=cleanString(b.ticketNo,80), status=cleanString(b.status,40), reply=cleanString(b.staffReply,2000);
+  if(!ticket || !["جديد","قيد المراجعة","تم الرد","تم الحل","مرفوض"].includes(status)) return json({ok:false,error:"حالة الطلب غير صحيحة"},400);
+  const r=await env.DB.prepare(`UPDATE support_requests SET status=?,staff_reply=?,updated_at=? WHERE ticket_no=?`).bind(status,reply,now(),ticket).run();
+  if(!r.meta?.changes) return json({ok:false,error:"الطلب غير موجود"},404);
+  return json({ok:true});
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
@@ -667,13 +862,20 @@ export default {
         headers: {
           "access-control-allow-origin": ALLOWED_ORIGIN,
           "access-control-allow-methods": "GET,POST,OPTIONS",
-          "access-control-allow-headers": "Content-Type, Authorization, X-Device-Id"
+          "access-control-allow-headers": "Content-Type, Authorization, X-Device-Id, X-Support-Session"
         }
       });
     }
 
     const url = new URL(request.url);
     try {
+      if (url.pathname === "/support/challenge" && request.method === "POST") return await supportChallenge(request, env);
+      if (url.pathname === "/support/verify" && request.method === "POST") return await supportVerify(request, env);
+      if (url.pathname === "/support/lookup" && request.method === "POST") return await supportLookup(request, env);
+      if (url.pathname === "/support/submit" && request.method === "POST") return await supportSubmit(request, env);
+      if (url.pathname === "/support/status" && request.method === "POST") return await supportStatus(request, env);
+      if (url.pathname === "/support/list" && request.method === "GET") return await supportList(request, env);
+      if (url.pathname === "/support/update" && request.method === "POST") return await supportUpdate(request, env);
       if (url.pathname === "/health") return await health(env);
       if (url.pathname === "/auth/display-login" && request.method === "POST") return await displayLogin(request, env);
       if (url.pathname === "/auth/display-validate" && request.method === "GET") return await displayValidate(request, env);
