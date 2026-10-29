@@ -12,11 +12,60 @@ jobs:
           distribution: 'temurin'
       - name: Create Project
         run: |
-          mkdir -p app/src/main/java/com/mokhayam/app
-          echo "include ':app'" > settings.gradle
-          echo "plugins { id 'com.android.application' } android { namespace 'com.mokhayam.app'; compileSdk 33; defaultConfig { applicationId 'com.mokhayam.app'; minSdk 21; targetSdk 33; versionCode 1; versionName '1.0' } }" > app/build.gradle
-          echo '<?xml version="1.0" encoding="utf-8"?><manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.INTERNET"/><application android:label="مخيم ابو عريبان"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>' > app/src/main/AndroidManifest.xml
-          echo 'package com.mokhayam.app; import android.app.Activity; import android.os.Bundle; import android.webkit.WebView; import android.webkit.WebViewClient; public class MainActivity extends Activity { WebView w; protected void onCreate(Bundle b){ super.onCreate(b); w=new WebView(this); w.getSettings().setJavaScriptEnabled(true); w.setWebViewClient(new WebViewClient()); w.loadUrl("https://moood.eyad2000515.workers.dev/"); setContentView(w); } public void onBackPressed(){ if(w.canGoBack()) w.goBack(); else super.onBackPressed(); } }' > app/src/main/java/com/mokhayam/app/MainActivity.java
+          python3 << 'PY'
+          import pathlib
+          pathlib.Path("app/src/main/java/com/mokhayam/app").mkdir(parents=True, exist_ok=True)
+          pathlib.Path("settings.gradle").write_text("include ':app'")
+          pathlib.Path("app/build.gradle").write_text("""
+          plugins {
+              id 'com.android.application'
+          }
+          android {
+              namespace 'com.mokhayam.app'
+              compileSdk 33
+              defaultConfig {
+                  applicationId "com.mokhayam.app"
+                  minSdk 21
+                  targetSdk 33
+                  versionCode 1
+                  versionName "1.0"
+              }
+          }
+          """)
+          pathlib.Path("app/src/main/AndroidManifest.xml").write_text("""<?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <application android:label="مخيم ابو عريبان">
+                  <activity android:name=".MainActivity" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>""")
+          pathlib.Path("app/src/main/java/com/mokhayam/app/MainActivity.java").write_text("""
+          package com.mokhayam.app;
+          import android.app.Activity;
+          import android.os.Bundle;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          public class MainActivity extends Activity {
+              WebView w;
+              protected void onCreate(Bundle b){
+                  super.onCreate(b);
+                  w=new WebView(this);
+                  w.getSettings().setJavaScriptEnabled(true);
+                  w.setWebViewClient(new WebViewClient());
+                  w.loadUrl("https://moood.eyad2000515.workers.dev/");
+                  setContentView(w);
+              }
+              public void onBackPressed(){
+                  if(w.canGoBack()) w.goBack(); else super.onBackPressed();
+              }
+          }
+          """)
+          PY
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
