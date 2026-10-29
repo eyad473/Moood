@@ -10,12 +10,6 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: 8.4
       - name: Create Project
         run: |
           mkdir -p app/src/main/java/com/mokhayam/app
@@ -23,10 +17,15 @@ jobs:
           echo "plugins { id 'com.android.application' } android { namespace 'com.mokhayam.app'; compileSdk 33; defaultConfig { applicationId 'com.mokhayam.app'; minSdk 21; targetSdk 33; versionCode 1; versionName '1.0' } }" > app/build.gradle
           echo '<?xml version="1.0" encoding="utf-8"?><manifest xmlns:android="http://schemas.android.com/apk/res/android"><uses-permission android:name="android.permission.INTERNET"/><application android:label="مخيم ابو عريبان"><activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>' > app/src/main/AndroidManifest.xml
           echo 'package com.mokhayam.app; import android.app.Activity; import android.os.Bundle; import android.webkit.WebView; import android.webkit.WebViewClient; public class MainActivity extends Activity { WebView w; protected void onCreate(Bundle b){ super.onCreate(b); w=new WebView(this); w.getSettings().setJavaScriptEnabled(true); w.setWebViewClient(new WebViewClient()); w.loadUrl("https://moood.eyad2000515.workers.dev/"); setContentView(w); } public void onBackPressed(){ if(w.canGoBack()) w.goBack(); else super.onBackPressed(); } }' > app/src/main/java/com/mokhayam/app/MainActivity.java
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.4
+      - name: Build APK
+        run: |
           gradle wrapper --gradle-version 8.4
           chmod +x gradlew
-      - name: Build APK
-        run: ./gradlew :app:assembleDebug
+          ./gradlew :app:assembleDebug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
