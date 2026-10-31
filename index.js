@@ -671,6 +671,7 @@ async function ensureSupportSchema(env) {
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, device_hint TEXT NOT NULL DEFAULT ''
     )`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_support_requests_created ON support_requests(created_at DESC)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_support_requests_family_created ON support_requests(family_id,created_at DESC)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_support_requests_status ON support_requests(status,created_at DESC)`),
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS support_challenges (
       challenge_id TEXT PRIMARY KEY, family_id TEXT NOT NULL, challenge_json TEXT NOT NULL,
@@ -719,21 +720,32 @@ async function supportRowsForFamily(env, familyId) {
 }
 function supportChallengeCandidates(rows) {
   const candidates=[];
-  const wife=rows.find(r=>{const rel=supportNorm(r['صلة القرابة']);return rel.includes(supportNorm('زوجة')) || rel===supportNorm('الزوجة');});
-  if(wife) { const y=supportYear(wife['تاريخ الميلاد']||wife['سنة الميلاد']); if(y) candidates.push({key:'a'+candidates.length,label:'ما سنة ميلاد الزوجة المسجّلة؟',answer:y,kind:'year'}); }
-  const children=rows.filter(r=>{const rel=supportNorm(r['صلة القرابة']);return rel.includes(supportNorm('ابن'))||rel.includes(supportNorm('بنت'))||rel.includes(supportNorm('طفل'))||rel.includes(supportNorm('طفلة'));});
-  for(const child of children) { const y=supportYear(child['تاريخ الميلاد']||child['سنة الميلاد']); if(y) { const childName=String(child['اسم الفرد']||'').trim(); candidates.push({key:'a'+candidates.length,label:childName ? `ما سنة ميلاد ${childName} المسجّل/ة في الكشف؟` : 'ما سنة ميلاد أحد الأبناء المسجّلين؟',answer:y,kind:'year'}); } }
+  // Ask about a randomly selected registered family member, not always the wife.
+  for(const person of rows){
+    const birth=supportYear(person['تاريخ الميلاد']||person['سنة الميلاد']);
+    if(!birth) continue;
+    const name=String(person['اسم الفرد']||person['اسم رب الأسرة']||'').trim();
+    const relation=String(person['صلة القرابة']||'').trim();
+    const who=name ? `${name}${relation && supportNorm(relation)!==supportNorm('رب الأسرة') ? ` (${relation})` : ''}` : 'أحد أفراد الأسرة';
+    candidates.push({key:'',label:`ما سنة ميلاد ${who} المسجّلة في الكشف؟`,answer:birth,kind:'year'});
+  }
   const first=rows.find(r=>supportPhone(r['رقم الجوال']).length>=8);
-  if(first) { const p=supportPhone(first['رقم الجوال']); candidates.push({key:'a'+candidates.length,label:'ما آخر أربعة أرقام من رقم الجوال المعتمد؟',answer:p.slice(-4),kind:'last4'}); }
-  // Prefer two different kinds of evidence; don't repeat the same generic child question twice.
+  if(first){
+    const phone=supportPhone(first['رقم الجوال']);
+    candidates.push({key:'',label:'ما آخر أربعة أرقام من رقم الجوال المسجّل للأسرة؟',answer:phone.slice(-4),kind:'last4'});
+  }
+  if(rows.length) candidates.push({key:'',label:'كم عدد أفراد الأسرة المسجّلين في الكشف؟',answer:String(rows.length),kind:'count'});
+
+  // Cryptographically shuffle and choose two questions of different kinds.
+  for(let i=candidates.length-1;i>0;i--){
+    const bytes=new Uint32Array(1); crypto.getRandomValues(bytes);
+    const j=bytes[0]%(i+1); [candidates[i],candidates[j]]=[candidates[j],candidates[i]];
+  }
   const picked=[];
-  const wifeCandidate=candidates.find(c=>c.label.includes('الزوجة'));
-  const childCandidate=candidates.find(c=>c.label.includes('الأبناء'));
-  const phoneCandidate=candidates.find(c=>c.kind==='last4');
-  if(wifeCandidate) picked.push(wifeCandidate);
-  if(childCandidate && picked.length<2) picked.push(childCandidate);
-  if(picked.length<2 && phoneCandidate && !picked.includes(phoneCandidate)) picked.push(phoneCandidate);
-  if(picked.length<2) for(const c of candidates) if(!picked.includes(c) && picked.length<2) picked.push(c);
+  for(const candidate of candidates){
+    if(!picked.some(x=>x.kind===candidate.kind)) picked.push(candidate);
+    if(picked.length===2) break;
+  }
   return picked.map((c,i)=>({...c,key:'a'+i}));
 }
 async function supportChallenge(request, env) {
@@ -763,7 +775,9 @@ async function supportVerify(request, env) {
   const answers=body.answers||{};
   const ok=qs.length>=2 && qs.every(q=>{
     const given=String(answers[q.key]??'');
-    return q.kind==='last4' ? supportPhone(given).slice(-4)===q.answer : supportYear(given)===q.answer;
+    if(q.kind==='last4') return supportPhone(given).slice(-4)===q.answer;
+    if(q.kind==='count') return supportPhone(given)===q.answer;
+    return supportYear(given)===q.answer;
   });
   if(!ok) {
     const attempts=Number(row.attempts)+1, t=now();
@@ -778,15 +792,37 @@ async function supportVerify(request, env) {
   }
   await env.DB.prepare('DELETE FROM support_failures WHERE family_id=?').bind(row.family_id).run();
   const token=crypto.randomUUID()+crypto.randomUUID().replace(/-/g,''), t=now();
-  await env.DB.prepare('INSERT INTO support_sessions(token,family_id,expires_at,created_at) VALUES(?,?,?,?)').bind(token,row.family_id,t+30*60*1000,t).run();
+  await env.DB.prepare('INSERT INTO support_sessions(token,family_id,expires_at,created_at) VALUES(?,?,?,?)').bind(token,row.family_id,t+30*24*60*60*1000,t).run();
   await env.DB.prepare('DELETE FROM support_challenges WHERE challenge_id=?').bind(challengeId).run();
-  return json({ok:true,sessionToken:token,expiresInSeconds:1800,message:'تم التحقق بنجاح.'});
+  return json({ok:true,sessionToken:token,expiresInSeconds:30*24*60*60,message:'تم التحقق بنجاح.'});
 }
 async function supportSession(env, token) {
   if(!token) return null;
   const row=await env.DB.prepare('SELECT family_id,expires_at FROM support_sessions WHERE token=? LIMIT 1').bind(token).first();
   if(!row || Number(row.expires_at)<now()) { if(row) await env.DB.prepare('DELETE FROM support_sessions WHERE token=?').bind(token).run(); return null; }
-  return row;
+  // Sliding 30-day expiry: refreshing the portal does not require a new identity check.
+  const expiresAt=now()+30*24*60*60*1000;
+  await env.DB.prepare('UPDATE support_sessions SET expires_at=? WHERE token=?').bind(expiresAt,token).run();
+  return {...row,expires_at:expiresAt};
+}
+async function supportLogout(request, env) {
+  await ensureSupportSchema(env);
+  const token=cleanString(request.headers.get('X-Support-Session')||'',200);
+  if(token) await env.DB.prepare('DELETE FROM support_sessions WHERE token=?').bind(token).run();
+  return json({ok:true,message:'تم تسجيل الخروج وإنهاء الجلسة.'});
+}
+async function supportNotifications(request, env) {
+  await ensureSupportSchema(env);
+  const token=cleanString(request.headers.get('X-Support-Session')||'',200);
+  const session=await supportSession(env,token);
+  if(!session) return json({ok:false,error:'انتهت جلسة الدخول. أعد التحقق من الهوية.'},401);
+  const result=await env.DB.prepare(`SELECT ticket_no,request_type,subject,message,requested_changes,status,staff_reply,created_at,updated_at
+    FROM support_requests WHERE family_id=? ORDER BY created_at DESC LIMIT 100`).bind(session.family_id).all();
+  return json({ok:true,items:(result.results||[]).map(r=>({
+    ticketNo:r.ticket_no,requestType:r.request_type,subject:r.subject,message:r.message,
+    requestedChanges:r.requested_changes,status:r.status,staffReply:r.staff_reply,
+    createdAt:Number(r.created_at),updatedAt:Number(r.updated_at)
+  }))});
 }
 async function supportLookup(request, env) {
   await ensureSupportSchema(env);
@@ -890,6 +926,8 @@ export default {
       if (url.pathname === "/support/verify" && request.method === "POST") return await supportVerify(request, env);
       if (url.pathname === "/support/lookup" && request.method === "POST") return await supportLookup(request, env);
       if (url.pathname === "/support/submit" && request.method === "POST") return await supportSubmit(request, env);
+      if (url.pathname === "/support/notifications" && request.method === "GET") return await supportNotifications(request, env);
+      if (url.pathname === "/support/logout" && request.method === "POST") return await supportLogout(request, env);
       if (url.pathname === "/support/status" && request.method === "POST") return await supportStatus(request, env);
       if (url.pathname === "/support/list" && request.method === "GET") return await supportList(request, env);
       if (url.pathname === "/support/update" && request.method === "POST") return await supportUpdate(request, env);
