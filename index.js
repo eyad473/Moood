@@ -673,6 +673,12 @@ async function ensureSupportSchema(env) {
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_support_requests_created ON support_requests(created_at DESC)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_support_requests_family_created ON support_requests(family_id,created_at DESC)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_support_requests_status ON support_requests(status,created_at DESC)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS support_attachments (
+      id TEXT PRIMARY KEY, ticket_no TEXT NOT NULL, file_name TEXT NOT NULL,
+      content_type TEXT NOT NULL, file_size INTEGER NOT NULL, data_base64 TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_support_attachments_ticket ON support_attachments(ticket_no)`),
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS support_challenges (
       challenge_id TEXT PRIMARY KEY, family_id TEXT NOT NULL, challenge_json TEXT NOT NULL,
       attempts INTEGER NOT NULL DEFAULT 0, expires_at INTEGER NOT NULL, created_at INTEGER NOT NULL
@@ -882,8 +888,19 @@ async function supportSubmit(request, env) {
   const first=rows.find(r=>supportNorm(r['صلة القرابة'])===supportNorm('رب الأسرة'))||rows[0];
   const type=cleanString(b.requestType,40), familyName=cleanString(first['اسم رب الأسرة']||rows[0]['اسم رب الأسرة']||'',200), familyId=String(session.family_id), phone=supportPhone(first['رقم الجوال']);
   const subject=cleanString(b.subject,160), message=cleanString(b.message,2500), changes=cleanString(b.requestedChanges,2000);
-  if(!['استفسار','شكوى','طلب تحديث بيانات'].includes(type)) return json({ok:false,error:'نوع الطلب غير صحيح'},400);
+  if(!['استفسار','شكوى','طلب تحديث بيانات','طلب مساعدة','طلب آخر'].includes(type)) return json({ok:false,error:'نوع الطلب غير صحيح'},400);
   if(familyName.length<3 || phone.length<8 || subject.length<3 || message.length<5) return json({ok:false,error:'يرجى استكمال عنوان الطلب وتفاصيله'},400);
+  const incoming=Array.isArray(b.attachments)?b.attachments:[];
+  if(incoming.length>3) return json({ok:false,error:'الحد الأقصى ثلاثة مرفقات للطلب الواحد'},400);
+  const allowedTypes=new Set(['image/jpeg','image/png','image/webp','application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document']);
+  const attachments=[];let totalBytes=0;
+  for(const file of incoming){
+    const name=cleanString(file?.name,180),mime=cleanString(file?.type,100),data=String(file?.data||''),size=Number(file?.size||0);
+    if(!name||!allowedTypes.has(mime)||!Number.isInteger(size)||size<1||size>524288||!/^[A-Za-z0-9+/]*={0,2}$/.test(data)) return json({ok:false,error:'أحد المرفقات غير صالح أو يتجاوز 512 كيلوبايت'},400);
+    const decoded=atob(data);if(decoded.length!==size) return json({ok:false,error:'تعذر التحقق من حجم أحد المرفقات'},400);
+    totalBytes+=size;if(totalBytes>1572864)return json({ok:false,error:'إجمالي أحجام المرفقات يتجاوز 1.5 ميجابايت'},400);
+    attachments.push({id:crypto.randomUUID(),name,mime,size,data});
+  }
   const id=crypto.randomUUID(), t=now();
   // New requests use a simple six-digit code. The existing UNIQUE constraint
   // protects old and new ticket numbers without changing any stored records.
@@ -894,9 +911,10 @@ async function supportSubmit(request, env) {
     const exists=await env.DB.prepare(`SELECT 1 AS found FROM support_requests WHERE ticket_no=? LIMIT 1`).bind(ticketNo).first();
     if(exists) continue;
     try{
-      await env.DB.prepare(`INSERT INTO support_requests(id,ticket_no,request_type,family_name,family_id,phone,subject,message,requested_changes,status,staff_reply,created_at,updated_at,device_hint) VALUES(?,?,?,?,?,?,?,?,?,'جديد','',?,?,?)`)
-        .bind(id,ticketNo,type,familyName,familyId,phone,subject,message,changes,t,t,cleanString(request.headers.get('X-Device-Id'),120)).run();
-      saved=true;
+      const statements=[env.DB.prepare(`INSERT INTO support_requests(id,ticket_no,request_type,family_name,family_id,phone,subject,message,requested_changes,status,staff_reply,created_at,updated_at,device_hint) VALUES(?,?,?,?,?,?,?,?,?,'جديد','',?,?,?)`)
+        .bind(id,ticketNo,type,familyName,familyId,phone,subject,message,changes,t,t,cleanString(request.headers.get('X-Device-Id'),120))];
+      for(const f of attachments) statements.push(env.DB.prepare(`INSERT INTO support_attachments(id,ticket_no,file_name,content_type,file_size,data_base64,created_at) VALUES(?,?,?,?,?,?,?)`).bind(f.id,ticketNo,f.name,f.mime,f.size,f.data,t));
+      await env.DB.batch(statements);saved=true;
     }catch(err){
       // A simultaneous request may claim the same six-digit number; retry only
       // if that code now exists, otherwise propagate the actual database error.
@@ -905,7 +923,7 @@ async function supportSubmit(request, env) {
     }
   }
   if(!saved) return json({ok:false,error:'تعذر إنشاء رقم متابعة الآن. يرجى المحاولة مرة أخرى.'},503);
-  return json({ok:true,ticketNo,status:'قيد المتابعة',message:'تم استلام طلبك وحفظه لدى إدارة المخيم. احتفظ برقم المتابعة المكوّن من 6 أرقام.'},201);
+  return json({ok:true,ticketNo,status:'قيد المتابعة',attachmentCount:attachments.length,message:'تم استلام طلبك وحفظه لدى إدارة المخيم. احتفظ برقم المتابعة المكوّن من 6 أرقام.'},201);
 }
 async function supportStatus(request, env) {
   await ensureSupportSchema(env);
@@ -929,8 +947,18 @@ async function supportList(request, env) {
   sql+=" ORDER BY created_at DESC LIMIT 300";
   const stmt=env.DB.prepare(sql);
   const res=await (vals.length?stmt.bind(...vals):stmt).all();
-  return json({ok:true,items:(res.results||[]).map(r=>({id:r.id,ticketNo:r.ticket_no,requestType:r.request_type,familyName:r.family_name,familyId:r.family_id,phone:r.phone,subject:r.subject,message:r.message,requestedChanges:r.requested_changes,status:r.status,staffReply:r.staff_reply,createdAt:Number(r.created_at),updatedAt:Number(r.updated_at)}))});
+  const rows=res.results||[], tickets=rows.map(r=>r.ticket_no);let attachmentMap={};
+  if(tickets.length){const marks=tickets.map(()=>'?').join(',');const ar=await env.DB.prepare(`SELECT id,ticket_no,file_name,content_type,file_size FROM support_attachments WHERE ticket_no IN (${marks}) ORDER BY created_at ASC`).bind(...tickets).all();for(const f of (ar.results||[])){(attachmentMap[f.ticket_no] ||= []).push({id:f.id,name:f.file_name,type:f.content_type,size:Number(f.file_size)})}}
+  return json({ok:true,items:rows.map(r=>({id:r.id,ticketNo:r.ticket_no,requestType:r.request_type,familyName:r.family_name,familyId:r.family_id,phone:r.phone,subject:r.subject,message:r.message,requestedChanges:r.requested_changes,status:r.status,staffReply:r.staff_reply,attachments:attachmentMap[r.ticket_no]||[],createdAt:Number(r.created_at),updatedAt:Number(r.updated_at)}))});
 }
+async function supportAttachment(request,env){
+ const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||'AUTH'},auth.code==='READ_ONLY'?403:401);
+ await ensureSupportSchema(env);const id=cleanString(new URL(request.url).searchParams.get('id'),80);if(!id)return json({ok:false,error:'معرّف المرفق مطلوب'},400);
+ const f=await env.DB.prepare(`SELECT id,ticket_no,file_name,content_type,file_size,data_base64 FROM support_attachments WHERE id=? LIMIT 1`).bind(id).first();
+ if(!f)return json({ok:false,error:'المرفق غير موجود'},404);
+ return json({ok:true,attachment:{id:f.id,ticketNo:f.ticket_no,name:f.file_name,type:f.content_type,size:Number(f.file_size),data:f.data_base64}});
+}
+
 async function supportUpdate(request, env) {
   const auth=await requirePrimaryDevice(request,env);
   if(!auth.ok) return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);
@@ -970,6 +998,7 @@ export default {
       if (url.pathname === "/support/status" && request.method === "POST") return await supportStatus(request, env);
       if (url.pathname === "/support/list" && request.method === "GET") return await supportList(request, env);
       if (url.pathname === "/support/update" && request.method === "POST") return await supportUpdate(request, env);
+      if (url.pathname === "/support/attachment" && request.method === "GET") return await supportAttachment(request, env);
       if (url.pathname === "/health") return await health(env);
       if (url.pathname === "/auth/display-login" && request.method === "POST") return await displayLogin(request, env);
       if (url.pathname === "/auth/display-validate" && request.method === "GET") return await displayValidate(request, env);
