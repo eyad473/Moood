@@ -811,6 +811,42 @@ async function supportLogout(request, env) {
   if(token) await env.DB.prepare('DELETE FROM support_sessions WHERE token=?').bind(token).run();
   return json({ok:true,message:'تم تسجيل الخروج وإنهاء الجلسة.'});
 }
+
+async function ensureAnnouncementsSchema(env){
+ await ensureSchema(env);
+ await env.DB.batch([
+  env.DB.prepare(`CREATE TABLE IF NOT EXISTS camp_announcements (
+   id TEXT PRIMARY KEY,title TEXT NOT NULL,body TEXT NOT NULL,category TEXT NOT NULL DEFAULT 'تعميم',
+   priority TEXT NOT NULL DEFAULT 'عادي',status TEXT NOT NULL DEFAULT 'منشور',
+   published_at INTEGER NOT NULL,expires_at INTEGER,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,author_device TEXT NOT NULL DEFAULT ''
+  )`),
+  env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_camp_announcements_public ON camp_announcements(status,published_at DESC,expires_at)`)
+ ]);
+}
+function announcementDto(r){return {id:r.id,title:r.title,body:r.body,category:r.category,priority:r.priority,status:r.status,publishedAt:Number(r.published_at||0),expiresAt:r.expires_at==null?null:Number(r.expires_at),createdAt:Number(r.created_at||0),updatedAt:Number(r.updated_at||0)}}
+async function listPublicAnnouncements(request,env){
+ await ensureAnnouncementsSchema(env);const t=now();
+ const r=await env.DB.prepare(`SELECT id,title,body,category,priority,status,published_at,expires_at,created_at,updated_at FROM camp_announcements WHERE status='منشور' AND published_at<=? AND (expires_at IS NULL OR expires_at>?) ORDER BY CASE priority WHEN 'عاجل' THEN 0 WHEN 'مهم' THEN 1 ELSE 2 END,published_at DESC LIMIT 50`).bind(t,t).all();
+ return json({ok:true,items:(r.results||[]).map(announcementDto),serverTime:t});
+}
+async function listAdminAnnouncements(request,env){
+ const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||'AUTH'},auth.code==='READ_ONLY'?403:401);
+ await ensureAnnouncementsSchema(env);const r=await env.DB.prepare(`SELECT * FROM camp_announcements ORDER BY created_at DESC LIMIT 200`).all();return json({ok:true,items:(r.results||[]).map(announcementDto)});
+}
+async function saveAnnouncement(request,env){
+ const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||'AUTH'},auth.code==='READ_ONLY'?403:401);
+ await ensureAnnouncementsSchema(env);let b;try{b=await request.json()}catch{return json({ok:false,error:'البيانات المرسلة غير صالحة'},400)}
+ const action=cleanString(b.action,20),id=cleanString(b.id,80),title=cleanString(b.title,160),body=cleanString(b.body,5000),category=cleanString(b.category||'تعميم',40),priority=cleanString(b.priority||'عادي',20),status=cleanString(b.status||'منشور',20);
+ if(action==='delete'){if(!id)return json({ok:false,error:'معرّف الإعلان مطلوب'},400);const r=await env.DB.prepare(`DELETE FROM camp_announcements WHERE id=?`).bind(id).run();if(!r.meta?.changes)return json({ok:false,error:'الإعلان غير موجود'},404);return json({ok:true,deleted:true})}
+ if(!['create','update'].includes(action))return json({ok:false,error:'الإجراء غير صحيح'},400);
+ if(title.length<3||body.length<5)return json({ok:false,error:'أدخل عنوان الإعلان ونصاً واضحاً'},400);
+ if(!['عادي','مهم','عاجل'].includes(priority)||!['منشور','مسودة','مؤرشف'].includes(status)||!['تعميم','تنويه','خدمات','تعليم','صحة','إغاثة'].includes(category))return json({ok:false,error:'الأولوية أو حالة النشر غير صحيحة'},400);
+ const t=now(),pub=Number(b.publishedAt)||t,exp=b.expiresAt?Number(b.expiresAt):null;if(exp!==null&&(!Number.isFinite(exp)||exp<=pub))return json({ok:false,error:'تاريخ انتهاء الإعلان يجب أن يكون بعد تاريخ النشر'},400);
+ if(action==='create'){const newId=crypto.randomUUID();await env.DB.prepare(`INSERT INTO camp_announcements(id,title,body,category,priority,status,published_at,expires_at,created_at,updated_at,author_device) VALUES(?,?,?,?,?,?,?,?,?,?,?)`).bind(newId,title,body,category,priority,status,pub,exp,t,t,auth.deviceId||'').run();return json({ok:true,id:newId},201)}
+ if(!id)return json({ok:false,error:'معرّف الإعلان مطلوب'},400);
+ const r=await env.DB.prepare(`UPDATE camp_announcements SET title=?,body=?,category=?,priority=?,status=?,published_at=?,expires_at=?,updated_at=? WHERE id=?`).bind(title,body,category,priority,status,pub,exp,t,id).run();if(!r.meta?.changes)return json({ok:false,error:'الإعلان غير موجود'},404);return json({ok:true,id});
+}
+
 async function supportNotifications(request, env) {
   await ensureSupportSchema(env);
   const token=cleanString(request.headers.get('X-Support-Session')||'',200);
@@ -922,6 +958,9 @@ export default {
 
     const url = new URL(request.url);
     try {
+      if (url.pathname === "/announcements" && request.method === "GET") return await listPublicAnnouncements(request, env);
+      if (url.pathname === "/announcements/admin" && request.method === "GET") return await listAdminAnnouncements(request, env);
+      if (url.pathname === "/announcements/admin" && request.method === "POST") return await saveAnnouncement(request, env);
       if (url.pathname === "/support/challenge" && request.method === "POST") return await supportChallenge(request, env);
       if (url.pathname === "/support/verify" && request.method === "POST") return await supportVerify(request, env);
       if (url.pathname === "/support/lookup" && request.method === "POST") return await supportLookup(request, env);
