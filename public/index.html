@@ -701,6 +701,7 @@ html[data-theme="dark"] .abu-badge-float{border-color:#141e2b}
 <button class="tab" data-view="classified">الكشوفات المصنفة</button>
 <button class="tab" data-view="syncCenter">☁️ مركز المزامنة</button>
 <button class="tab" data-view="settings">الحماية والبيانات</button>
+<button class="tabx" type="button" onclick="displayAuthLogout()">⎋ تسجيل الخروج</button>
 </nav>
 <section class="view" id="familySearch">
 <div class="section-head">
@@ -1081,7 +1082,7 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 </div>
 <div class="sync-panel sync-role-panel">
 <div><b>صلاحية الجهاز</b><p class="muted" id="syncRoleText">جاري التحقق من الجهاز الرئيسي...</p></div>
-<div class="actions no-print"><button class="btn primary" id="claimPrimaryBtn" onclick="claimPrimaryDevice()">تعيين هذا الجهاز كجهاز رئيسي</button></div>
+<div class="actions no-print"><button class="btn primary" id="claimPrimaryBtn" onclick="claimPrimaryDevice()">تعيين هذا الجهاز كجهاز رئيسي</button><button class="btn primary" id="adminAccountBtn" type="button" onclick="openAdminAccountSetup()" hidden>🔑 إنشاء الحساب الرئيسي</button><button class="btn danger" id="logoutBtn" type="button" onclick="displayAuthLogout()" hidden>تسجيل الخروج</button></div>
 </div>
 <div class="sync-panel">
 <div><b>مزامنة آمنة</b><p class="muted">البيانات الحالية لا تُستبدل عشوائياً. التعديلات تُرسل للسحابة وتُجلب من الأجهزة الأخرى حسب نظام الإصدارات.</p></div>
@@ -1306,6 +1307,7 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
    <button data-drawer-view="loginLog"><span>🔐</span>سجل دخول الأهالي</button>
    <button data-drawer-view="syncCenter"><span>☁</span>السحابة</button>
    <button data-drawer-view="settings"><span>⚙</span>الإعدادات</button>
+   <button type="button" onclick="displayAuthLogout()"><span>⎋</span>تسجيل الخروج</button>
   </div>
   <div class="drawer-copyright" aria-label="حقوق الملكية">
    <div class="drawer-copyright-year">© 2026</div>
@@ -1329,7 +1331,7 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 <script id="login-log-module">
 (function(){
  'use strict';
- var DEFAULT_BASE='https://moood.eyad2000515.workers.dev';
+ var DEFAULT_BASE='https://moood.oreiban.workers.dev';
  var CAP={base:'',auth:'',device:''};
  var origFetch=window.fetch;
  function pick(h,name){try{if(!h)return '';if(typeof h.get==='function')return h.get(name)||'';if(Array.isArray(h)){var f=h.filter(function(x){return String(x[0]).toLowerCase()===name.toLowerCase()})[0];return f?f[1]:''}var k=Object.keys(h).filter(function(x){return x.toLowerCase()===name.toLowerCase()})[0];return k?h[k]:''}catch(e){return ''}}
@@ -1407,6 +1409,6 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
  });
 })();
 </script>
-<script src="./app.js?v=70.21-menu-entries"></script></body>
+<script src="./app.js?v=71.0-admin-login"></script></body>
 </html>
 <style>.original-governorate-card .housing-chart-item{cursor:pointer}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-track{box-shadow:0 0 0 3px rgba(59,130,246,.18),0 4px 14px rgba(37,99,235,.13);transform:translateY(-1px)}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-fill{filter:brightness(1.16)}</style>

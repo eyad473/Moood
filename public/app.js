@@ -1671,7 +1671,7 @@ function distSyncSoon(){try{distSavePending(distBuildChanges());distRenderPendin
 function distInit(){try{distLoad();distShadow=JSON.parse(localStorage.getItem(DIST_SHADOW_KEY)||'[]');if(!Array.isArray(distShadow))distShadow=[]}catch(e){distShadow=[]}renderDistributions();distRenderPendingCenter();window.addEventListener('online',()=>setTimeout(distSync,400));window.addEventListener('offline',distRenderPendingCenter);setTimeout(()=>{if(navigator.onLine)distSync()},1200)}
 
 /* ================= مزامنة سحابية D1 — Worker moood — V24 offline-first ================= */
-const SYNC_API_URL = "https://moood.eyad2000515.workers.dev";
+const SYNC_API_URL = "https://moood.oreiban.workers.dev";
 const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
@@ -1696,9 +1696,11 @@ function displayAuthUnlock(){document.body.classList.remove("display-auth-locked
 /* V52 SECURE DISPLAY AUTHENTICATION */
 const DISPLAY_SESSION_KEY="aboreiban_display_session_v52";
 let displaySessionInfo=null;
+let authEpoch=0; /* يزيد عند أي تغيير في جلسة الدخول لتجاهل ردود الخادم القديمة */
+function authSessionToken(){try{return displaySessionLoad()?.token||""}catch(e){return ""}}
 let displayPermissions={dashboard:true,families:true,people:true,search:true,reports:true,distributions:true,ids:false,phones:false,health:false,notes:false};
 function displaySessionLoad(){try{displaySessionInfo=JSON.parse(localStorage.getItem(DISPLAY_SESSION_KEY)||"null")}catch(e){displaySessionInfo=null}return displaySessionInfo}
-function displaySessionSave(x){displaySessionInfo=x||null;if(x)localStorage.setItem(DISPLAY_SESSION_KEY,JSON.stringify(x));else localStorage.removeItem(DISPLAY_SESSION_KEY)}
+function displaySessionSave(x){const oldTok=displaySessionInfo?.token||"";displaySessionInfo=x||null;if(x)localStorage.setItem(DISPLAY_SESSION_KEY,JSON.stringify(x));else localStorage.removeItem(DISPLAY_SESSION_KEY);if((x?.token||"")!==oldTok)authEpoch++}
 function displayAuthHeader(){const s=displaySessionLoad();return s?.token?{"Authorization":"Bearer "+s.token}:{} }
 async function displayAuthValidate(){
   const s=displaySessionLoad();
@@ -1760,7 +1762,7 @@ async function displayLoginSubmit(e){
     const r=await fetch(SYNC_API_URL+"/auth/display-login",{method:"POST",headers:{"Content-Type":"application/json","X-Device-Id":syncDeviceId()},body:JSON.stringify({username:u,password:p,deviceId:syncDeviceId()}),cache:"no-store"});
     let b=null; try{b=await r.json()}catch(_){}
     if(!r.ok||!b?.ok){const er=new Error(b?.error||"تعذر تسجيل الدخول");er.status=r.status;throw er}
-    displaySessionSave({token:b.token,expiresAt:b.expiresAt,displayName:b.displayName,username:b.username,permissions:b.permissions||displayPermissions});
+    displaySessionSave({token:b.token,expiresAt:b.expiresAt,displayName:b.displayName,username:b.username,role:b.role||"display",permissions:b.permissions||displayPermissions});
     displayPermissions=b.permissions||displayPermissions;
     document.getElementById("displayLoginPassword").value="";
     await fetchSyncRole(true);
@@ -1775,7 +1777,17 @@ async function displayLoginSubmit(e){
     document.getElementById("displayLoginPassword")?.focus();
   }finally{loginUiLoading(false)}
 }
-function displayAuthLogout(){displaySessionSave(null);displayShowLogin("تم تسجيل الخروج")}
+async function displayAuthLogout(){
+  const tok=authSessionToken();
+  try{if(tok)await fetch(SYNC_API_URL+"/auth/logout",{method:"POST",headers:{"Authorization":"Bearer "+tok,"X-Device-Id":syncDeviceId()},cache:"no-store"})}catch(_e){}
+  displaySessionSave(null);
+  try{localStorage.removeItem(SYNC_ROLE_CACHE_KEY)}catch(_e){}
+  syncRole={...syncRole,isPrimary:false,isAdmin:false};
+  appReadOnly=true;document.body.classList.add("app-read-only");
+  try{updateAdminAccountUI()}catch(_e){}
+  displayShowLogin("تم تسجيل الخروج");
+}
+window.displayAuthLogout=displayAuthLogout;
 async function authFetch(path,options={}){const headers={"Content-Type":"application/json","X-Device-Id":syncDeviceId(),...displayAuthHeader(),...(options.headers||{})};const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),20000);try{const r=await fetch(SYNC_API_URL+path,{...options,headers,cache:"no-store",signal:options.signal||controller.signal});let b=null;try{b=await r.json()}catch(e){throw Error("الخادم أعاد استجابة غير صالحة")};if(!r.ok||b?.ok===false){const err=new Error(b?.error||(`تعذر تنفيذ العملية (HTTP ${r.status})`));err.status=r.status;err.code=b?.code||"HTTP_ERROR";err.requestId=b?.requestId||r.headers.get("X-Request-Id")||"";throw err}return b}catch(e){if(e?.name==="AbortError"){const err=new Error("الخادم لم يرد خلال 20 ثانية. لم يتم اعتبار الحساب منشأً؛ افحص اتصال السحابة ثم حدّث قائمة الحسابات.");err.code="REQUEST_TIMEOUT";throw err}throw e}finally{clearTimeout(timer)}}
 window.openDisplayAccountsManager=async function(){try{await fetchSyncRole(true)}catch(e){} if(appReadOnly){toast("إدارة أجهزة العرض متاحة من الجهاز الرئيسي فقط — تحقق من اتصال السحابة والجهاز الرئيسي");return}const modal=document.getElementById("displayAccountsModal");if(!modal){toast("واجهة إدارة أجهزة العرض غير موجودة في هذه النسخة");return}modal.classList.add("show");await renderDisplayAccounts()};
 window.closeDisplayAccountsManager=function(){document.getElementById("displayAccountsModal")?.classList.remove("show")};
@@ -1788,6 +1800,56 @@ window.editDisplayPermissions=async function(id,name){try{const r=await authFetc
 window.saveDisplayPermissions=async function(id){const m=document.getElementById('permTempModal');const permissions={};m?.querySelectorAll('[data-perm]').forEach(x=>permissions[x.dataset.perm]=x.checked);try{await authFetch('/auth/display-permissions',{method:'POST',body:JSON.stringify({id,permissions})});toast('تم حفظ صلاحيات جهاز العرض');m?.remove();await renderDisplayAccounts()}catch(e){toast(e.message||'تعذر حفظ الصلاحيات')}};
 window.toggleDisplayEmergency=async function(id,name,locked){const action=locked?'إلغاء قفل الطوارئ':'قفل الجهاز فوراً';if(!confirm(`هل تريد ${action} لـ ${name}؟`))return;try{await authFetch('/auth/display-emergency-lock',{method:'POST',body:JSON.stringify({id,locked:!locked})});toast(locked?'تم إلغاء قفل الجهاز':'تم قفل جهاز العرض فوراً');await renderDisplayAccounts()}catch(e){toast(e.message||'تعذر تنفيذ الأمر')}};
 window.showDisplayActivity=async function(id,name){try{const r=await authFetch(`/auth/display-activity?accountId=${id}&limit=40`,{method:'GET'});const fmt=t=>new Date(t).toLocaleString('ar-EG',{dateStyle:'short',timeStyle:'short'});const rows=(r.items||[]).map(x=>`<div style="padding:9px 0;border-bottom:1px solid #eee"><b>${esc(x.action)}</b><small style="display:block;color:#667085">${esc(fmt(x.createdAt))} · ${esc(x.details||'')}</small></div>`).join('');const wrap=document.createElement('div');wrap.className='modal show';wrap.id='activityTempModal';wrap.innerHTML=`<div class="modalbox" style="max-width:620px"><div class="modalhead"><b>سجل نشاط — ${esc(name)}</b><button class="btn" onclick="document.getElementById('activityTempModal')?.remove()">إغلاق</button></div><div class="modalbody"><div class="familybox">${rows||'<div class="empty">لا يوجد نشاط مسجل.</div>'}</div></div></div>`;document.body.appendChild(wrap)}catch(e){toast(e.message||'تعذر تحميل سجل النشاط')}};
+
+
+/* ===== V71: الحساب الرئيسي (اسم مستخدم + كلمة مرور) ===== */
+function updateAdminAccountUI(){
+  const ab=document.getElementById("adminAccountBtn"),lb=document.getElementById("logoutBtn");
+  if(ab){
+    ab.hidden=!syncRole.isPrimary;
+    ab.textContent=syncRole.adminConfigured?"🔑 تغيير كلمة مرور الحساب الرئيسي":"🔑 إنشاء الحساب الرئيسي (يعمل من أي جهاز)";
+  }
+  if(lb)lb.hidden=!authSessionToken();
+}
+function adminModalClose(){document.getElementById("adminSetupModal")?.remove()}
+window.adminModalClose=adminModalClose;
+window.openAdminAccountSetup=async function(){
+  try{await fetchSyncRole(true)}catch(e){}
+  if(appReadOnly){toast("هذه الميزة متاحة من الحساب/الجهاز الرئيسي فقط");return}
+  adminModalClose();
+  const exists=!!syncRole.adminConfigured;
+  const wrap=document.createElement("div");wrap.className="modal show";wrap.id="adminSetupModal";
+  const form=exists?
+   `<div class="formgrid"><div class="field span3"><label>كلمة المرور الحالية</label><input id="asOld" type="password" autocomplete="current-password"></div><div class="field"><label>كلمة المرور الجديدة (8 أحرف على الأقل)</label><input id="asPass" type="password" autocomplete="new-password"></div><div class="field"><label>تأكيد كلمة المرور الجديدة</label><input id="asPass2" type="password" autocomplete="new-password"></div></div><div class="actions"><button class="btn primary" onclick="submitAdminPassword()">حفظ كلمة المرور</button></div>`:
+   `<p class="muted" style="line-height:1.9">بعد الإنشاء يصبح هذا الحساب هو الوحيد صاحب كل الصلاحيات من أي جهاز، وتصبح بقية الحسابات (التي تنشئها من إدارة أجهزة العرض) للعرض فقط. لا يبقى أي جهاز رئيسي بالمعرّف.</p><div class="formgrid"><div class="field span3"><label>الاسم</label><input id="asFull" placeholder="مثال: أبو عمر" autocomplete="off"></div><div class="field"><label>اسم المستخدم</label><input id="asUser" autocomplete="username" autocapitalize="none" spellcheck="false" dir="ltr" placeholder="admin"></div><div class="field"><label>كلمة المرور (8 أحرف على الأقل)</label><input id="asPass" type="password" autocomplete="new-password"></div><div class="field"><label>تأكيد كلمة المرور</label><input id="asPass2" type="password" autocomplete="new-password"></div></div><div class="actions"><button class="btn primary" onclick="submitAdminSetup()">إنشاء الحساب الرئيسي</button></div>`;
+  wrap.innerHTML=`<div class="modalbox" style="max-width:560px"><div class="modalhead"><b>${exists?"تغيير كلمة مرور الحساب الرئيسي":"إنشاء الحساب الرئيسي"}</b><button class="btn" onclick="adminModalClose()">إغلاق</button></div><div class="modalbody"><div class="familybox">${form}</div></div></div>`;
+  document.body.appendChild(wrap);
+};
+window.submitAdminSetup=async function(){
+  const g=id=>document.getElementById(id)?.value||"";
+  const fullName=g("asFull").trim(),username=g("asUser").trim().toLowerCase(),p=g("asPass"),p2=g("asPass2");
+  if(!username||!p){toast("أدخل اسم المستخدم وكلمة المرور");return}
+  if(p.length<8){toast("كلمة المرور 8 أحرف على الأقل");return}
+  if(p!==p2){toast("كلمتا المرور غير متطابقتين");return}
+  try{
+    const r=await authFetch("/auth/admin-setup",{method:"POST",body:JSON.stringify({fullName,username,password:p})});
+    displaySessionSave({token:r.token,expiresAt:r.expiresAt,displayName:r.displayName,username:r.username,role:"admin"});
+    syncRoleCheckedAt=0;await fetchSyncRole(true);
+    adminModalClose();
+    toast("تم إنشاء الحساب الرئيسي — سجّل الدخول به من أي جهاز");
+  }catch(e){toast(e.message||"تعذر إنشاء الحساب الرئيسي")}
+};
+window.submitAdminPassword=async function(){
+  const g=id=>document.getElementById(id)?.value||"";
+  const o=g("asOld"),p=g("asPass"),p2=g("asPass2");
+  if(!o||!p){toast("أكمل الحقول");return}
+  if(p.length<8){toast("كلمة المرور 8 أحرف على الأقل");return}
+  if(p!==p2){toast("كلمتا المرور غير متطابقتين");return}
+  try{
+    await authFetch("/auth/admin-password",{method:"POST",body:JSON.stringify({oldPassword:o,newPassword:p})});
+    adminModalClose();toast("تم تغيير كلمة المرور (وتم إنهاء جلسات الأجهزة الأخرى)");
+  }catch(e){toast(e.message||"تعذر تغيير كلمة المرور")}
+};
 
 function initDisplayLoginUI(){
   const form=document.getElementById("displayLoginForm");
@@ -1908,23 +1970,27 @@ function syncBuildChanges(){
 }
 function syncRebuildPending(){const c=syncBuildChanges();syncSavePending(c);return c}
 
-async function fetchSyncRole(force=false){
+async function fetchSyncRole(force=false,_retry=0){
   const nowTs=Date.now();
   if(!force && syncRoleCheckedAt && (nowTs-syncRoleCheckedAt)<SYNC_ROLE_CACHE_MS) return syncRole;
+  const epoch=authEpoch;
   try{
     const r=await fetch(SYNC_API_URL+"/sync/role",{headers:{"X-Device-Id":syncDeviceId(),...displayAuthHeader()},cache:"no-store"});
     const body=await r.json();
+    /* الجذر: رد قديم أُرسل قبل تسجيل الدخول كان يعيد إظهار شاشة الدخول بعد نجاحه. نتجاهله ونعيد الطلب بالجلسة الجديدة. */
+    if(epoch!==authEpoch&&_retry<2)return await fetchSyncRole(true,_retry+1);
     if(!r.ok||body?.ok===false)throw Error(body?.error||"تعذر معرفة صلاحية الجهاز");
     if(!body.isPrimary && body.displayAuthRequired && !body.displayAuthenticated){displayShowLogin("تسجيل الدخول مطلوب للوصول إلى بيانات جهاز العرض.");throw Error("تسجيل الدخول مطلوب");}
-    syncRole={configured:!!body.configured,isPrimary:!!body.isPrimary,deviceId:body.deviceId||syncDeviceId(),primaryDeviceId:body.primaryDeviceId||"",authoritativeReady:!!body.authoritativeReady,authoritativeGeneration:Number(body.authoritativeGeneration||0),displayPermissions:body.displayPermissions||null,displaySessionExpiresAt:Number(body.displaySessionExpiresAt||0)};
+    syncRole={configured:!!body.configured,isPrimary:!!body.isPrimary,isAdmin:!!body.isAdmin,adminConfigured:!!body.adminConfigured,adminUsername:body.displayUsername||"",deviceId:body.deviceId||syncDeviceId(),primaryDeviceId:body.primaryDeviceId||"",authoritativeReady:!!body.authoritativeReady,authoritativeGeneration:Number(body.authoritativeGeneration||0),displayPermissions:body.displayPermissions||null,displaySessionExpiresAt:Number(body.displaySessionExpiresAt||0)};
     if(body.displayPermissions){displayPermissions=body.displayPermissions;try{localStorage.setItem(DISPLAY_PERMS_CACHE_KEY,JSON.stringify(displayPermissions))}catch(e){}}
     try{localStorage.setItem(SYNC_ROLE_CACHE_KEY,JSON.stringify(syncRole))}catch(e){}
     syncRoleCheckedAt=nowTs;
     appReadOnly=!syncRole.isPrimary;
     document.body.classList.toggle("app-read-only",appReadOnly);
     const t=document.getElementById("syncRoleText"),b=document.getElementById("claimPrimaryBtn");
-    if(t)t.textContent=syncRole.isPrimary?"هذا هو الجهاز الرئيسي — التعديل والإضافة والحذف والمزامنة مسموحة.":syncRole.configured?"هذا الجهاز للعرض فقط — يستقبل تحديثات الجهاز الرئيسي ولا يسمح بتعديل بيانات المخيم.":"لم يتم تعيين جهاز رئيسي بعد. لا تقم بتعيين هذا الجهاز إلا إذا كان هو الجهاز الرئيسي الفعلي.";
+    if(t)t.textContent=syncRole.isAdmin?"أنت مسجّل دخول بالحساب الرئيسي — كل الصلاحيات متاحة لك من أي جهاز أو كمبيوتر.":syncRole.isPrimary?"هذا هو الجهاز الرئيسي — التعديل والإضافة والحذف والمزامنة مسموحة.":syncRole.configured?"هذا الجهاز للعرض فقط — يستقبل تحديثات الجهاز الرئيسي ولا يسمح بتعديل بيانات المخيم.":"لم يتم تعيين جهاز رئيسي بعد. لا تقم بتعيين هذا الجهاز إلا إذا كان هو الجهاز الرئيسي الفعلي.";
     if(b){b.hidden=syncRole.isPrimary||syncRole.configured;b.textContent=syncRole.configured?"الجهاز الرئيسي محدد":"تعيين هذا الجهاز كجهاز رئيسي";}
+    try{updateAdminAccountUI()}catch(_e){}
     return syncRole;
   }catch(e){
     syncRoleCheckedAt=0;
@@ -2087,11 +2153,18 @@ async function syncOnlineReconcile(reason="auto"){
     // Secondary/display: never push. A lightweight pulse checks the authoritative generation
     // every cycle so display devices can follow the primary device without repeatedly reading
     // the full role payload. Full data is downloaded only when the generation changes.
-    let pulse;
+    let pulse;const sentToken=authSessionToken(),sentEpoch=authEpoch;
     try{
       pulse=await syncFetch("/sync/pulse",{method:"GET"});
     }catch(e){
-      if(e?.code?.startsWith("DISPLAY_")||e?.status===401||e?.status===403||/تسجيل الدخول|قفل جهاز العرض|غير مفعل|جلسة/.test(String(e?.message||""))){
+      if(e?.code?.startsWith("DISPLAY_")||e?.code==="AUTH"||e?.status===401||e?.status===403||/تسجيل الدخول|قفل جهاز العرض|غير مفعل|جلسة/.test(String(e?.message||""))){
+        /* الجذر الثاني: فشل طلب قديم كان يمسح الجلسة الجديدة. نتجاهله إن تغيّرت الجلسة، ونتأكد قبل المسح. */
+        if(sentEpoch!==authEpoch||authSessionToken()!==sentToken)return;
+        if(e?.code==="DISPLAY_AUTH_REQUIRED"||e?.status===401){
+          const v=await displayAuthValidate();
+          if(v.ok)return;
+          if(sentEpoch!==authEpoch||authSessionToken()!==sentToken)return;
+        }
         displaySessionSave(null);
         displayShowLogin(String(e.message||"تسجيل الدخول مطلوب"));
         return;
@@ -2183,6 +2256,7 @@ async function initDisplayAuth(){
 }
 
 setTimeout(()=>initDisplayAuth(),120);
+document.addEventListener("DOMContentLoaded",()=>{try{updateAdminAccountUI()}catch(_e){}});
 
 function styleExcelWorksheet(ws, options={}){
   if(!ws || !ws["!ref"]) return ws;
