@@ -696,6 +696,7 @@ html[data-theme="dark"] .abu-badge-float{border-color:#141e2b}
 <button class="tab" data-view="distributions">إدارة التوزيعات</button>
 <button class="tabx" type="button" data-menu-action="supportInbox">🛠️ طلبات الدعم الفني<i class="abu-badge abu-support-badge abu-badge-tab" hidden>0</i></button>
 <button class="tabx" type="button" data-menu-action="campAnnouncements">📢 إعلانات المخيم</button>
+<button class="tab" data-view="loginLog">🔐 سجل دخول الأهالي</button>
 <button class="tab" data-view="records">السجلات</button>
 <button class="tab" data-view="classified">الكشوفات المصنفة</button>
 <button class="tab" data-view="syncCenter">☁️ مركز المزامنة</button>
@@ -1024,6 +1025,41 @@ html[data-theme="dark"] .abu-badge-float{border-color:#141e2b}
 </div>
 </div>
 </section>
+<style id="login-log-styles">
+.ll-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.ll-toolbar input,.ll-toolbar select{flex:1 1 150px;min-width:0;padding:10px 12px;border:1px solid var(--line,#dbe3ea);border-radius:12px;background:var(--card,#fff);color:var(--text,#17334a);font:inherit;font-size:13px}
+.ll-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+@media(min-width:701px){.ll-stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.ll-status{margin:10px 0 0;font-size:12px}
+.ll-list{display:grid;gap:8px;margin-top:6px}
+.ll-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:11px 12px;border:1px solid var(--line,#e2e8f0);border-radius:14px;background:var(--card,#fff)}
+.ll-dot{width:10px;height:10px;border-radius:50%;background:#94a3b8}
+.ll-row.ev-login .ll-dot{background:#16a34a}.ll-row.ev-return .ll-dot{background:#2563eb}.ll-row.ev-logout .ll-dot{background:#94a3b8}.ll-row.ev-failed .ll-dot{background:#dc2626}
+.ll-main{min-width:0}.ll-name{font-weight:800;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ll-sub{font-size:11px;color:var(--muted,#64748b);margin-top:3px;line-height:1.7}
+.ll-time{text-align:left;direction:ltr;white-space:nowrap}.ll-time b{display:block;font-size:13px}.ll-time small{display:block;font-size:11px;color:var(--muted,#64748b);margin-top:2px;direction:rtl;text-align:left}
+.ll-badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;margin-inline-start:6px;vertical-align:middle}
+.ev-login .ll-badge{background:#dcfce7;color:#166534}.ev-return .ll-badge{background:#dbeafe;color:#1e40af}.ev-logout .ll-badge{background:#f1f5f9;color:#475569}.ev-failed .ll-badge{background:#fee2e2;color:#991b1b}
+.ll-empty{padding:26px 12px;text-align:center;color:var(--muted,#64748b);font-size:13px;line-height:1.9}
+html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
+</style>
+<section class="view" id="loginLog">
+<div class="card">
+<div class="cardhead"><div><h2>سجل دخول الأهالي</h2><p class="muted">يعرض اسم رب الأسرة والتوقيت الفعلي لكل دخول إلى بوابة الأهالي، لمعرفة نشاط الموقع. التوقيت من خادم Worker بتوقيت غزة.</p></div><button class="btn primary no-print" type="button" id="llRefresh">🔄 تحديث</button></div>
+<div class="ll-stats">
+<div class="mini-stat"><span class="muted">دخول جديد اليوم</span><b id="llLogins">—</b><small class="muted">تحقق ناجح من الهوية</small></div>
+<div class="mini-stat"><span class="muted">عودة اليوم</span><b id="llReturns">—</b><small class="muted">فتح البوابة بجلسة قائمة</small></div>
+<div class="mini-stat"><span class="muted">أسر نشطة اليوم</span><b id="llFamilies">—</b><small class="muted">عدد الأسر المختلفة</small></div>
+<div class="mini-stat"><span class="muted">محاولات فاشلة اليوم</span><b id="llFailed">—</b><small class="muted" id="llLast">آخر نشاط: —</small></div>
+</div>
+<div class="ll-toolbar no-print">
+<input id="llSearch" type="search" placeholder="بحث باسم رب الأسرة أو رقم الهوية" autocomplete="off">
+<select id="llEvent"><option value="">كل العمليات</option><option value="login">دخول جديد</option><option value="return">عودة للجلسة</option><option value="logout">خروج</option><option value="failed">محاولة فاشلة</option></select>
+</div>
+<p class="muted ll-status" id="llStatus">جارٍ التحميل...</p>
+<div class="ll-list" id="llList"></div>
+</div>
+</section>
 <section class="view" id="syncCenter">
 <div class="card">
 <div class="cardhead"><div><h2>مركز المزامنة السحابية</h2><p class="muted">مراقبة اتصال التطبيق بقاعدة Cloudflare D1 وإدارة المزامنة بين الأجهزة.</p></div><button class="btn primary no-print" onclick="syncCenterNow()">🔄 مزامنة الآن</button></div>
@@ -1258,6 +1294,7 @@ html[data-theme="dark"] .abu-badge-float{border-color:#141e2b}
    <button data-drawer-view="distributions"><span>◫</span>التوزيعات</button>
    <button type="button" data-menu-action="supportInbox"><span>🛠</span>طلبات الدعم الفني<i class="abu-badge abu-support-badge abu-badge-inline" hidden>0</i></button>
    <button type="button" data-menu-action="campAnnouncements"><span>📢</span>إعلانات المخيم</button>
+   <button data-drawer-view="loginLog"><span>🔐</span>سجل دخول الأهالي</button>
    <button data-drawer-view="syncCenter"><span>☁</span>السحابة</button>
    <button data-drawer-view="settings"><span>⚙</span>الإعدادات</button>
   </div>
@@ -1280,6 +1317,85 @@ html[data-theme="dark"] .abu-badge-float{border-color:#141e2b}
 <style id="mobile-drawer-final-overrides">
 @media(max-width:700px){.mobile-bottom-nav{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;padding:7px 12px max(7px,env(safe-area-inset-bottom))!important}.mobile-bottom-nav button{height:52px!important;min-height:52px!important;border-radius:14px!important}.mobile-bottom-nav button small{font-size:11px!important;line-height:14px!important}}
 </style>
+<script id="login-log-module">
+(function(){
+ 'use strict';
+ var DEFAULT_BASE='https://moood.eyad2000515.workers.dev';
+ var CAP={base:'',auth:'',device:''};
+ var origFetch=window.fetch;
+ function pick(h,name){try{if(!h)return '';if(typeof h.get==='function')return h.get(name)||'';if(Array.isArray(h)){var f=h.filter(function(x){return String(x[0]).toLowerCase()===name.toLowerCase()})[0];return f?f[1]:''}var k=Object.keys(h).filter(function(x){return x.toLowerCase()===name.toLowerCase()})[0];return k?h[k]:''}catch(e){return ''}}
+ // نلتقط ترويسة الجهاز والمفتاح من طلبات المزامنة التي يرسلها التطبيق نفسه، فلا نحتاج لإعدادات إضافية
+ window.fetch=function(input,init){
+  try{
+   var url=typeof input==='string'?input:((input&&input.url)||String(input));
+   var u=new URL(url,location.href);
+   if(/^\/(sync|support|announcements)\//.test(u.pathname)){
+    var h=(init&&init.headers)||(input&&input.headers);
+    var dev=pick(h,'X-Device-Id'),auth=pick(h,'Authorization');
+    if(dev||auth){CAP.base=u.origin;if(dev)CAP.device=dev;if(auth)CAP.auth=auth}
+   }
+  }catch(e){}
+  return origFetch.apply(this,arguments);
+ };
+ var $=function(id){return document.getElementById(id)};
+ var sec=$('loginLog');if(!sec)return;
+ var timer=null,busy=false,searchT=null;
+ var LABEL={login:'دخول جديد',return:'عودة للجلسة',logout:'خروج',failed:'محاولة فاشلة'};
+ var dFmt=new Intl.DateTimeFormat('ar-u-nu-latn',{timeZone:'Asia/Gaza',day:'2-digit',month:'2-digit',year:'numeric'});
+ var tFmt=new Intl.DateTimeFormat('ar-u-nu-latn',{timeZone:'Asia/Gaza',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
+ function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+ function ago(ms){var s=Math.max(0,Math.round((Date.now()-ms)/1000));if(s<45)return 'الآن';var m=Math.round(s/60);if(m<60)return 'قبل '+m+' دقيقة';var h=Math.round(m/60);if(h<24)return 'قبل '+h+' ساعة';var d=Math.round(h/24);return 'قبل '+d+' يوم'}
+ function status(t,err){var el=$('llStatus');el.textContent=t;el.style.color=err?'#b91c1c':''}
+ function render(data){
+  var s=data.summary||{};
+  $('llLogins').textContent=s.logins;$('llReturns').textContent=s.returns;$('llFamilies').textContent=s.families;$('llFailed').textContent=s.failed;
+  $('llLast').textContent='آخر نشاط: '+(s.lastActivityAt?ago(s.lastActivityAt):'—');
+  var list=$('llList'),items=data.items||[];
+  if(!items.length){list.innerHTML='<div class="ll-empty">لا توجد عمليات دخول مسجّلة بعد.<br>ستظهر هنا فور دخول أي رب أسرة إلى بوابة الأهالي.</div>';return}
+  list.innerHTML=items.map(function(r){
+   var ev=LABEL[r.event]?r.event:'login';
+   var name=r.familyName||'غير معروف';
+   var sub=['الهوية: '+esc(r.familyId)];if(r.device)sub.push(esc(r.device));if(r.country)sub.push(esc(r.country));
+   return '<div class="ll-row ev-'+ev+'"><span class="ll-dot"></span><div class="ll-main"><div class="ll-name">'+esc(name)+'<span class="ll-badge">'+LABEL[ev]+'</span></div><div class="ll-sub">'+sub.join(' · ')+'</div></div><div class="ll-time"><b>'+esc(tFmt.format(new Date(r.at)))+'</b><small>'+esc(dFmt.format(new Date(r.at)))+' · '+esc(ago(r.at))+'</small></div></div>';
+  }).join('');
+ }
+ function load(){
+  if(busy)return;
+  if(!CAP.device&&!CAP.auth){status('بانتظار اتصال التطبيق بالسحابة...');clearTimeout(load.retry);load.retry=setTimeout(function(){if(sec.classList.contains('active'))load()},2500);return}
+  busy=true;
+  var d=new Date();d.setHours(0,0,0,0);
+  var p=new URLSearchParams({limit:'150',since:String(d.getTime())});
+  var ev=$('llEvent').value,q=$('llSearch').value.trim();if(ev)p.set('event',ev);if(q)p.set('q',q);
+  var h={Accept:'application/json'};if(CAP.auth)h.Authorization=CAP.auth;if(CAP.device)h['X-Device-Id']=CAP.device;
+  origFetch.call(window,(CAP.base||DEFAULT_BASE)+'/support/logins?'+p.toString(),{headers:h,cache:'no-store'})
+   .then(function(r){return r.json().catch(function(){return {}}).then(function(b){return {r:r,b:b}})})
+   .then(function(x){
+    if(!x.r.ok||!x.b.ok){status(x.b.error||'تعذر تحميل السجل. تأكد من أنك على الجهاز الرئيسي وأن الـ Worker محدّث.',true);return}
+    render(x.b);status('آخر تحديث: '+tFmt.format(new Date())+' · يتحدث تلقائيًا كل 20 ثانية')
+   })
+   .catch(function(){status('تعذر الاتصال بالخادم.',true)})
+   .then(function(){busy=false});
+ }
+ function start(){load();clearInterval(timer);timer=setInterval(function(){if(!document.hidden)load()},20000)}
+ function stop(){clearInterval(timer);timer=null}
+ new MutationObserver(function(){sec.classList.contains('active')?start():stop()}).observe(sec,{attributes:true,attributeFilter:['class']});
+ $('llRefresh').addEventListener('click',load);
+ $('llEvent').addEventListener('change',load);
+ $('llSearch').addEventListener('input',function(){clearTimeout(searchT);searchT=setTimeout(load,350)});
+ // احتياط: إن لم يُفعّل التطبيق الصفحة الجديدة تلقائيًا نفعّلها هنا
+ document.addEventListener('click',function(e){
+  var b=e.target.closest&&e.target.closest('[data-view="loginLog"],[data-drawer-view="loginLog"]');if(!b)return;
+  setTimeout(function(){
+   if(!sec.classList.contains('active')){
+    Array.prototype.forEach.call(document.querySelectorAll('.view.active'),function(v){v.classList.remove('active')});
+    Array.prototype.forEach.call(document.querySelectorAll('.tab.active'),function(t){t.classList.remove('active')});
+    sec.classList.add('active');var tab=document.querySelector('.tab[data-view="loginLog"]');if(tab)tab.classList.add('active');
+    var dr=$('mobileDrawerBackdrop');if(dr)dr.classList.remove('open');window.scrollTo(0,0);
+   }
+  },80);
+ });
+})();
+</script>
 <script src="./app.js?v=70.21-menu-entries"></script></body>
 </html>
 <style>.original-governorate-card .housing-chart-item{cursor:pointer}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-track{box-shadow:0 0 0 3px rgba(59,130,246,.18),0 4px 14px rgba(37,99,235,.13);transform:translateY(-1px)}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-fill{filter:brightness(1.16)}</style>
