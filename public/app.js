@@ -1671,7 +1671,7 @@ function distSyncSoon(){try{distSavePending(distBuildChanges());distRenderPendin
 function distInit(){try{distLoad();distShadow=JSON.parse(localStorage.getItem(DIST_SHADOW_KEY)||'[]');if(!Array.isArray(distShadow))distShadow=[]}catch(e){distShadow=[]}renderDistributions();distRenderPendingCenter();window.addEventListener('online',()=>setTimeout(distSync,400));window.addEventListener('offline',distRenderPendingCenter);setTimeout(()=>{if(navigator.onLine)distSync()},1200)}
 
 /* ================= مزامنة سحابية D1 — Worker moood — V24 offline-first ================= */
-const SYNC_API_URL = "https://moood.oreiban.workers.dev";
+const SYNC_API_URL = "https://moood.eyad2000515.workers.dev";
 const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
