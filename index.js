@@ -81,12 +81,37 @@ async function createSession(env, accountId, token, deviceId) {
   await env.DB.prepare(`DELETE FROM auth_sessions WHERE account_id=? AND token_hash NOT IN (SELECT token_hash FROM auth_sessions WHERE account_id=? ORDER BY created_at DESC LIMIT ?)`).bind(accountId, accountId, MAX_SESSIONS_PER_ACCOUNT).run();
   return t + SESSION_MS;
 }
+
+/* حساب رئيسي دائم من متغيرات سرية: ADMIN_USERNAME و ADMIN_PASSWORD (Secrets في Cloudflare).
+   يُنشأ/يُحدَّث تلقائياً فقط عند تغيّر قيمتهما، فتغيير كلمة المرور من البرنامج يبقى فعّالاً. */
+let seededAdminFp = "";
+async function seedAdminFromEnv(env) {
+  const u = cleanString(env.ADMIN_USERNAME, 120).toLowerCase(), p = String(env.ADMIN_PASSWORD || "");
+  if (!u || p.length < 8 || !/^[a-zA-Z0-9._-]{3,}$/.test(u)) return;
+  const fp = await hashText(u + "\n" + p);
+  if (seededAdminFp === fp) return;
+  await ensureAuthSchema(env);
+  if (await getMeta(env, "admin_env_fp") !== fp) {
+    const row = await env.DB.prepare(`SELECT id FROM display_accounts WHERE username=? LIMIT 1`).bind(u).first();
+    const salt = randomToken(), ph = await makePasswordHash(salt, p), t = now();
+    if (row) {
+      await env.DB.prepare(`UPDATE display_accounts SET role='admin',enabled=1,password_salt=?,password_hash=?,failed_attempts=0,locked_until=NULL,emergency_locked=0,updated_at=? WHERE id=?`).bind(salt, ph, t, Number(row.id)).run();
+      await env.DB.prepare(`DELETE FROM auth_sessions WHERE account_id=?`).bind(Number(row.id)).run();
+    } else {
+      await env.DB.prepare(`INSERT INTO display_accounts(full_name,username,password_salt,password_hash,enabled,created_at,updated_at,role,permissions_json) VALUES(?,?,?,?,1,?,?,'admin',?)`).bind("المدير", u, salt, ph, t, t, JSON.stringify(DEFAULT_DISPLAY_PERMISSIONS)).run();
+    }
+    await setMeta(env, "admin_env_fp", fp);
+    resetAdminCache();
+  }
+  seededAdminFp = fp;
+}
 let adminCache = { v: null, t: 0 };
 function resetAdminCache() { adminCache = { v: null, t: 0 }; }
 async function adminConfigured(env) {
   const t = now();
   if (adminCache.v !== null && t - adminCache.t < 5000) return adminCache.v;
   await ensureAuthSchema(env);
+  await seedAdminFromEnv(env);
   const r = await env.DB.prepare(`SELECT id FROM display_accounts WHERE role='admin' AND enabled=1 LIMIT 1`).first();
   adminCache = { v: !!r, t };
   return !!r;
@@ -166,6 +191,7 @@ async function requireDisplayOrPrimary(request,env){
 }
 async function displayLogin(request,env){
   await ensureAuthSchema(env);
+  await seedAdminFromEnv(env);
   let body;try{body=await request.json()}catch{return json({ok:false,error:"بيانات الدخول غير صالحة"},400)}
   const username=cleanString(body.username,120).toLowerCase(),password=String(body.password||"");
   if(!username||password.length<6)return json({ok:false,error:"اسم المستخدم وكلمة المرور مطلوبان"},400);
