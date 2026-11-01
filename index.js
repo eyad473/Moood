@@ -691,7 +691,13 @@ async function ensureSupportSchema(env) {
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS support_failures (
       family_id TEXT PRIMARY KEY, failed_count INTEGER NOT NULL DEFAULT 0,
       window_start INTEGER NOT NULL, blocked_until INTEGER NOT NULL DEFAULT 0
-    )`)
+    )`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS support_login_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, family_id TEXT NOT NULL, family_name TEXT,
+      event TEXT NOT NULL, device TEXT, country TEXT, created_at INTEGER NOT NULL
+    )`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_support_login_created ON support_login_log(created_at DESC)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_support_login_family ON support_login_log(family_id,created_at DESC)`)
   ]);
 }
 function supportNorm(v) {
@@ -754,6 +760,47 @@ function supportChallengeCandidates(rows) {
   }
   return picked.map((c,i)=>({...c,key:'a'+i}));
 }
+/* ===== سجل دخول الأهالي إلى البوابة (إضافة) ===== */
+function supportDevice(request) {
+  const ua = request.headers.get('User-Agent') || '';
+  const os = /Android/i.test(ua) ? 'Android' : /iPhone|iPad|iPod/i.test(ua) ? 'iOS' : /Windows/i.test(ua) ? 'Windows' : /Macintosh|Mac OS/i.test(ua) ? 'Mac' : /Linux/i.test(ua) ? 'Linux' : 'غير معروف';
+  const br = /SamsungBrowser/i.test(ua) ? 'Samsung Browser' : /Edg\//i.test(ua) ? 'Edge' : /OPR\/|Opera/i.test(ua) ? 'Opera' : /Firefox|FxiOS/i.test(ua) ? 'Firefox' : /Chrome|CriOS/i.test(ua) ? 'Chrome' : /Safari/i.test(ua) ? 'Safari' : '';
+  return br ? os + ' · ' + br : os;
+}
+// event: login (تحقق جديد) | return (عودة بجلسة قائمة) | logout (خروج) | failed (محاولة فاشلة)
+async function logSupportLogin(env, request, familyId, event, familyName = '') {
+  try {
+    const t = now();
+    if (event === 'return') {
+      // لا نكرر "العودة" لنفس الأسرة أكثر من مرة كل 30 دقيقة حتى لا يمتلئ السجل
+      const last = await env.DB.prepare("SELECT created_at FROM support_login_log WHERE family_id=? AND event IN ('login','return') ORDER BY created_at DESC LIMIT 1").bind(String(familyId)).first();
+      if (last && t - Number(last.created_at) < 30 * 60 * 1000) return;
+    }
+    await env.DB.prepare('INSERT INTO support_login_log(family_id,family_name,event,device,country,created_at) VALUES(?,?,?,?,?,?)')
+      .bind(String(familyId), cleanString(familyName, 200), event, supportDevice(request), cleanString(request.cf?.country || '', 8), t).run();
+  } catch (e) { /* التسجيل لا يجب أن يعطّل الدخول أبدًا */ }
+}
+async function supportLogins(request, env) {
+  const auth = await requirePrimaryDevice(request, env);
+  if (!auth.ok) return json({ ok: false, error: auth.error, code: auth.code || 'AUTH' }, auth.code === 'READ_ONLY' ? 403 : 401);
+  await ensureSupportSchema(env);
+  const url = new URL(request.url);
+  const event = cleanString(url.searchParams.get('event'), 20), q = cleanString(url.searchParams.get('q'), 120);
+  const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 100, 1), 500);
+  const since = Number(url.searchParams.get('since')) || 0;
+  try { await env.DB.prepare('DELETE FROM support_login_log WHERE created_at<?').bind(now() - 180 * 24 * 60 * 60 * 1000).run(); } catch (e) {}
+  const where = [], vals = [];
+  if (['login', 'return', 'logout', 'failed'].includes(event)) { where.push('event=?'); vals.push(event); }
+  if (q) { where.push('(family_id LIKE ? OR name LIKE ?)'); vals.push('%' + q + '%', '%' + q + '%'); }
+  const sql = `SELECT * FROM (SELECT l.id, l.family_id, COALESCE(NULLIF(l.family_name,''),(SELECT l2.family_name FROM support_login_log l2 WHERE l2.family_id=l.family_id AND l2.family_name<>'' ORDER BY l2.created_at DESC LIMIT 1),'') AS name, l.event, l.device, l.country, l.created_at FROM support_login_log l)` + (where.length ? ' WHERE ' + where.join(' AND ') : '') + ` ORDER BY created_at DESC LIMIT ${limit}`;
+  const stmt = env.DB.prepare(sql);
+  const res = await (vals.length ? stmt.bind(...vals) : stmt).all();
+  const sum = await env.DB.prepare(`SELECT COALESCE(SUM(event='login'),0) AS logins, COALESCE(SUM(event='return'),0) AS returns, COALESCE(SUM(event='failed'),0) AS failed, COUNT(DISTINCT CASE WHEN event IN ('login','return') THEN family_id END) AS families FROM support_login_log WHERE created_at>=?`).bind(since).first();
+  const lastLogin = await env.DB.prepare(`SELECT MAX(created_at) AS t FROM support_login_log WHERE event IN ('login','return')`).first();
+  return json({ ok: true, serverTime: now(), summary: { logins: Number(sum?.logins || 0), returns: Number(sum?.returns || 0), failed: Number(sum?.failed || 0), families: Number(sum?.families || 0), lastActivityAt: lastLogin?.t ? Number(lastLogin.t) : null },
+    items: (res.results || []).map(r => ({ id: r.id, familyId: r.family_id, familyName: r.name || '', event: r.event, device: r.device || '', country: r.country || '', at: Number(r.created_at) })) });
+}
+
 async function supportChallenge(request, env) {
   await ensureSupportSchema(env);
   let body; try { body=await request.json(); } catch { return json({ok:false,error:'البيانات المرسلة غير صالحة'},400); }
@@ -794,12 +841,15 @@ async function supportVerify(request, env) {
     const blockedUntil=count>=5 ? t+15*60*1000 : 0;
     await env.DB.prepare('INSERT INTO support_failures(family_id,failed_count,window_start,blocked_until) VALUES(?,?,?,?) ON CONFLICT(family_id) DO UPDATE SET failed_count=excluded.failed_count,window_start=excluded.window_start,blocked_until=excluded.blocked_until').bind(row.family_id,count,windowStart,blockedUntil).run();
     const error=blockedUntil ? 'تكررت الإجابات غير الصحيحة. تم إيقاف التحقق مؤقتًا لمدة 15 دقيقة.' : attempts>=3 ? 'الإجابات غير صحيحة. انتهت هذه المحاولة؛ ابدأ تحققًا جديدًا أو تواصل مع مندوب المنطقة.' : 'الإجابات غير صحيحة. راجع البيانات وحاول مجددًا.';
+    await logSupportLogin(env,request,row.family_id,'failed');
     return json({ok:false,error},403);
   }
   await env.DB.prepare('DELETE FROM support_failures WHERE family_id=?').bind(row.family_id).run();
   const token=crypto.randomUUID()+crypto.randomUUID().replace(/-/g,''), t=now();
   await env.DB.prepare('INSERT INTO support_sessions(token,family_id,expires_at,created_at) VALUES(?,?,?,?)').bind(token,row.family_id,t+30*24*60*60*1000,t).run();
   await env.DB.prepare('DELETE FROM support_challenges WHERE challenge_id=?').bind(challengeId).run();
+  let loginName=''; try { const lrows=await supportRowsForFamily(env,row.family_id); const lf=lrows.find(r=>supportNorm(r['صلة القرابة'])===supportNorm('رب الأسرة'))||lrows[0]||{}; loginName=String(lf['اسم رب الأسرة']||''); } catch(e) {}
+  await logSupportLogin(env,request,row.family_id,'login',loginName);
   return json({ok:true,sessionToken:token,expiresInSeconds:30*24*60*60,message:'تم التحقق بنجاح.'});
 }
 async function supportSession(env, token) {
@@ -814,7 +864,10 @@ async function supportSession(env, token) {
 async function supportLogout(request, env) {
   await ensureSupportSchema(env);
   const token=cleanString(request.headers.get('X-Support-Session')||'',200);
-  if(token) await env.DB.prepare('DELETE FROM support_sessions WHERE token=?').bind(token).run();
+  if(token) {
+    try { const ls=await env.DB.prepare('SELECT family_id FROM support_sessions WHERE token=? LIMIT 1').bind(token).first(); if(ls) await logSupportLogin(env,request,ls.family_id,'logout'); } catch(e) {}
+    await env.DB.prepare('DELETE FROM support_sessions WHERE token=?').bind(token).run();
+  }
   return json({ok:true,message:'تم تسجيل الخروج وإنهاء الجلسة.'});
 }
 
@@ -875,6 +928,7 @@ async function supportLookup(request, env) {
   if(!rows.length) return json({ok:false,error:'تعذر العثور على بيانات الأسرة في السجل.'},404);
   const first=rows.find(r=>supportNorm(r['صلة القرابة'])===supportNorm('رب الأسرة'))||rows[0];
   const familyName=String(first['اسم رب الأسرة']||rows[0]['اسم رب الأسرة']||'');
+  await logSupportLogin(env,request,session.family_id,'return',familyName);
   return json({ok:true,family:{name:familyName,fields:supportPublicRecord(first),members:rows.map(supportPublicRecord),count:rows.length}});
 }
 async function supportSubmit(request, env) {
@@ -999,6 +1053,7 @@ export default {
       if (url.pathname === "/support/list" && request.method === "GET") return await supportList(request, env);
       if (url.pathname === "/support/update" && request.method === "POST") return await supportUpdate(request, env);
       if (url.pathname === "/support/attachment" && request.method === "GET") return await supportAttachment(request, env);
+      if (url.pathname === "/support/logins" && request.method === "GET") return await supportLogins(request, env);
       if (url.pathname === "/health") return await health(env);
       if (url.pathname === "/auth/display-login" && request.method === "POST") return await displayLogin(request, env);
       if (url.pathname === "/auth/display-validate" && request.method === "GET") return await displayValidate(request, env);
