@@ -50,6 +50,7 @@ function randomToken(){return crypto.randomUUID()+"-"+crypto.randomUUID()}
 
 /* ===== V71: حساب رئيسي (Admin) + جلسات متعددة + تشفير PBKDF2 ===== */
 const SESSION_MS = 1000 * 60 * 60 * 24 * 30;
+const ADMIN_SESSION_MS = 1000 * 60 * 60 * 24 * 365; /* الحساب الرئيسي: جلسة سنة تتجدد مع الاستخدام */
 const MAX_SESSIONS_PER_ACCOUNT = 25;
 const PBKDF2_ITERATIONS = 100000;
 function timingSafeEq(a, b) {
@@ -74,12 +75,12 @@ function bearerToken(request) {
   const auth = request.headers.get("Authorization") || "";
   return auth.startsWith("Bearer ") ? auth.slice(7) : "";
 }
-async function createSession(env, accountId, token, deviceId) {
-  const t = now();
+async function createSession(env, accountId, token, deviceId, isAdmin = false) {
+  const t = now(), ms = isAdmin ? ADMIN_SESSION_MS : SESSION_MS;
   await env.DB.prepare(`DELETE FROM auth_sessions WHERE expires_at<?`).bind(t).run();
-  await env.DB.prepare(`INSERT INTO auth_sessions(token_hash,account_id,device_id,created_at,expires_at,last_seen_at) VALUES(?,?,?,?,?,?)`).bind(await hashText(token), accountId, cleanString(deviceId, 120), t, t + SESSION_MS, t).run();
+  await env.DB.prepare(`INSERT INTO auth_sessions(token_hash,account_id,device_id,created_at,expires_at,last_seen_at) VALUES(?,?,?,?,?,?)`).bind(await hashText(token), accountId, cleanString(deviceId, 120), t, t + ms, t).run();
   await env.DB.prepare(`DELETE FROM auth_sessions WHERE account_id=? AND token_hash NOT IN (SELECT token_hash FROM auth_sessions WHERE account_id=? ORDER BY created_at DESC LIMIT ?)`).bind(accountId, accountId, MAX_SESSIONS_PER_ACCOUNT).run();
-  return t + SESSION_MS;
+  return t + ms;
 }
 
 /* حساب رئيسي دائم من متغيرات سرية: ADMIN_USERNAME و ADMIN_PASSWORD (Secrets في Cloudflare).
@@ -173,7 +174,7 @@ async function displaySession(request,env){
   if(!row.seen_at || now()-Number(row.seen_at)>30000){
     const t=now();
     await env.DB.prepare(`UPDATE display_accounts SET last_seen_at=? WHERE id=?`).bind(t,Number(row.id)).run();
-    if(Number(row.via_session)===1)await env.DB.prepare(`UPDATE auth_sessions SET last_seen_at=?,expires_at=? WHERE token_hash=?`).bind(t,t+SESSION_MS,sh).run();
+    if(Number(row.via_session)===1)await env.DB.prepare(`UPDATE auth_sessions SET last_seen_at=?,expires_at=? WHERE token_hash=?`).bind(t,t+(isAdmin?ADMIN_SESSION_MS:SESSION_MS),sh).run();
   }
   return {ok:true,accountId:Number(row.id),fullName:cleanString(row.full_name,200),username:cleanString(row.username,120),role:isAdmin?"admin":"display",permissions:parseDisplayPermissions(row.permissions_json),expiresAt:Number(row.session_expires_at||0)}
 }
@@ -210,7 +211,7 @@ async function displayLogin(request,env){
     return json({ok:false,error:"اسم المستخدم أو كلمة المرور غير صحيحة",code:"BAD_LOGIN",attemptsRemaining:Math.max(0,5-attempts)},401);
   }
   const token=randomToken();
-  const expires=await createSession(env,Number(row.id),token,request.headers.get("X-Device-Id")||String(body.deviceId||""));
+  const expires=await createSession(env,Number(row.id),token,request.headers.get("X-Device-Id")||String(body.deviceId||""),rowIsAdmin);
   await env.DB.prepare(`UPDATE display_accounts SET last_login_at=?,last_seen_at=?,failed_attempts=0,locked_until=NULL,updated_at=? WHERE id=?`).bind(now(),now(),now(),Number(row.id)).run();
   await logDisplayActivity(env,Number(row.id),cleanString(row.username,120),"تسجيل دخول","تم تسجيل الدخول بنجاح",request.headers.get("X-Device-Id")||"");
   return json({ok:true,token,expiresAt:expires,role:rowIsAdmin?"admin":"display",isAdmin:rowIsAdmin,displayName:cleanString(row.full_name,200),username:cleanString(row.username,120),permissions:parseDisplayPermissions(row.permissions_json)});
@@ -233,7 +234,7 @@ async function adminSetup(request,env){
   const res=await env.DB.prepare(`INSERT INTO display_accounts(full_name,username,password_salt,password_hash,enabled,created_at,updated_at,role,permissions_json) VALUES(?,?,?,?,1,?,?,'admin',?)`).bind(fullName,username,salt,ph,t,t,JSON.stringify(DEFAULT_DISPLAY_PERMISSIONS)).run();
   const id=Number(res.meta?.last_row_id||0);if(!id)throw new Error("تعذر إنشاء الحساب الرئيسي");
   resetAdminCache();
-  const token=randomToken();const expiresAt=await createSession(env,id,token,auth.deviceId);
+  const token=randomToken();const expiresAt=await createSession(env,id,token,auth.deviceId,true);
   await logDisplayActivity(env,id,username,"إنشاء الحساب الرئيسي","",auth.deviceId);
   return json({ok:true,token,expiresAt,role:"admin",isAdmin:true,displayName:fullName,username});
 }
