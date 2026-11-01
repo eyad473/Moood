@@ -47,6 +47,50 @@ function validRecord(item) {
 
 async function hashText(text){const bytes=new TextEncoder().encode(String(text||""));const digest=await crypto.subtle.digest("SHA-256",bytes);return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,"0")).join("")}
 function randomToken(){return crypto.randomUUID()+"-"+crypto.randomUUID()}
+
+/* ===== V71: حساب رئيسي (Admin) + جلسات متعددة + تشفير PBKDF2 ===== */
+const SESSION_MS = 1000 * 60 * 60 * 24 * 30;
+const MAX_SESSIONS_PER_ACCOUNT = 25;
+const PBKDF2_ITERATIONS = 100000;
+function timingSafeEq(a, b) {
+  a = String(a); b = String(b);
+  if (a.length !== b.length) return false;
+  let r = 0;
+  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
+async function pbkdf2Hex(password, salt) {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(String(password)), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(String(salt)), iterations: PBKDF2_ITERATIONS }, key, 256);
+  return [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+async function makePasswordHash(salt, password) { return "p1:" + await pbkdf2Hex(password, salt); }
+async function verifyPassword(row, password) {
+  const stored = String(row.password_hash || "");
+  if (stored.startsWith("p1:")) return timingSafeEq(stored, await makePasswordHash(row.password_salt, password));
+  return timingSafeEq(stored, await hashText(String(row.password_salt) + password)); // حسابات قديمة
+}
+function bearerToken(request) {
+  const auth = request.headers.get("Authorization") || "";
+  return auth.startsWith("Bearer ") ? auth.slice(7) : "";
+}
+async function createSession(env, accountId, token, deviceId) {
+  const t = now();
+  await env.DB.prepare(`DELETE FROM auth_sessions WHERE expires_at<?`).bind(t).run();
+  await env.DB.prepare(`INSERT INTO auth_sessions(token_hash,account_id,device_id,created_at,expires_at,last_seen_at) VALUES(?,?,?,?,?,?)`).bind(await hashText(token), accountId, cleanString(deviceId, 120), t, t + SESSION_MS, t).run();
+  await env.DB.prepare(`DELETE FROM auth_sessions WHERE account_id=? AND token_hash NOT IN (SELECT token_hash FROM auth_sessions WHERE account_id=? ORDER BY created_at DESC LIMIT ?)`).bind(accountId, accountId, MAX_SESSIONS_PER_ACCOUNT).run();
+  return t + SESSION_MS;
+}
+let adminCache = { v: null, t: 0 };
+function resetAdminCache() { adminCache = { v: null, t: 0 }; }
+async function adminConfigured(env) {
+  const t = now();
+  if (adminCache.v !== null && t - adminCache.t < 5000) return adminCache.v;
+  await ensureAuthSchema(env);
+  const r = await env.DB.prepare(`SELECT id FROM display_accounts WHERE role='admin' AND enabled=1 LIMIT 1`).first();
+  adminCache = { v: !!r, t };
+  return !!r;
+}
 let displayAuthSchemaReady=false;
 async function ensureAuthSchema(env){
   if(displayAuthSchemaReady)return;
@@ -59,7 +103,8 @@ async function ensureAuthSchema(env){
     ["failed_attempts","ALTER TABLE display_accounts ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0"],
     ["locked_until","ALTER TABLE display_accounts ADD COLUMN locked_until INTEGER"],
     ["permissions_json","ALTER TABLE display_accounts ADD COLUMN permissions_json TEXT"],
-    ["emergency_locked","ALTER TABLE display_accounts ADD COLUMN emergency_locked INTEGER NOT NULL DEFAULT 0"]
+    ["emergency_locked","ALTER TABLE display_accounts ADD COLUMN emergency_locked INTEGER NOT NULL DEFAULT 0"],
+    ["role","ALTER TABLE display_accounts ADD COLUMN role TEXT NOT NULL DEFAULT 'display'"]
   ];
   for(const [name,sql] of migrations){
     if(names.has(name))continue;
@@ -70,6 +115,8 @@ async function ensureAuthSchema(env){
     }
   }
   await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS auth_sessions (token_hash TEXT PRIMARY KEY,account_id INTEGER NOT NULL,device_id TEXT,created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,last_seen_at INTEGER)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_auth_sessions_account ON auth_sessions(account_id,created_at DESC)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_display_accounts_enabled ON display_accounts(enabled)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_display_accounts_session ON display_accounts(session_hash)`),
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS display_activity (id INTEGER PRIMARY KEY AUTOINCREMENT,account_id INTEGER,username TEXT,action TEXT,details TEXT,device_id TEXT,created_at INTEGER NOT NULL)`),
@@ -83,40 +130,116 @@ function normalizeDisplayPermissions(x){let p={...DEFAULT_DISPLAY_PERMISSIONS};i
 function parseDisplayPermissions(v){try{return normalizeDisplayPermissions(JSON.parse(v||'{}'))}catch{return {...DEFAULT_DISPLAY_PERMISSIONS}}}
 async function logDisplayActivity(env,accountId,username,action,details='',deviceId=''){try{await env.DB.prepare(`INSERT INTO display_activity(account_id,username,action,details,device_id,created_at) VALUES(?,?,?,?,?,?)`).bind(accountId||null,cleanString(username,120),cleanString(action,120),cleanString(details,500),cleanString(deviceId,120),now()).run()}catch(e){}}
 function redactDisplayData(data,permissions){const p=normalizeDisplayPermissions(permissions);if(!data||typeof data!=='object')return data;const o={...data};const keys=Object.keys(o);for(const k of keys){const n=String(k);if(!p.ids && /(^|\s)(رقم هوية|رقم الهوية|الهوية|id)(\s|$)/i.test(n))delete o[k];if(!p.phones && /جوال|هاتف|هاتف|phone|mobile/i.test(n))delete o[k];if(!p.health && /مرض|إصابة|إعاقة|حامل|مرضعة|يتيم|صحي|health|injur|disab/i.test(n))delete o[k];if(!p.notes && /ملاحظات|note/i.test(n))delete o[k]}return o}
-async function displaySession(request,env){await ensureAuthSchema(env);const auth=request.headers.get("Authorization")||"";const token=auth.startsWith("Bearer ")?auth.slice(7):"";if(!token)return {ok:false,error:"تسجيل الدخول مطلوب",code:"DISPLAY_AUTH_REQUIRED"};const sh=await hashText(token);const row=await env.DB.prepare(`SELECT id,full_name,username,enabled,emergency_locked,permissions_json,session_expires_at,last_seen_at FROM display_accounts WHERE session_hash=? LIMIT 1`).bind(sh).first();if(!row)return {ok:false,error:"جلسة الدخول غير صالحة",code:"DISPLAY_AUTH_REQUIRED"};if(Number(row.enabled)!==1)return {ok:false,error:"تم إيقاف حساب جهاز العرض من الجهاز الرئيسي",code:"DISPLAY_DISABLED"};if(Number(row.emergency_locked)===1)return {ok:false,error:"تم قفل جهاز العرض مؤقتاً من الجهاز الرئيسي",code:"DISPLAY_EMERGENCY_LOCK"};if(Number(row.session_expires_at||0)<now())return {ok:false,error:"انتهت جلسة الدخول، سجّل الدخول من جديد",code:"DISPLAY_AUTH_REQUIRED"};if(!row.last_seen_at || now()-Number(row.last_seen_at)>30000)await env.DB.prepare(`UPDATE display_accounts SET last_seen_at=? WHERE id=?`).bind(now(),Number(row.id)).run();return {ok:true,accountId:Number(row.id),fullName:cleanString(row.full_name,200),username:cleanString(row.username,120),permissions:parseDisplayPermissions(row.permissions_json),expiresAt:Number(row.session_expires_at||0)}}
-async function requireDisplayOrPrimary(request,env){const p=await requirePrimaryDevice(request,env);if(p.ok)return {...p,role:"primary"};const d=await displaySession(request,env);if(d.ok)return {...d,role:"display"};return {ok:false,error:d.error,code:d.code||p.code||"AUTH"}}
+async function displaySession(request,env){
+  await ensureAuthSchema(env);
+  const token=bearerToken(request);
+  if(!token)return {ok:false,error:"تسجيل الدخول مطلوب",code:"DISPLAY_AUTH_REQUIRED"};
+  const sh=await hashText(token);
+  let row=await env.DB.prepare(`SELECT a.id,a.full_name,a.username,a.role,a.enabled,a.emergency_locked,a.permissions_json,s.expires_at AS session_expires_at,s.last_seen_at AS seen_at,1 AS via_session FROM auth_sessions s JOIN display_accounts a ON a.id=s.account_id WHERE s.token_hash=? LIMIT 1`).bind(sh).first();
+  if(!row){
+    // جلسات قديمة (قبل V71) ما زالت صالحة
+    row=await env.DB.prepare(`SELECT id,full_name,username,role,enabled,emergency_locked,permissions_json,session_expires_at,last_seen_at AS seen_at,0 AS via_session FROM display_accounts WHERE session_hash=? LIMIT 1`).bind(sh).first();
+  }
+  if(!row)return {ok:false,error:"جلسة الدخول غير صالحة",code:"DISPLAY_AUTH_REQUIRED"};
+  const isAdmin=String(row.role||"")==="admin";
+  if(Number(row.enabled)!==1)return {ok:false,error:"تم إيقاف الحساب",code:"DISPLAY_DISABLED"};
+  if(!isAdmin&&Number(row.emergency_locked)===1)return {ok:false,error:"تم قفل جهاز العرض مؤقتاً من الجهاز الرئيسي",code:"DISPLAY_EMERGENCY_LOCK"};
+  if(Number(row.session_expires_at||0)<now())return {ok:false,error:"انتهت جلسة الدخول، سجّل الدخول من جديد",code:"DISPLAY_AUTH_REQUIRED"};
+  if(!row.seen_at || now()-Number(row.seen_at)>30000){
+    const t=now();
+    await env.DB.prepare(`UPDATE display_accounts SET last_seen_at=? WHERE id=?`).bind(t,Number(row.id)).run();
+    if(Number(row.via_session)===1)await env.DB.prepare(`UPDATE auth_sessions SET last_seen_at=?,expires_at=? WHERE token_hash=?`).bind(t,t+SESSION_MS,sh).run();
+  }
+  return {ok:true,accountId:Number(row.id),fullName:cleanString(row.full_name,200),username:cleanString(row.username,120),role:isAdmin?"admin":"display",permissions:parseDisplayPermissions(row.permissions_json),expiresAt:Number(row.session_expires_at||0)}
+}
+async function requireDisplayOrPrimary(request,env){
+  const a=requireAuth(request,env);if(!a.ok)return a;
+  if(await adminConfigured(env)){
+    const d=await displaySession(request,env);
+    if(!d.ok)return {ok:false,error:d.error,code:d.code||"AUTH"};
+    if(d.role==="admin")return {ok:true,deviceId:a.deviceId,primaryDeviceId:a.deviceId,role:"primary",admin:true,accountId:d.accountId,username:d.username};
+    return {...d,role:"display"};
+  }
+  const p=await requirePrimaryDevice(request,env);if(p.ok)return {...p,role:"primary"};
+  const d=await displaySession(request,env);if(d.ok)return {...d,role:"display"};
+  return {ok:false,error:d.error,code:d.code||p.code||"AUTH"}
+}
 async function displayLogin(request,env){
   await ensureAuthSchema(env);
   let body;try{body=await request.json()}catch{return json({ok:false,error:"بيانات الدخول غير صالحة"},400)}
   const username=cleanString(body.username,120).toLowerCase(),password=String(body.password||"");
   if(!username||password.length<6)return json({ok:false,error:"اسم المستخدم وكلمة المرور مطلوبان"},400);
-  const row=await env.DB.prepare(`SELECT id,full_name,username,password_salt,password_hash,enabled,failed_attempts,locked_until,permissions_json,emergency_locked FROM display_accounts WHERE username=? LIMIT 1`).bind(username).first();
+  const row=await env.DB.prepare(`SELECT id,full_name,username,role,password_salt,password_hash,enabled,failed_attempts,locked_until,permissions_json,emergency_locked FROM display_accounts WHERE username=? LIMIT 1`).bind(username).first();
   if(!row)return json({ok:false,error:"اسم المستخدم أو كلمة المرور غير صحيحة",code:"BAD_LOGIN"},401);
   const locked=Number(row.locked_until||0)>now();
   if(locked){const sec=Math.max(1,Math.ceil((Number(row.locked_until)-now())/1000));return json({ok:false,error:`تم إيقاف محاولات الدخول مؤقتًا — حاول بعد ${sec} ثانية`,code:"LOGIN_LOCKED",retryAfter:sec},429)}
   if(Number(row.enabled)!==1)return json({ok:false,error:"تم إيقاف حساب جهاز العرض من الجهاز الرئيسي",code:"DISPLAY_DISABLED"},403);
-  if(Number(row.emergency_locked)===1)return json({ok:false,error:"تم قفل جهاز العرض مؤقتاً من الجهاز الرئيسي",code:"DISPLAY_EMERGENCY_LOCK"},403);
-  const check=await hashText(String(row.password_salt)+password);
-  if(check!==String(row.password_hash)){
+  const rowIsAdmin=String(row.role||"")==="admin";
+  if(!rowIsAdmin&&Number(row.emergency_locked)===1)return json({ok:false,error:"تم قفل جهاز العرض مؤقتاً من الجهاز الرئيسي",code:"DISPLAY_EMERGENCY_LOCK"},403);
+  if(!(await verifyPassword(row,password))){
     const attempts=Number(row.failed_attempts||0)+1;
     const lockUntil=attempts>=5?now()+60000:null;
     await env.DB.prepare(`UPDATE display_accounts SET failed_attempts=?,locked_until=?,updated_at=? WHERE id=?`).bind(lockUntil?0:attempts,lockUntil,now(),Number(row.id)).run();
     if(lockUntil)return json({ok:false,error:"تم إيقاف محاولات الدخول مؤقتًا — حاول بعد 60 ثانية",code:"LOGIN_LOCKED",retryAfter:60},429);
     return json({ok:false,error:"اسم المستخدم أو كلمة المرور غير صحيحة",code:"BAD_LOGIN",attemptsRemaining:Math.max(0,5-attempts)},401);
   }
-  const token=randomToken(),sessionHash=await hashText(token),expires=now()+1000*60*60*24*30;
-  await env.DB.prepare(`UPDATE display_accounts SET session_hash=?,session_expires_at=?,last_login_at=?,last_seen_at=?,failed_attempts=0,locked_until=NULL,updated_at=? WHERE id=?`).bind(sessionHash,expires,now(),now(),now(),Number(row.id)).run();
+  const token=randomToken();
+  const expires=await createSession(env,Number(row.id),token,request.headers.get("X-Device-Id")||String(body.deviceId||""));
+  await env.DB.prepare(`UPDATE display_accounts SET last_login_at=?,last_seen_at=?,failed_attempts=0,locked_until=NULL,updated_at=? WHERE id=?`).bind(now(),now(),now(),Number(row.id)).run();
   await logDisplayActivity(env,Number(row.id),cleanString(row.username,120),"تسجيل دخول","تم تسجيل الدخول بنجاح",request.headers.get("X-Device-Id")||"");
-  return json({ok:true,token,expiresAt:expires,displayName:cleanString(row.full_name,200),username:cleanString(row.username,120),permissions:parseDisplayPermissions(row.permissions_json)});
+  return json({ok:true,token,expiresAt:expires,role:rowIsAdmin?"admin":"display",isAdmin:rowIsAdmin,displayName:cleanString(row.full_name,200),username:cleanString(row.username,120),permissions:parseDisplayPermissions(row.permissions_json)});
 }
-async function displayValidate(request,env){const d=await displaySession(request,env);if(!d.ok)return json({ok:false,error:d.error,code:d.code},d.code==="DISPLAY_DISABLED"?403:401);return json({ok:true,displayName:d.fullName,username:d.username,permissions:d.permissions,expiresAt:d.expiresAt})}
-async function listDisplayAccounts(request,env){const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);await ensureAuthSchema(env);const rows=await env.DB.prepare(`SELECT id,full_name,username,enabled,emergency_locked,permissions_json,created_at,updated_at,last_login_at,last_seen_at,session_expires_at FROM display_accounts ORDER BY id DESC`).all();return json({ok:true,accounts:(rows.results||[]).map(r=>({id:Number(r.id),fullName:r.full_name,username:r.username,enabled:Number(r.enabled)===1,emergencyLocked:Number(r.emergency_locked)===1,permissions:parseDisplayPermissions(r.permissions_json),sessionExpiresAt:r.session_expires_at?Number(r.session_expires_at):null,createdAt:Number(r.created_at),updatedAt:Number(r.updated_at),lastLoginAt:r.last_login_at?Number(r.last_login_at):null,lastSeenAt:r.last_seen_at?Number(r.last_seen_at):null}))})}
-async function createDisplayAccount(request,env){const requestId=cleanString(request.headers.get("X-Request-Id")||crypto.randomUUID(),80);try{const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH",requestId},auth.code==="READ_ONLY"?403:401);await ensureAuthSchema(env);let body;try{body=await request.json()}catch{return json({ok:false,error:"JSON غير صالح",requestId},400)}const fullName=cleanString(body.fullName,200),username=cleanString(body.username,120).toLowerCase(),password=String(body.password||"");if(fullName.length<3||username.length<3||password.length<6)return json({ok:false,error:"أدخل الاسم الرباعي واسم مستخدم من 3 أحرف على الأقل وكلمة مرور من 6 أحرف على الأقل",requestId},400);if(!/^[a-zA-Z0-9._-]+$/.test(username))return json({ok:false,error:"اسم المستخدم يجب أن يحتوي على أحرف إنجليزية وأرقام و . _ - فقط",requestId},400);const exists=await env.DB.prepare(`SELECT id,full_name,username FROM display_accounts WHERE username=? LIMIT 1`).bind(username).first();if(exists)return json({ok:false,error:"اسم المستخدم مستخدم بالفعل",code:"USERNAME_EXISTS",requestId,accountId:Number(exists.id)},409);const salt=randomToken(),ph=await hashText(salt+password),t=now();const res=await env.DB.prepare(`INSERT INTO display_accounts(full_name,username,password_salt,password_hash,enabled,created_at,updated_at) VALUES(?,?,?,?,1,?,?)`).bind(fullName,username,salt,ph,t,t).run();const id=Number(res.meta?.last_row_id||0);if(!id)throw new Error("تم تنفيذ الحفظ دون إرجاع رقم الحساب");try{await env.DB.prepare(`UPDATE display_accounts SET permissions_json=?,emergency_locked=0 WHERE id=?`).bind(JSON.stringify(DEFAULT_DISPLAY_PERMISSIONS),id).run()}catch(e){throw new Error(`تم إنشاء الحساب لكن تعذر حفظ إعداداته الإضافية: ${e?.message||e}`)}await logDisplayActivity(env,id,username,"إنشاء حساب جهاز عرض","تم إنشاء الحساب من الجهاز الرئيسي",request.headers.get("X-Device-Id")||"");return json({ok:true,id,fullName,username,requestId})}catch(e){return json({ok:false,error:`تعذر إنشاء حساب جهاز العرض: ${e?.message||e}`,code:"DISPLAY_ACCOUNT_CREATE_FAILED",requestId},500)}}
-async function revokeDisplaySession(request,env){await ensureAuthSchema(env);const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);let body;try{body=await request.json()}catch{return json({ok:false,error:"JSON غير صالح"},400)}const id=Number(body.id||0);if(!id)return json({ok:false,error:"معرّف الحساب مفقود"},400);const r=await env.DB.prepare(`UPDATE display_accounts SET session_hash=NULL,session_expires_at=NULL,updated_at=? WHERE id=?`).bind(now(),id).run();if(!r.meta?.changes)return json({ok:false,error:"حساب جهاز العرض غير موجود"},404);await logDisplayActivity(env,id,"","إنهاء جلسة عن بُعد","",request.headers.get("X-Device-Id")||"");return json({ok:true})}
-async function setDisplayAccount(request,env){const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);await ensureAuthSchema(env);let body;try{body=await request.json()}catch{return json({ok:false,error:"JSON غير صالح"},400)}const id=Number(body.id||0);if(!id)return json({ok:false,error:"معرّف الحساب مفقود"},400);const exists=await env.DB.prepare(`SELECT id FROM display_accounts WHERE id=?`).bind(id).first();if(!exists)return json({ok:false,error:"حساب جهاز العرض غير موجود"},404);const enabled=body.enabled===true,password=String(body.password||"");if(password){if(password.length<6)return json({ok:false,error:"كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل"},400);const salt=randomToken(),ph=await hashText(salt+password);await env.DB.prepare(`UPDATE display_accounts SET enabled=?,password_salt=?,password_hash=?,session_hash=NULL,session_expires_at=NULL,updated_at=? WHERE id=?`).bind(enabled?1:0,salt,ph,now(),id).run()}else{if(enabled)await env.DB.prepare(`UPDATE display_accounts SET enabled=1,updated_at=? WHERE id=?`).bind(now(),id).run();else await env.DB.prepare(`UPDATE display_accounts SET enabled=0,session_hash=NULL,session_expires_at=NULL,updated_at=? WHERE id=?`).bind(now(),id).run()}await logDisplayActivity(env,id,"","تحديث الحساب",password?"تغيير كلمة المرور":"تغيير حالة الحساب",request.headers.get("X-Device-Id")||"");return json({ok:true})}
 
-async function setDisplayPermissions(request,env){const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);await ensureAuthSchema(env);let body;try{body=await request.json()}catch{return json({ok:false,error:"JSON غير صالح"},400)}const id=Number(body.id||0);const row=await env.DB.prepare(`SELECT id,username FROM display_accounts WHERE id=?`).bind(id).first();if(!row)return json({ok:false,error:"حساب جهاز العرض غير موجود"},404);const perms=normalizeDisplayPermissions(body.permissions);await env.DB.prepare(`UPDATE display_accounts SET permissions_json=?,updated_at=? WHERE id=?`).bind(JSON.stringify(perms),now(),id).run();await logDisplayActivity(env,id,row.username,"تغيير الصلاحيات",JSON.stringify(perms),request.headers.get("X-Device-Id")||"");return json({ok:true,permissions:perms})}
-async function setDisplayEmergencyLock(request,env){const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);await ensureAuthSchema(env);let body;try{body=await request.json()}catch{return json({ok:false,error:"JSON غير صالح"},400)}const id=Number(body.id||0),locked=body.locked===true;const row=await env.DB.prepare(`SELECT id,username FROM display_accounts WHERE id=?`).bind(id).first();if(!row)return json({ok:false,error:"حساب جهاز العرض غير موجود"},404);await env.DB.prepare(`UPDATE display_accounts SET emergency_locked=?,session_hash=CASE WHEN ?=1 THEN NULL ELSE session_hash END,session_expires_at=CASE WHEN ?=1 THEN NULL ELSE session_expires_at END,updated_at=? WHERE id=?`).bind(locked?1:0,locked?1:0,locked?1:0,now(),id).run();await logDisplayActivity(env,id,row.username,locked?"قفل طوارئ":"إلغاء قفل الطوارئ",locked?"تم إيقاف الوصول فوراً":"تم السماح بالدخول",request.headers.get("X-Device-Id")||"");return json({ok:true,locked})}
+async function adminSetup(request,env){
+  const auth=requireAuth(request,env);if(!auth.ok)return json({ok:false,error:auth.error},401);
+  await ensureAuthSchema(env);
+  let body;try{body=await request.json()}catch{return json({ok:false,error:"JSON غير صالح"},400)}
+  const fullName=cleanString(body.fullName,200)||"المدير",username=cleanString(body.username,120).toLowerCase(),password=String(body.password||"");
+  if(username.length<3||!/^[a-zA-Z0-9._-]+$/.test(username))return json({ok:false,error:"اسم المستخدم: 3 أحرف على الأقل، أحرف إنجليزية وأرقام و . _ - فقط"},400);
+  if(password.length<8)return json({ok:false,error:"كلمة مرور الحساب الرئيسي يجب أن تكون 8 أحرف على الأقل"},400);
+  if(await adminConfigured(env))return json({ok:false,error:"الحساب الرئيسي موجود بالفعل — استخدم تغيير كلمة المرور",code:"ADMIN_EXISTS"},409);
+  if(!auth.deviceId)return json({ok:false,error:"معرّف الجهاز مفقود"},400);
+  const primary=await getPrimaryDevice(env);
+  if(primary&&auth.deviceId!==primary)return json({ok:false,error:"إنشاء الحساب الرئيسي مسموح من الجهاز الرئيسي الحالي فقط",code:"READ_ONLY"},403);
+  const exists=await env.DB.prepare(`SELECT id FROM display_accounts WHERE username=? LIMIT 1`).bind(username).first();
+  if(exists)return json({ok:false,error:"اسم المستخدم مستخدم بالفعل",code:"USERNAME_EXISTS"},409);
+  const salt=randomToken(),ph=await makePasswordHash(salt,password),t=now();
+  const res=await env.DB.prepare(`INSERT INTO display_accounts(full_name,username,password_salt,password_hash,enabled,created_at,updated_at,role,permissions_json) VALUES(?,?,?,?,1,?,?,'admin',?)`).bind(fullName,username,salt,ph,t,t,JSON.stringify(DEFAULT_DISPLAY_PERMISSIONS)).run();
+  const id=Number(res.meta?.last_row_id||0);if(!id)throw new Error("تعذر إنشاء الحساب الرئيسي");
+  resetAdminCache();
+  const token=randomToken();const expiresAt=await createSession(env,id,token,auth.deviceId);
+  await logDisplayActivity(env,id,username,"إنشاء الحساب الرئيسي","",auth.deviceId);
+  return json({ok:true,token,expiresAt,role:"admin",isAdmin:true,displayName:fullName,username});
+}
+async function adminChangePassword(request,env){
+  const auth=await requirePrimaryDevice(request,env);
+  if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);
+  if(!auth.admin)return json({ok:false,error:"متاح من الحساب الرئيسي فقط"},403);
+  let body;try{body=await request.json()}catch{return json({ok:false,error:"JSON غير صالح"},400)}
+  const oldPassword=String(body.oldPassword||""),newPassword=String(body.newPassword||"");
+  if(newPassword.length<8)return json({ok:false,error:"كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل"},400);
+  const row=await env.DB.prepare(`SELECT id,username,password_salt,password_hash FROM display_accounts WHERE id=? AND role='admin'`).bind(auth.accountId).first();
+  if(!row||!(await verifyPassword(row,oldPassword)))return json({ok:false,error:"كلمة المرور الحالية غير صحيحة",code:"BAD_LOGIN"},401);
+  const salt=randomToken(),ph=await makePasswordHash(salt,newPassword),keep=await hashText(bearerToken(request));
+  await env.DB.prepare(`UPDATE display_accounts SET password_salt=?,password_hash=?,updated_at=? WHERE id=?`).bind(salt,ph,now(),auth.accountId).run();
+  await env.DB.prepare(`DELETE FROM auth_sessions WHERE account_id=? AND token_hash!=?`).bind(auth.accountId,keep).run();
+  await logDisplayActivity(env,auth.accountId,row.username,"تغيير كلمة مرور الحساب الرئيسي","",request.headers.get("X-Device-Id")||"");
+  return json({ok:true});
+}
+async function authLogout(request,env){
+  await ensureAuthSchema(env);
+  const token=bearerToken(request);
+  if(token){const sh=await hashText(token);await env.DB.prepare(`DELETE FROM auth_sessions WHERE token_hash=?`).bind(sh).run();await env.DB.prepare(`UPDATE display_accounts SET session_hash=NULL,session_expires_at=NULL WHERE session_hash=?`).bind(sh).run()}
+  return json({ok:true});
+}
+async function displayValidate(request,env){const d=await displaySession(request,env);if(!d.ok)return json({ok:false,error:d.error,code:d.code},d.code==="DISPLAY_DISABLED"?403:401);return json({ok:true,role:d.role,isAdmin:d.role==="admin",displayName:d.fullName,username:d.username,permissions:d.permissions,expiresAt:d.expiresAt})}
+async function listDisplayAccounts(request,env){const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);await ensureAuthSchema(env);const rows=await env.DB.prepare(`SELECT id,full_name,username,enabled,emergency_locked,permissions_json,created_at,updated_at,last_login_at,last_seen_at,session_expires_at FROM display_accounts WHERE role!='admin' ORDER BY id DESC`).all();return json({ok:true,accounts:(rows.results||[]).map(r=>({id:Number(r.id),fullName:r.full_name,username:r.username,enabled:Number(r.enabled)===1,emergencyLocked:Number(r.emergency_locked)===1,permissions:parseDisplayPermissions(r.permissions_json),sessionExpiresAt:r.session_expires_at?Number(r.session_expires_at):null,createdAt:Number(r.created_at),updatedAt:Number(r.updated_at),lastLoginAt:r.last_login_at?Number(r.last_login_at):null,lastSeenAt:r.last_seen_at?Number(r.last_seen_at):null}))})}
+async function createDisplayAccount(request,env){const requestId=cleanString(request.headers.get("X-Request-Id")||crypto.randomUUID(),80);try{const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH",requestId},auth.code==="READ_ONLY"?403:401);await ensureAuthSchema(env);let body;try{body=await request.json()}catch{return json({ok:false,error:"JSON غير صالح",requestId},400)}const fullName=cleanString(body.fullName,200),username=cleanString(body.username,120).toLowerCase(),password=String(body.password||"");if(fullName.length<3||username.length<3||password.length<6)return json({ok:false,error:"أدخل الاسم الرباعي واسم مستخدم من 3 أحرف على الأقل وكلمة مرور من 6 أحرف على الأقل",requestId},400);if(!/^[a-zA-Z0-9._-]+$/.test(username))return json({ok:false,error:"اسم المستخدم يجب أن يحتوي على أحرف إنجليزية وأرقام و . _ - فقط",requestId},400);const exists=await env.DB.prepare(`SELECT id,full_name,username FROM display_accounts WHERE username=? LIMIT 1`).bind(username).first();if(exists)return json({ok:false,error:"اسم المستخدم مستخدم بالفعل",code:"USERNAME_EXISTS",requestId,accountId:Number(exists.id)},409);const salt=randomToken(),ph=await makePasswordHash(salt,password),t=now();const res=await env.DB.prepare(`INSERT INTO display_accounts(full_name,username,password_salt,password_hash,enabled,created_at,updated_at) VALUES(?,?,?,?,1,?,?)`).bind(fullName,username,salt,ph,t,t).run();const id=Number(res.meta?.last_row_id||0);if(!id)throw new Error("تم تنفيذ الحفظ دون إرجاع رقم الحساب");try{await env.DB.prepare(`UPDATE display_accounts SET permissions_json=?,emergency_locked=0 WHERE id=?`).bind(JSON.stringify(DEFAULT_DISPLAY_PERMISSIONS),id).run()}catch(e){throw new Error(`تم إنشاء الحساب لكن تعذر حفظ إعداداته الإضافية: ${e?.message||e}`)}await logDisplayActivity(env,id,username,"إنشاء حساب جهاز عرض","تم إنشاء الحساب من الجهاز الرئيسي",request.headers.get("X-Device-Id")||"");return json({ok:true,id,fullName,username,requestId})}catch(e){return json({ok:false,error:`تعذر إنشاء حساب جهاز العرض: ${e?.message||e}`,code:"DISPLAY_ACCOUNT_CREATE_FAILED",requestId},500)}}
+async function revokeDisplaySession(request,env){await ensureAuthSchema(env);const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);let body;try{body=await request.json()}catch{return json({ok:false,error:"JSON غير صالح"},400)}const id=Number(body.id||0);if(!id)return json({ok:false,error:"معرّف الحساب مفقود"},400);const r=await env.DB.prepare(`UPDATE display_accounts SET session_hash=NULL,session_expires_at=NULL,updated_at=? WHERE id=? AND role!='admin'`).bind(now(),id).run();if(!r.meta?.changes)return json({ok:false,error:"حساب جهاز العرض غير موجود"},404);await env.DB.prepare(`DELETE FROM auth_sessions WHERE account_id=?`).bind(id).run();await logDisplayActivity(env,id,"","إنهاء جلسة عن بُعد","",request.headers.get("X-Device-Id")||"");return json({ok:true})}
+async function setDisplayAccount(request,env){const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);await ensureAuthSchema(env);let body;try{body=await request.json()}catch{return json({ok:false,error:"JSON غير صالح"},400)}const id=Number(body.id||0);if(!id)return json({ok:false,error:"معرّف الحساب مفقود"},400);const exists=await env.DB.prepare(`SELECT id FROM display_accounts WHERE id=? AND role!='admin'`).bind(id).first();if(!exists)return json({ok:false,error:"حساب جهاز العرض غير موجود"},404);const enabled=body.enabled===true,password=String(body.password||"");if(password){if(password.length<6)return json({ok:false,error:"كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل"},400);const salt=randomToken(),ph=await makePasswordHash(salt,password);await env.DB.prepare(`DELETE FROM auth_sessions WHERE account_id=?`).bind(id).run();await env.DB.prepare(`UPDATE display_accounts SET enabled=?,password_salt=?,password_hash=?,session_hash=NULL,session_expires_at=NULL,updated_at=? WHERE id=?`).bind(enabled?1:0,salt,ph,now(),id).run()}else{if(enabled)await env.DB.prepare(`UPDATE display_accounts SET enabled=1,updated_at=? WHERE id=?`).bind(now(),id).run();else{await env.DB.prepare(`UPDATE display_accounts SET enabled=0,session_hash=NULL,session_expires_at=NULL,updated_at=? WHERE id=?`).bind(now(),id).run();await env.DB.prepare(`DELETE FROM auth_sessions WHERE account_id=?`).bind(id).run()}}await logDisplayActivity(env,id,"","تحديث الحساب",password?"تغيير كلمة المرور":"تغيير حالة الحساب",request.headers.get("X-Device-Id")||"");return json({ok:true})}
+
+async function setDisplayPermissions(request,env){const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);await ensureAuthSchema(env);let body;try{body=await request.json()}catch{return json({ok:false,error:"JSON غير صالح"},400)}const id=Number(body.id||0);const row=await env.DB.prepare(`SELECT id,username FROM display_accounts WHERE id=? AND role!='admin'`).bind(id).first();if(!row)return json({ok:false,error:"حساب جهاز العرض غير موجود"},404);const perms=normalizeDisplayPermissions(body.permissions);await env.DB.prepare(`UPDATE display_accounts SET permissions_json=?,updated_at=? WHERE id=?`).bind(JSON.stringify(perms),now(),id).run();await logDisplayActivity(env,id,row.username,"تغيير الصلاحيات",JSON.stringify(perms),request.headers.get("X-Device-Id")||"");return json({ok:true,permissions:perms})}
+async function setDisplayEmergencyLock(request,env){const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);await ensureAuthSchema(env);let body;try{body=await request.json()}catch{return json({ok:false,error:"JSON غير صالح"},400)}const id=Number(body.id||0),locked=body.locked===true;const row=await env.DB.prepare(`SELECT id,username FROM display_accounts WHERE id=? AND role!='admin'`).bind(id).first();if(!row)return json({ok:false,error:"حساب جهاز العرض غير موجود"},404);await env.DB.prepare(`UPDATE display_accounts SET emergency_locked=?,session_hash=CASE WHEN ?=1 THEN NULL ELSE session_hash END,session_expires_at=CASE WHEN ?=1 THEN NULL ELSE session_expires_at END,updated_at=? WHERE id=?`).bind(locked?1:0,locked?1:0,locked?1:0,now(),id).run();await logDisplayActivity(env,id,row.username,locked?"قفل طوارئ":"إلغاء قفل الطوارئ",locked?"تم إيقاف الوصول فوراً":"تم السماح بالدخول",request.headers.get("X-Device-Id")||"");return json({ok:true,locked})}
 async function listDisplayActivity(request,env){const auth=await requirePrimaryDevice(request,env);if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||"AUTH"},auth.code==="READ_ONLY"?403:401);await ensureAuthSchema(env);const url=new URL(request.url),id=Number(url.searchParams.get("accountId")||0),limit=Math.min(100,Math.max(1,Number(url.searchParams.get("limit")||30)));const q=id?env.DB.prepare(`SELECT id,account_id,username,action,details,device_id,created_at FROM display_activity WHERE account_id=? ORDER BY id DESC LIMIT ?`).bind(id,limit):env.DB.prepare(`SELECT id,account_id,username,action,details,device_id,created_at FROM display_activity ORDER BY id DESC LIMIT ?`).bind(limit);const r=await q.all();return json({ok:true,items:(r.results||[]).map(x=>({id:Number(x.id),accountId:x.account_id?Number(x.account_id):null,username:x.username,action:x.action,details:x.details,deviceId:x.device_id,createdAt:Number(x.created_at)}))})}
 async function ensureSchema(env) {
   await env.DB.batch([
@@ -169,34 +292,48 @@ async function setMeta(env, key, value) {
 async function requirePrimaryDevice(request, env) {
   const auth = requireAuth(request, env);
   if (!auth.ok) return auth;
+  // V71: بعد إنشاء الحساب الرئيسي، الصلاحية الكاملة للحساب فقط (من أي جهاز) وليست للجهاز.
+  if (await adminConfigured(env)) {
+    const s = await displaySession(request, env);
+    if (s.ok && s.role === "admin") return { ok: true, deviceId: auth.deviceId, primaryDeviceId: auth.deviceId, admin: true, accountId: s.accountId, username: s.username };
+    if (s.ok) return { ok: false, error: "هذا الحساب للعرض فقط؛ التعديل مسموح من الحساب الرئيسي فقط", code: "READ_ONLY" };
+    return { ok: false, error: s.error || "تسجيل الدخول مطلوب", code: s.code || "AUTH" };
+  }
+  // قبل إنشاء حساب رئيسي: النظام القديم (جهاز رئيسي بالمعرّف)
   const primary = await getPrimaryDevice(env);
   if (!primary) return { ok: false, error: "لم يتم تعيين جهاز رئيسي بعد", code: "NO_PRIMARY" };
   if (auth.deviceId !== primary) return { ok: false, error: "هذا الجهاز للعرض فقط؛ التعديل مسموح من الجهاز الرئيسي فقط", code: "READ_ONLY" };
   return { ok: true, deviceId: auth.deviceId, primaryDeviceId: primary };
 }
 
+async function resolveRoleState(request, env, auth) {
+  const adminOn = await adminConfigured(env);
+  const display = await displaySession(request, env);
+  const primary = await getPrimaryDevice(env);
+  const isPrimary = adminOn ? (display.ok && display.role === "admin") : (!!primary && auth.deviceId === primary);
+  return { adminOn, display, primary, isPrimary };
+}
+
 async function role(request, env) {
   const auth=requireAuth(request,env); if(!auth.ok)return json({ok:false,error:auth.error},401);
-  const primary=await getPrimaryDevice(env); const ready=(await getMeta(env,"authoritative_snapshot_at"))!==""; const count=Number(await getMeta(env,"authoritative_record_count")||0); const generation=Number(await getMeta(env,"authoritative_generation")||0); const isPrimary=!!primary&&auth.deviceId===primary;
-  const display=await displaySession(request,env);
-  if(!isPrimary && !display.ok) return json({ok:true,deviceId:auth.deviceId,primaryDeviceId:primary||null,isPrimary:false,configured:!!primary,authoritativeReady:ready,authoritativeRecordCount:count,authoritativeGeneration:generation,displayAuthenticated:false,displayAuthRequired:true},200);
-  return json({ok:true,deviceId:auth.deviceId,primaryDeviceId:primary||null,isPrimary,configured:!!primary,authoritativeReady:ready,authoritativeRecordCount:count,authoritativeGeneration:generation,displayAuthenticated:!!display.ok,displayAuthRequired:false,displayName:display.ok?display.fullName:"",displayUsername:display.ok?display.username:"",displayPermissions:display.ok?display.permissions:null,displaySessionExpiresAt:display.ok?display.expiresAt:null});
+  const { adminOn, display, primary, isPrimary } = await resolveRoleState(request, env, auth);
+  const ready=(await getMeta(env,"authoritative_snapshot_at"))!==""; const count=Number(await getMeta(env,"authoritative_record_count")||0); const generation=Number(await getMeta(env,"authoritative_generation")||0);
+  const base={ok:true,deviceId:auth.deviceId,primaryDeviceId:primary||null,isPrimary,isAdmin:adminOn&&isPrimary,adminConfigured:adminOn,configured:adminOn||!!primary,authoritativeReady:ready,authoritativeRecordCount:count,authoritativeGeneration:generation};
+  if(!isPrimary && !display.ok) return json({...base,displayAuthenticated:false,displayAuthRequired:true},200);
+  const isDisp=display.ok&&display.role!=="admin";
+  return json({...base,displayAuthenticated:!!display.ok,displayAuthRequired:false,displayName:display.ok?display.fullName:"",displayUsername:display.ok?display.username:"",displayPermissions:isDisp?display.permissions:null,displaySessionExpiresAt:display.ok?display.expiresAt:null});
 }
 
 async function syncPulse(request, env) {
   const auth = requireAuth(request, env);
   if (!auth.ok) return json({ok:false,error:auth.error,code:"AUTH"},401);
-  const primary = await getPrimaryDevice(env);
-  const isPrimary = !!primary && auth.deviceId === primary;
-  let display = null;
-  if (!isPrimary) {
-    display = await displaySession(request, env);
-    if (!display.ok) return json({ok:false,error:display.error,code:display.code||"DISPLAY_AUTH_REQUIRED",displayAuthRequired:true}, display.code === "DISPLAY_DISABLED" || display.code === "DISPLAY_EMERGENCY_LOCK" ? 403 : 401);
-  }
+  const { display, isPrimary } = await resolveRoleState(request, env, auth);
+  if (!isPrimary && !display.ok) return json({ok:false,error:display.error,code:display.code||"DISPLAY_AUTH_REQUIRED",displayAuthRequired:true}, display.code === "DISPLAY_DISABLED" || display.code === "DISPLAY_EMERGENCY_LOCK" ? 403 : 401);
+  const isDisp = display.ok && display.role !== "admin";
   const ready = (await getMeta(env,"authoritative_snapshot_at")) !== "";
   const generation = Number(await getMeta(env,"authoritative_generation") || 0);
   const count = Number(await getMeta(env,"authoritative_record_count") || 0);
-  return json({ok:true,isPrimary,authoritativeReady:ready,authoritativeGeneration:generation,authoritativeRecordCount:count,displayAuthenticated:!!display?.ok,displayPermissions:display?.permissions||null,displaySessionExpiresAt:display?.expiresAt||null,serverTime:now()});
+  return json({ok:true,isPrimary,authoritativeReady:ready,authoritativeGeneration:generation,authoritativeRecordCount:count,displayAuthenticated:!!display.ok,displayPermissions:isDisp?display.permissions:null,displaySessionExpiresAt:display.ok?display.expiresAt:null,serverTime:now()});
 }
 
 async function claimPrimary(request, env) {
@@ -204,6 +341,7 @@ async function claimPrimary(request, env) {
   if (!auth.ok) return json({ ok:false, error:auth.error }, 401);
   if (!auth.deviceId) return json({ ok:false, error:"معرّف الجهاز مفقود" }, 400);
   await ensureSchema(env);
+  if (await adminConfigured(env)) return json({ ok:false, error:"تم تفعيل الحساب الرئيسي؛ سجّل الدخول به بدل تعيين جهاز رئيسي", code:"ADMIN_EXISTS" }, 409);
   const current = await getPrimaryDevice(env);
   if (current && current !== auth.deviceId) return json({ ok:false, error:"يوجد جهاز رئيسي محدد بالفعل", primaryDeviceId:current }, 409);
   await env.DB.prepare("INSERT INTO sync_meta(key,value) VALUES('primary_device_id',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(auth.deviceId).run();
@@ -1057,6 +1195,9 @@ export default {
       if (url.pathname === "/health") return await health(env);
       if (url.pathname === "/auth/display-login" && request.method === "POST") return await displayLogin(request, env);
       if (url.pathname === "/auth/display-validate" && request.method === "GET") return await displayValidate(request, env);
+      if (url.pathname === "/auth/admin-setup" && request.method === "POST") return await adminSetup(request, env);
+      if (url.pathname === "/auth/admin-password" && request.method === "POST") return await adminChangePassword(request, env);
+      if (url.pathname === "/auth/logout" && request.method === "POST") return await authLogout(request, env);
       if (url.pathname === "/auth/display-accounts" && request.method === "GET") return await listDisplayAccounts(request, env);
       if (url.pathname === "/auth/display-accounts" && request.method === "POST") return await createDisplayAccount(request, env);
       if (url.pathname === "/auth/display-account" && request.method === "POST") return await setDisplayAccount(request, env);
