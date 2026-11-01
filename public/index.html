@@ -658,6 +658,113 @@ html[data-theme="dark"] :focus-visible{outline-color:#8abaff!important}
 body.dark .campmap-board{background:#172333}body.dark .campmap-board-head{background:#111c2b}body.dark .campmap-form input,body.dark .campmap-form select,body.dark .campmap-form textarea{background:#101a29;color:#e5edf7;border-color:#344256}
 </style>
 
+<style id="sc-styles">
+/* ===== وحدة الدعم الفني والإعلانات (sc-) — معزولة عن بقية التطبيق ===== */
+.sc-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:#dc2626;color:#fff;font:800 11px/1 Cairo,Tajawal,Arial,sans-serif;box-shadow:0 0 0 0 rgba(220,38,38,.55);animation:scPulse 1.8s infinite;font-style:normal}
+.sc-badge[hidden]{display:none!important}
+.sc-badge-inline{margin-inline-start:auto}
+.sc-badge-tab{margin-inline-start:6px;vertical-align:middle}
+.sc-badge-float{position:absolute;top:2px;inset-inline-end:calc(50% - 26px);min-width:18px;height:18px;font-size:10px;border:2px solid #fff}
+#mobileDrawerOpen{position:relative}
+@keyframes scPulse{0%{box-shadow:0 0 0 0 rgba(220,38,38,.5)}70%{box-shadow:0 0 0 8px rgba(220,38,38,0)}100%{box-shadow:0 0 0 0 rgba(220,38,38,0)}}
+
+.sc-dash-alert{display:none;align-items:center;justify-content:space-between;gap:10px;margin-top:15px;padding:13px 15px;border:1px solid #fca5a5;background:#fef2f2;color:#991b1b;border-radius:14px;font-weight:800;font-size:13px;cursor:pointer}
+.sc-dash-alert.show{display:flex}
+.sc-dash-alert .btn{border-color:#fca5a5;color:#991b1b}
+.sc-alert{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:12px 14px;border-radius:13px;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;font-weight:800;font-size:13px}
+.sc-alert .btn{background:#dc2626;color:#fff;border-color:#dc2626}
+
+.sc-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:4px 0 14px}
+.sc-stat{border:1px solid var(--line);background:var(--card);border-radius:14px;padding:12px;text-align:start;color:var(--text);cursor:pointer;transition:transform .15s,border-color .15s}
+.sc-stat:hover{transform:translateY(-1px);border-color:#93c5fd}
+.sc-stat span{display:block;font-size:11px;color:var(--muted)}
+.sc-stat b{display:block;font-size:24px;margin-top:3px;font-variant-numeric:tabular-nums}
+.sc-stat.red b{color:#dc2626}.sc-stat.amber b{color:#d97706}.sc-stat.green b{color:#059669}
+.sc-stat.on{border-color:#2563eb;box-shadow:0 0 0 2px #2563eb22}
+
+.sc-toolbar{display:grid;grid-template-columns:2fr 1fr 1fr;gap:9px;margin-bottom:10px}
+.sc-toolbar input,.sc-toolbar select,.sc-form input,.sc-form select,.sc-form textarea{width:100%;box-sizing:border-box;border:1px solid #dbe1ea;border-radius:10px;padding:11px;background:var(--card);color:var(--text);font:inherit;outline:none;min-height:44px}
+.sc-toolbar input:focus,.sc-form input:focus,.sc-form select:focus,.sc-form textarea:focus{border-color:#93c5fd;box-shadow:0 0 0 3px #dbeafe}
+.sc-chips{display:flex;gap:7px;overflow-x:auto;padding:2px 1px 9px;scrollbar-width:none}
+.sc-chips::-webkit-scrollbar{display:none}
+.sc-chip{flex:0 0 auto;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:99px;padding:8px 13px;font:700 12px Cairo,Tajawal,Arial,sans-serif;cursor:pointer;min-height:38px}
+.sc-chip.on{background:#172033;color:#fff;border-color:#172033}
+.sc-chip em{font-style:normal;opacity:.7;margin-inline-start:5px}
+
+.sc-list{display:grid;gap:10px}
+.sc-item{position:relative;border:1px solid var(--line);border-inline-start:5px solid #94a3b8;background:var(--card);color:var(--text);border-radius:15px;padding:13px 14px;cursor:pointer;transition:box-shadow .2s,transform .15s;min-width:0}
+.sc-item:hover{box-shadow:0 8px 22px rgba(15,23,42,.08);transform:translateY(-1px)}
+.sc-item:focus-visible{outline:3px solid #93c5fd}
+.sc-item.sc-st-new{border-inline-start-color:#dc2626}
+.sc-item.sc-st-progress{border-inline-start-color:#d97706}
+.sc-item.sc-st-done{border-inline-start-color:#059669;opacity:.88}
+.sc-item.sc-unread{background:linear-gradient(90deg,#fef2f2,var(--card) 55%);border-color:#fca5a5;border-inline-start-color:#dc2626}
+.sc-item-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.sc-who b{display:block;font-size:14px}.sc-who small{color:var(--muted);font-size:11px}
+.sc-tags{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.sc-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:99px;font-size:10.5px;font-weight:800;background:#eef2ff;color:#3730a3;white-space:nowrap}
+.sc-pill i{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
+.sc-pill-new{background:#fee2e2;color:#991b1b}.sc-pill-new.unread i{animation:scPulse 1.4s infinite;background:#dc2626}
+.sc-pill-progress{background:#fef3c7;color:#92400e}.sc-pill-done{background:#d1fae5;color:#065f46}
+.sc-pill-urgent{background:#dc2626;color:#fff}.sc-pill-high{background:#ffedd5;color:#9a3412}
+.sc-msg{margin:9px 0;font-size:13px;line-height:1.85;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;white-space:pre-wrap}
+.sc-item-foot{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:11px}
+.sc-quick{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.sc-quick .btn{padding:7px 11px;font-size:11px;min-height:36px}
+.sc-empty{text-align:center;padding:38px 12px;color:var(--muted);border:1px dashed var(--line);border-radius:14px;line-height:2}
+.sc-sync{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;padding:5px 10px;border-radius:99px;background:#f1f5f9;color:#475569}
+.sc-sync[data-s="ok"]{background:#dcfce7;color:#166534}.sc-sync[data-s="off"]{background:#fef3c7;color:#92400e}.sc-sync[data-s="err"]{background:#fee2e2;color:#991b1b}
+
+.sc-form{display:grid;gap:11px}
+.sc-form label{display:block;font-size:12px;font-weight:800;margin-bottom:5px}
+.sc-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sc-check{display:flex!important;align-items:center;gap:8px;font-weight:700!important;cursor:pointer}
+.sc-check input{width:19px!important;min-height:0!important;height:19px;accent-color:#2563eb}
+.sc-info{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px}
+.sc-info div{border:1px solid var(--line);border-radius:11px;padding:9px 11px;background:var(--bg);min-width:0;overflow-wrap:anywhere}
+.sc-info small{display:block;color:var(--muted);font-size:10px;margin-bottom:3px}
+.sc-info a{color:#2563eb;font-weight:800;text-decoration:none}
+.sc-bubble{border:1px solid var(--line);background:var(--bg);border-radius:13px;padding:13px;line-height:1.95;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;margin-bottom:12px}
+.sc-sec{margin:14px 0 7px;font-weight:900;font-size:13px}
+.sc-actions{display:flex;gap:7px;flex-wrap:wrap}
+.sc-actions .btn{min-height:42px}
+.sc-qr{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.sc-qr button{border:1px dashed #93c5fd;background:#eff6ff;color:#1d4ed8;border-radius:10px;padding:6px 10px;font:700 11px Cairo,Tajawal,Arial,sans-serif;cursor:pointer;text-align:start}
+.sc-tl{display:grid;gap:7px;margin-top:6px}
+.sc-tl-item{border-inline-start:3px solid #94a3b8;background:var(--bg);border-radius:9px;padding:8px 11px;font-size:12px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
+.sc-tl-item.reply{border-inline-start-color:#2563eb}.sc-tl-item.note{border-inline-start-color:#d97706}
+.sc-tl-item small{display:block;color:var(--muted);font-size:10px}
+.btn.sc-red{background:#dc2626;color:#fff;border-color:#dc2626}
+.btn.sc-wa{background:#16a34a;color:#fff;border-color:#16a34a}
+
+.sc-ann{position:relative;border:1px solid var(--line);border-inline-start:5px solid #2563eb;background:var(--card);color:var(--text);border-radius:15px;padding:14px;min-width:0}
+.sc-ann.urgent{border-inline-start-color:#dc2626;background:linear-gradient(90deg,#fef2f2,var(--card) 55%)}
+.sc-ann.draft{border-inline-start-color:#94a3b8;opacity:.85}.sc-ann.expired{border-inline-start-color:#94a3b8;opacity:.7}
+.sc-ann h3{margin:7px 0 6px;font-size:16px}
+.sc-ann-body{font-size:13px;line-height:2;white-space:pre-wrap;overflow-wrap:anywhere;max-height:5.8em;overflow:hidden;position:relative}
+.sc-ann.open .sc-ann-body{max-height:none}
+.sc-ann-meta{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:11px;margin:9px 0}
+.sc-preview{white-space:pre-wrap;background:#ecfdf5;border:1px solid #a7f3d0;color:#064e3b;border-radius:13px;padding:13px;font:13px/1.95 Cairo,Tajawal,Arial,sans-serif;direction:rtl;overflow-wrap:anywhere}
+html[data-theme="dark"] .sc-item.sc-unread,html[data-theme="dark"] .sc-ann.urgent{background:linear-gradient(90deg,#3a1c26,#182230 55%)!important}
+html[data-theme="dark"] .sc-alert,html[data-theme="dark"] .sc-dash-alert{background:#3a1c26;color:#fecdd3;border-color:#7f2d3f}
+html[data-theme="dark"] .sc-toolbar input,html[data-theme="dark"] .sc-toolbar select,html[data-theme="dark"] .sc-form input,html[data-theme="dark"] .sc-form select,html[data-theme="dark"] .sc-form textarea{background:#111a26!important;color:#e7edf5!important;border-color:#3b4a5e!important}
+html[data-theme="dark"] .sc-chip{background:#202d3d;color:#d5dfec;border-color:#3a4a5e}
+html[data-theme="dark"] .sc-chip.on{background:#315f9e;color:#fff}
+html[data-theme="dark"] .sc-preview{background:#12302a;border-color:#245c4d;color:#c8f1de}
+html[data-theme="dark"] .sc-qr button{background:#172a44;color:#bcd6ff;border-color:#3d6aa8}
+html[data-theme="dark"] .sc-badge-float{border-color:#141e2b}
+@media(max-width:700px){
+ .sc-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .sc-toolbar{grid-template-columns:1fr}
+ .sc-row2{grid-template-columns:1fr}
+ .sc-toolbar input,.sc-toolbar select,.sc-form input,.sc-form select,.sc-form textarea{font-size:16px}
+ .sc-actions .btn{flex:1 1 45%}
+}
+@media(prefers-reduced-motion:reduce){.sc-badge,.sc-pill-new.unread i{animation:none!important}}
+/* إصلاح: التنبيه كان يتمدد عموديًا في سطح المكتب لأن top و bottom معرّفان معًا */
+#toast,.toast{bottom:auto!important;right:auto!important;height:auto!important}
+
+</style>
 </head>
 <body>
 <div class="app">
@@ -680,6 +787,8 @@ body.dark .campmap-board{background:#172333}body.dark .campmap-board-head{backgr
 <button class="tab" data-view="sectors">🧭 قواطع المخيم</button>
 <button class="tab" data-view="campMap">🗺️ خريطة المخيم</button>
 <button class="tab" data-view="distributions">إدارة التوزيعات</button>
+<button class="tab" data-view="scSupport">🛠️ الدعم الفني<i class="sc-badge sc-badge-support sc-badge-tab" hidden>0</i></button>
+<button class="tab" data-view="scAnnouncements">📢 الإعلانات</button>
 <button class="tab" data-view="records">السجلات</button>
 <button class="tab" data-view="classified">الكشوفات المصنفة</button>
 <button class="tab" data-view="syncCenter">☁️ مركز المزامنة</button>
@@ -725,6 +834,7 @@ body.dark .campmap-board{background:#172333}body.dark .campmap-board-head{backgr
     <div class="daily-header-signature"><span>إدارة منظمة</span><b>خدمة أهل المخيم</b></div>
   </div>
 </section>
+<div class="sc-dash-alert no-print" id="scDashAlert" role="button" tabindex="0"></div>
 <div class="grid stats">
 <div class="stat"><div class="label">إجمالي الأفراد</div><div class="num" id="sPeople">0</div><div class="sub">كل أفراد الكشف</div></div>
 <div class="stat"><div class="label">إجمالي العائلات</div><div class="num" id="sFamilies">0</div><div class="sub">بحسب رب الأسرة</div></div>
@@ -1028,6 +1138,26 @@ body.dark .campmap-board{background:#172333}body.dark .campmap-board-head{backgr
 </div>
 </div>
 </section>
+<section class="view" id="scSupport">
+<div class="card">
+<div class="cardhead"><div><h2>🛠️ طلبات الدعم الفني</h2><p class="muted" style="margin:3px 0 0;font-size:12px">كل طلب يصل يظهر هنا بإشعار أحمر حتى تفتحه.</p></div>
+<div class="actions no-print"><span class="sc-sync" id="scSyncState" data-s="local">محلي فقط</span><button class="btn primary" data-sc="newreq" type="button">＋ تسجيل طلب</button><button class="btn" data-sc="sync" type="button">🔄 تحديث</button><button class="btn" data-sc="export" type="button">تصدير CSV</button><button class="btn" data-sc="cfg" type="button">⚙ الربط</button></div></div>
+<div id="scAlert"></div>
+<div class="sc-stats" id="scStats"></div>
+<div class="sc-toolbar no-print"><input id="scQ" type="search" autocomplete="off" placeholder="بحث بالاسم أو الجوال أو نص الطلب..."><select id="scPri"><option value="">كل الأولويات</option><option value="urgent">عاجل</option><option value="high">مهم</option><option value="normal">عادي</option></select><select id="scCat"></select></div>
+<div class="sc-chips" id="scChips"></div>
+<div class="sc-list" id="scList"></div>
+</div>
+</section>
+<section class="view" id="scAnnouncements">
+<div class="card">
+<div class="cardhead"><div><h2>📢 إعلانات المخيم</h2><p class="muted" style="margin:3px 0 0;font-size:12px">أنشئ إعلانًا، شاركه على واتساب بصيغة جاهزة، أو اطبعه.</p></div>
+<div class="actions no-print"><button class="btn primary" data-sc="newann" type="button">＋ إعلان جديد</button></div></div>
+<div class="sc-chips" id="scAnnChips"></div>
+<div class="sc-list" id="scAnnList"></div>
+</div>
+</section>
+
 <section class="view" id="settings">
 <div class="card">
 <div class="cardhead"><h2>الحماية والبيانات</h2></div>
@@ -1240,6 +1370,8 @@ body.dark .campmap-board{background:#172333}body.dark .campmap-board-head{backgr
    <button data-drawer-view="records"><span>▤</span>السجلات</button>
    <button data-drawer-view="classified"><span>▥</span>الكشوفات</button>
    <button data-drawer-view="distributions"><span>◫</span>التوزيعات</button>
+   <button data-drawer-view="scSupport"><span>🛠</span>الدعم الفني<i class="sc-badge sc-badge-support sc-badge-inline" hidden>0</i></button>
+   <button data-drawer-view="scAnnouncements"><span>📢</span>الإعلانات</button>
    <button data-drawer-view="syncCenter"><span>☁</span>السحابة</button>
    <button data-drawer-view="settings"><span>⚙</span>الإعدادات</button>
   </div>
@@ -1262,6 +1394,271 @@ body.dark .campmap-board{background:#172333}body.dark .campmap-board-head{backgr
 <style id="mobile-drawer-final-overrides">
 @media(max-width:700px){.mobile-bottom-nav{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;padding:7px 12px max(7px,env(safe-area-inset-bottom))!important}.mobile-bottom-nav button{height:52px!important;min-height:52px!important;border-radius:14px!important}.mobile-bottom-nav button small{font-size:11px!important;line-height:14px!important}}
 </style>
-<script src="./app.js?v=70.20-announcements"></script></body>
+<script src="./app.js?v=70.20-announcements"></script>
+<script id="sc-module">
+/* ===== وحدة الدعم الفني والإعلانات — مستقلة (بادئة sc / SC) ===== */
+(function(){
+'use strict';
+if(window.__scLoaded) return; window.__scLoaded=true;
+var K={req:'abu_sc_req_v1',ann:'abu_sc_ann_v1',cfg:'abu_sc_cfg_v1',delA:'abu_sc_delA_v1',first:'abu_sc_first_v1'};
+var $=function(s,r){return (r||document).querySelector(s)};
+var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function load(k,d){try{var v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){toast('تعذر الحفظ المحلي')}}
+function uid(){return (window.crypto&&crypto.randomUUID)?crypto.randomUUID():'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,9)}
+function toast(m){if(typeof window.toast==='function'){try{window.toast(m);return}catch(e){}}var t=$('#toast');if(t){t.textContent=m;t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2300)}}
+function norm(s){return String(s||'').toLowerCase().replace(/[ً-ْـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[٠-٩]/g,function(d){return '٠١٢٣٤٥٦٧٨٩'.indexOf(d)})}
+var LOC='ar-EG-u-nu-latn';
+function fmtDate(t){return new Date(t).toLocaleDateString(LOC,{year:'numeric',month:'short',day:'numeric'})}
+function fmtDT(t){return new Date(t).toLocaleString(LOC,{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+function rel(t){var s=Math.max(0,(Date.now()-t)/1000);if(s<60)return 'الآن';var m=Math.floor(s/60);if(m<60)return 'منذ '+m+' د';var h=Math.floor(m/60);if(h<24)return 'منذ '+h+' س';var d=Math.floor(h/24);return d<30?'منذ '+d+' يوم':fmtDate(t)}
+function waPhone(p){var d=String(p||'').replace(/\D/g,'');if(d.indexOf('00')===0)d=d.slice(2);else if(d.charAt(0)==='0')d='970'+d.slice(1);return d}
+function today(){var d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
+
+var CATS=['مياه','غذاء ومساعدات','صحة','خيام وإيواء','صرف صحي ونظافة','تعليم','شكوى','أخرى'];
+var ST={new:'جديد',progress:'قيد المعالجة',done:'تم الحل'};
+var PRI={normal:'عادي',high:'مهم',urgent:'عاجل'};
+var QR=['تم استلام طلبك وهو قيد المعالجة، نشكر لك صبرك.','تم حل المشكلة، نرجو إبلاغنا إن استمرت.','نرجو تزويدنا بتفاصيل أكثر (الموقع / رقم الخيمة) لنتمكن من المساعدة.','سيتواصل معك أحد أعضاء الإدارة في أقرب وقت.'];
+var ACATS=['عام','مساعدات','مياه','صحي','تعليم','تنبيه عاجل'];
+
+var reqs=load(K.req,[]),anns=load(K.ann,[]),delA=load(K.delA,[]);
+var cfg=Object.assign({base:'',token:'',sound:true},load(K.cfg,{}));
+var ui={st:'open',q:'',pri:'',cat:'',aSt:'active'};
+var baseTitle=document.title,syncing=false,syncState='local';
+
+/* ---------- تحويل بيانات الخادم ---------- */
+function toTime(v){if(typeof v==='number')return v<1e12?v*1000:v;var t=Date.parse(v);return isNaN(t)?Date.now():t}
+function mapStatus(s){s=String(s||'new').toLowerCase();if(/progress|process|قيد|معالج/.test(s))return 'progress';if(/done|resolv|closed|solved|تم|حل|مغلق/.test(s))return 'done';return 'new'}
+function normReq(x){return {id:String(x.id||x._id||x.ref||uid()),createdAt:toTime(x.createdAt||x.created_at||x.date||Date.now()),updatedAt:toTime(x.updatedAt||x.updated_at||x.createdAt||x.created_at||Date.now()),name:x.name||x.fullName||x.familyName||'',familyId:x.familyId||x.family_id||x.nationalId||'',phone:x.phone||x.mobile||'',category:x.category||x.type||'أخرى',priority:/urgent|عاجل/.test(x.priority)?'urgent':/high|مهم/.test(x.priority)?'high':'normal',message:x.message||x.text||x.body||x.description||'',status:mapStatus(x.status),readAt:x.readAt||0,notes:x.notes||[],replies:x.replies||[],source:'remote',dirty:false}}
+
+/* ---------- الشارات والتنبيهات ---------- */
+function unseen(){return reqs.filter(function(r){return r.status==='new'&&!r.readAt}).length}
+function badges(){
+ var n=unseen();
+ $$('.sc-badge-support').forEach(function(b){b.textContent=n>99?'99+':n;b.hidden=!n});
+ document.title=(n?'('+n+') ':'')+baseTitle;
+ var d=$('#scDashAlert');
+ if(d){d.classList.toggle('show',n>0);d.innerHTML=n?'<span>🔴 '+n+(n===1?' طلب دعم فني جديد لم يُفتح':' طلبات دعم فني جديدة لم تُفتح')+'</span><button type="button" class="btn">عرض الطلبات</button>':''}
+}
+function beep(){if(!cfg.sound)return;try{var A=window.AudioContext||window.webkitAudioContext;if(!A)return;var c=new A(),t=c.currentTime;[880,1175].forEach(function(f,i){var o=c.createOscillator(),g=c.createGain();o.frequency.value=f;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.0001,t+i*.18);g.gain.exponentialRampToValueAtTime(.2,t+i*.18+.02);g.gain.exponentialRampToValueAtTime(.0001,t+i*.18+.16);o.start(t+i*.18);o.stop(t+i*.18+.18)});setTimeout(function(){c.close()},900)}catch(e){}}
+function alertNew(n){toast('🔴 وصل '+(n===1?'طلب دعم فني جديد':n+' طلبات دعم فني جديدة'));try{navigator.vibrate&&navigator.vibrate([180,80,180])}catch(e){}beep()}
+
+/* ---------- المزامنة (اختيارية) ---------- */
+function api(path,opt){
+ if(!cfg.base)return Promise.reject(new Error('no-base'));
+ opt=opt||{};var h={'Content-Type':'application/json'};if(cfg.token)h.Authorization='Bearer '+cfg.token;
+ return fetch(cfg.base.replace(/\/+$/,'')+path,Object.assign({},opt,{headers:h})).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.status===204?null:r.json()});
+}
+function setSync(s){syncState=s;var e=$('#scSyncState');if(!e)return;var t={local:'محلي فقط',ok:'متصل ✓',off:'غير متصل',err:'خطأ اتصال'}[s];e.textContent=t;e.setAttribute('data-s',s)}
+async function sync(manual){
+ if(!cfg.base){setSync('local');if(manual)toast('أدخل رابط الخادم من زر «الربط» لتفعيل الاستلام التلقائي');return}
+ if(!navigator.onLine){setSync('off');if(manual)toast('لا يوجد اتصال بالإنترنت');return}
+ if(syncing)return;syncing=true;
+ try{
+  for(var i=0;i<reqs.length;i++){var r=reqs[i];if(r.dirty&&r.source==='remote'){await api('/api/support/requests/'+encodeURIComponent(r.id),{method:'PATCH',body:JSON.stringify({status:r.status,notes:r.notes,replies:r.replies,updatedAt:r.updatedAt})});r.dirty=false}}
+  var d=await api('/api/support/requests');var list=Array.isArray(d)?d:(d&&(d.requests||d.items))||[];
+  var added=0,firstRun=!load(K.first,false);
+  list.forEach(function(x){var n=normReq(x);var j=reqs.findIndex(function(q){return q.id===n.id});
+   if(j<0){reqs.push(n);added++}
+   else{var l=reqs[j];if(!l.dirty&&n.updatedAt>l.updatedAt){l.status=n.status;l.priority=n.priority;l.message=n.message||l.message;l.updatedAt=n.updatedAt;
+     (n.replies||[]).forEach(function(rp){if(!l.replies.some(function(z){return z.t===rp.t&&z.text===rp.text}))l.replies.push(rp)})}}});
+  save(K.req,reqs);save(K.first,true);
+  for(var a=0;a<anns.length;a++){if(anns[a].dirty){await api('/api/announcements/'+encodeURIComponent(anns[a].id),{method:'PUT',body:JSON.stringify(anns[a])});anns[a].dirty=false}}
+  while(delA.length){await api('/api/announcements/'+encodeURIComponent(delA[0]),{method:'DELETE'});delA.shift();save(K.delA,delA)}
+  try{var ad=await api('/api/announcements');var al=Array.isArray(ad)?ad:(ad&&(ad.announcements||ad.items))||[];
+   al.forEach(function(x){var j=anns.findIndex(function(q){return q.id===String(x.id)});var o={id:String(x.id),title:x.title||'',body:x.body||x.text||'',category:x.category||'عام',urgent:!!x.urgent,pinned:!!x.pinned,status:x.status==='draft'?'draft':'published',expires:x.expires||'',createdAt:toTime(x.createdAt||Date.now()),updatedAt:toTime(x.updatedAt||x.createdAt||Date.now()),dirty:false};
+    if(j<0)anns.push(o);else if(!anns[j].dirty&&o.updatedAt>anns[j].updatedAt)anns[j]=o})}catch(e){}
+  save(K.ann,anns);
+  setSync('ok');
+  if(added){if(firstRun)toast('تم جلب '+added+' طلب من الخادم');else alertNew(added)}
+ }catch(e){setSync(navigator.onLine?'err':'off');if(manual)toast('تعذرت المزامنة: '+e.message)}
+ finally{syncing=false;badges();renderAll()}
+}
+
+/* ---------- نافذة عامة ---------- */
+function modal(title,body,foot){
+ var m=$('#scModal');if(!m){m=document.createElement('div');m.className='modal';m.id='scModal';document.body.appendChild(m);m.addEventListener('click',function(e){if(e.target===m)closeModal()})}
+ var old=$('#scMBody'),top=old?old.scrollTop:0;
+ m.innerHTML='<div class="modalbox" style="max-width:760px"><div class="modalhead"><b>'+title+'</b><button class="btn" data-sc="close" type="button">✕</button></div><div class="modalbody" id="scMBody">'+body+'</div>'+(foot?'<div class="modalfoot">'+foot+'</div>':'')+'</div>';
+ m.classList.add('show');var nb=$('#scMBody');if(nb&&old)nb.scrollTop=top;
+}
+function closeModal(){var m=$('#scModal');if(m){m.classList.remove('show');m.innerHTML=''}ui.cur=null}
+
+/* ---------- التنقل ---------- */
+var origShow=window.showView,MINE=['scSupport','scAnnouncements'];
+function closeDrawer(){var b=$('#mobileDrawerBackdrop');if(b)b.classList.remove('open');var o=$('#mobileDrawerOpen');if(o)o.setAttribute('aria-expanded','false')}
+function hideMine(){var act=$$('.view.active').filter(function(v){return MINE.indexOf(v.id)<0});if(act.length)MINE.forEach(function(id){var e=document.getElementById(id);if(e)e.classList.remove('active')})}
+function scShow(id){
+ if(typeof origShow==='function'){try{origShow(id)}catch(e){}}
+ $$('.view').forEach(function(v){v.classList.toggle('active',v.id===id)});
+ $$('[data-view],[data-drawer-view],[data-mobile-view]').forEach(function(b){var k=b.dataset.view||b.dataset.drawerView||b.dataset.mobileView;b.classList.toggle('active',k===id)});
+ closeDrawer();try{window.scrollTo({top:0})}catch(e){}
+ if(id==='scSupport')renderSupport();else renderAnn();
+}
+if(typeof origShow==='function'){window.showView=function(id){if(MINE.indexOf(id)>=0){scShow(id);return}var r=origShow.apply(this,arguments);hideMine();return r}}
+document.addEventListener('click',function(e){
+ var b=e.target.closest&&e.target.closest('[data-view],[data-drawer-view],[data-mobile-view]');if(!b)return;
+ var id=b.dataset.view||b.dataset.drawerView||b.dataset.mobileView;
+ if(MINE.indexOf(id)>=0){e.preventDefault();e.stopPropagation();scShow(id)}else setTimeout(hideMine,0);
+},true);
+
+/* ---------- الدعم الفني ---------- */
+function cmp(a,b){var ua=a.status==='new'&&!a.readAt?1:0,ub=b.status==='new'&&!b.readAt?1:0;if(ua!==ub)return ub-ua;var w={urgent:2,high:1,normal:0};if(w[a.priority]!==w[b.priority]&&a.status!=='done'&&b.status!=='done')return w[b.priority]-w[a.priority];return b.createdAt-a.createdAt}
+function filtered(){var q=norm(ui.q);return reqs.filter(function(r){
+ if(ui.st==='open'&&r.status==='done')return false;
+ if((ui.st==='new'||ui.st==='progress'||ui.st==='done')&&r.status!==ui.st)return false;
+ if(ui.pri&&r.priority!==ui.pri)return false;if(ui.cat&&r.category!==ui.cat)return false;
+ if(q&&norm([r.name,r.phone,r.familyId,r.message,r.category].join(' ')).indexOf(q)<0)return false;return true}).sort(cmp)}
+function cnt(s){return reqs.filter(function(r){return s==='all'?true:s==='open'?r.status!=='done':r.status===s}).length}
+function pill(r){var un=r.status==='new'&&!r.readAt;return '<span class="sc-pill sc-pill-'+r.status+(un?' unread':'')+'"><i></i>'+ST[r.status]+'</span>'}
+function reqCard(r){
+ var un=r.status==='new'&&!r.readAt;
+ return '<article class="sc-item sc-st-'+r.status+(un?' sc-unread':'')+'" data-sc="open" data-id="'+esc(r.id)+'" tabindex="0" role="button">'+
+ '<div class="sc-item-top"><div class="sc-who"><b>'+esc(r.name||'بدون اسم')+'</b>'+(r.familyId?'<small>هوية الأسرة: '+esc(r.familyId)+'</small>':'')+'</div><div class="sc-tags">'+pill(r)+(r.priority!=='normal'?'<span class="sc-pill sc-pill-'+r.priority+'">'+PRI[r.priority]+'</span>':'')+'</div></div>'+
+ '<p class="sc-msg">'+esc(r.message)+'</p>'+
+ '<div class="sc-item-foot"><span>🏷 '+esc(r.category)+'</span><span>🕒 '+rel(r.createdAt)+'</span>'+(r.phone?'<span dir="ltr">📞 '+esc(r.phone)+'</span>':'')+((r.replies||[]).length?'<span>💬 '+r.replies.length+'</span>':'')+'</div>'+
+ (r.status!=='done'?'<div class="sc-quick">'+(r.status==='new'?'<button class="btn" data-sc="st" data-id="'+esc(r.id)+'" data-v="progress" type="button">⏳ قيد المعالجة</button>':'')+'<button class="btn ok" data-sc="st" data-id="'+esc(r.id)+'" data-v="done" type="button">✓ تم الحل</button>'+(r.phone?'<button class="btn sc-wa" data-sc="wa" data-id="'+esc(r.id)+'" type="button">واتساب</button>':'')+'</div>':'')+
+ '</article>'}
+function renderSupport(){
+ var host=$('#scList');if(!host)return;var n=unseen();
+ var al=$('#scAlert');al.innerHTML=n?'<div class="sc-alert"><span>🔴 لديك '+n+(n===1?' طلب جديد':' طلبات جديدة')+' لم تُفتح بعد</span><button class="btn" data-sc="first" type="button">فتح أحدثها</button></div>':'';
+ $('#scStats').innerHTML=[['new','جديد','red'],['progress','قيد المعالجة','amber'],['done','تم الحل','green'],['all','الإجمالي','']].map(function(s){return '<button class="sc-stat '+s[2]+(ui.st===s[0]?' on':'')+'" data-sc="fst" data-v="'+s[0]+'" type="button"><span>'+s[1]+'</span><b>'+cnt(s[0])+'</b></button>'}).join('');
+ $('#scChips').innerHTML=[['open','المفتوحة'],['new','جديد'],['progress','قيد المعالجة'],['done','تم الحل'],['all','الكل']].map(function(s){return '<button class="sc-chip'+(ui.st===s[0]?' on':'')+'" data-sc="fst" data-v="'+s[0]+'" type="button">'+s[1]+'<em>'+cnt(s[0])+'</em></button>'}).join('');
+ var l=filtered();
+ host.innerHTML=l.length?l.map(reqCard).join(''):'<div class="sc-empty">'+(reqs.length?'لا توجد طلبات مطابقة للفلاتر الحالية.':'لا توجد طلبات دعم بعد.<br>ستظهر الطلبات الواردة هنا فور وصولها، ويظهر شارة حمراء في القائمة.')+'</div>';
+ setSync(syncState);
+}
+function getReq(id){return reqs.find(function(r){return r.id===id})}
+function persistReq(r){r.updatedAt=Date.now();if(r.source==='remote')r.dirty=true;save(K.req,reqs);badges();renderSupport();if(r.source==='remote')sync(false)}
+function setStatus(id,v){var r=getReq(id);if(!r)return;r.status=v;r.readAt=r.readAt||Date.now();persistReq(r);toast('الحالة: '+ST[v]);if(ui.cur===id)openReq(id,true)}
+function openReq(id,keep){
+ var r=getReq(id);if(!r)return;ui.cur=id;
+ if(!r.readAt){r.readAt=Date.now();save(K.req,reqs);badges();renderSupport()}
+ var tl=(r.replies||[]).map(function(x){return {t:x.t,text:x.text,k:'reply'}}).concat((r.notes||[]).map(function(x){return {t:x.t,text:x.text,k:'note'}})).sort(function(a,b){return b.t-a.t});
+ var body='<div class="sc-tags" style="justify-content:flex-start;margin-bottom:10px">'+pill(r)+'<span class="sc-pill sc-pill-'+r.priority+'">'+PRI[r.priority]+'</span></div>'+
+ '<div class="sc-info"><div><small>الاسم</small><b>'+esc(r.name||'—')+'</b></div><div><small>الجوال</small>'+(r.phone?'<a href="tel:'+esc(r.phone)+'" dir="ltr">'+esc(r.phone)+'</a>':'—')+'</div><div><small>هوية الأسرة</small>'+esc(r.familyId||'—')+'</div><div><small>التصنيف</small>'+esc(r.category)+'</div><div><small>وقت الاستلام</small>'+fmtDT(r.createdAt)+'</div></div>'+
+ '<div class="sc-sec">نص الطلب</div><div class="sc-bubble">'+esc(r.message)+'</div>'+
+ '<div class="sc-sec">تغيير الحالة</div><div class="sc-actions">'+(r.status!=='progress'?'<button class="btn" data-sc="st" data-id="'+esc(r.id)+'" data-v="progress" type="button">⏳ قيد المعالجة</button>':'')+(r.status!=='done'?'<button class="btn ok" data-sc="st" data-id="'+esc(r.id)+'" data-v="done" type="button">✓ تم الحل</button>':'<button class="btn" data-sc="st" data-id="'+esc(r.id)+'" data-v="new" type="button">↺ إعادة فتح</button>')+'</div>'+
+ '<div class="sc-sec">الرد على صاحب الطلب</div><div class="sc-form"><div class="sc-qr">'+QR.map(function(q,i){return '<button type="button" data-sc="qr" data-i="'+i+'">'+esc(q)+'</button>'}).join('')+'</div><textarea id="scReply" rows="3" placeholder="اكتب الرد هنا..."></textarea><div class="sc-actions"><button class="btn primary" data-sc="reply" data-id="'+esc(r.id)+'" type="button">حفظ الرد</button>'+(r.phone?'<button class="btn sc-wa" data-sc="replywa" data-id="'+esc(r.id)+'" type="button">إرسال عبر واتساب</button>':'')+'</div></div>'+
+ '<div class="sc-sec">ملاحظة داخلية (لا تُرسل)</div><div class="sc-form"><textarea id="scNote" rows="2" placeholder="ملاحظة للإدارة فقط..."></textarea><div class="sc-actions"><button class="btn" data-sc="note" data-id="'+esc(r.id)+'" type="button">إضافة ملاحظة</button></div></div>'+
+ (tl.length?'<div class="sc-sec">السجل</div><div class="sc-tl">'+tl.map(function(x){return '<div class="sc-tl-item '+x.k+'"><small>'+(x.k==='reply'?'رد':'ملاحظة داخلية')+' · '+fmtDT(x.t)+'</small>'+esc(x.text)+'</div>'}).join('')+'</div>':'');
+ var foot=r.source==='local'?'<button class="btn danger" data-sc="delreq" data-id="'+esc(r.id)+'" type="button">حذف الطلب</button>':'';
+ modal('طلب دعم فني',body,foot);
+}
+function newReqModal(){
+ modal('تسجيل طلب دعم','<div class="sc-form"><div><label>الاسم *</label><input id="nr_name"></div><div class="sc-row2"><div><label>الجوال</label><input id="nr_phone" type="tel" inputmode="tel" dir="ltr"></div><div><label>هوية الأسرة</label><input id="nr_fid" inputmode="numeric"></div></div><div class="sc-row2"><div><label>التصنيف</label><select id="nr_cat">'+CATS.map(function(c){return '<option>'+c+'</option>'}).join('')+'</select></div><div><label>الأولوية</label><select id="nr_pri"><option value="normal">عادي</option><option value="high">مهم</option><option value="urgent">عاجل</option></select></div></div><div><label>نص الطلب *</label><textarea id="nr_msg" rows="4"></textarea></div></div>','<button class="btn primary" data-sc="savereq" type="button">حفظ الطلب</button><button class="btn" data-sc="close" type="button">إلغاء</button>');
+}
+function saveReq(){
+ var name=$('#nr_name').value.trim(),msg=$('#nr_msg').value.trim();if(!name||!msg){toast('الاسم ونص الطلب مطلوبان');return}
+ var t=Date.now();reqs.push({id:uid(),createdAt:t,updatedAt:t,name:name,phone:$('#nr_phone').value.trim(),familyId:$('#nr_fid').value.trim(),category:$('#nr_cat').value,priority:$('#nr_pri').value,message:msg,status:'new',readAt:t,notes:[],replies:[],source:'local',dirty:false});
+ save(K.req,reqs);closeModal();badges();renderSupport();toast('تم تسجيل الطلب')}
+function addReply(id,wa){
+ var r=getReq(id),el=$('#scReply'),txt=el?el.value.trim():'';if(!r||!txt){toast('اكتب نص الرد أولاً');return}
+ r.replies=r.replies||[];r.replies.push({t:Date.now(),text:txt});if(r.status==='new')r.status='progress';
+ persistReq(r);
+ if(wa&&r.phone)window.open('https://wa.me/'+waPhone(r.phone)+'?text='+encodeURIComponent(txt),'_blank');
+ openReq(id,true);toast('تم حفظ الرد')}
+function addNote(id){var r=getReq(id),el=$('#scNote'),txt=el?el.value.trim():'';if(!r||!txt)return;r.notes=r.notes||[];r.notes.push({t:Date.now(),text:txt});persistReq(r);openReq(id,true)}
+function exportReqs(){
+ var rows=[['الاسم','الجوال','هوية الأسرة','التصنيف','الأولوية','الحالة','التاريخ','نص الطلب']].concat(reqs.map(function(r){return [r.name,r.phone,r.familyId,r.category,PRI[r.priority],ST[r.status],fmtDT(r.createdAt),r.message]}));
+ var csv='﻿'+rows.map(function(a){return a.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"'}).join(',')}).join('\r\n');
+ var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='support-requests-'+today()+'.csv';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500)}
+function cfgModal(){
+ modal('ربط خادم الدعم','<div class="sc-form"><div><label>رابط الخادم (Worker)</label><input id="cf_base" dir="ltr" placeholder="https://abu-ariban-support.xxx.workers.dev" value="'+esc(cfg.base)+'"></div><div><label>مفتاح الوصول (اختياري)</label><input id="cf_tok" dir="ltr" type="password" value="'+esc(cfg.token)+'"></div><label class="sc-check"><input type="checkbox" id="cf_snd"'+(cfg.sound?' checked':'')+'> صوت تنبيه عند وصول طلب جديد</label><details><summary style="cursor:pointer;font-weight:800;font-size:12px">الواجهات المتوقعة من الخادم</summary><pre dir="ltr" style="white-space:pre-wrap;font-size:11px;line-height:1.7;background:var(--bg);padding:10px;border-radius:10px;overflow:auto">GET   /api/support/requests\nPATCH /api/support/requests/:id   {status,notes,replies}\nGET   /api/announcements\nPUT   /api/announcements/:id\nDELETE /api/announcements/:id</pre></details><p class="muted" style="font-size:11px;line-height:1.8;margin:0">بدون رابط يعمل القسم محليًا على هذا الجهاز فقط. عند الربط يفحص التطبيق الخادم كل 20 ثانية وعند العودة للتطبيق.</p></div>','<button class="btn primary" data-sc="savecfg" type="button">حفظ وتجربة</button><button class="btn" data-sc="close" type="button">إلغاء</button>');
+}
+
+/* ---------- الإعلانات ---------- */
+function isExpired(a){return a.expires&&a.expires<today()}
+function aState(a){return a.status==='draft'?'draft':isExpired(a)?'expired':'active'}
+function shareText(a){
+ return (a.urgent?'🔴 *إعلان عاجل من إدارة مخيم أبو عريبان*':'📢 *إعلان من إدارة مخيم أبو عريبان*')+'\n\n*'+a.title+'*\n\n'+a.body+'\n\n📅 '+fmtDate(a.createdAt)+(a.expires?'\n⏳ ساري حتى: '+fmtDate(a.expires):'')+'\n\n— إدارة المخيم'}
+function renderAnn(){
+ var host=$('#scAnnList');if(!host)return;
+ var chips=[['active','المنشورة'],['draft','المسودات'],['expired','المنتهية'],['all','الكل']];
+ $('#scAnnChips').innerHTML=chips.map(function(c){var n=anns.filter(function(a){return c[0]==='all'||aState(a)===c[0]}).length;return '<button class="sc-chip'+(ui.aSt===c[0]?' on':'')+'" data-sc="afst" data-v="'+c[0]+'" type="button">'+c[1]+'<em>'+n+'</em></button>'}).join('');
+ var l=anns.filter(function(a){return ui.aSt==='all'||aState(a)===ui.aSt}).sort(function(a,b){return (b.pinned?1:0)-(a.pinned?1:0)||(b.urgent?1:0)-(a.urgent?1:0)||b.createdAt-a.createdAt});
+ host.innerHTML=l.length?l.map(function(a){var s=aState(a);
+  return '<article class="sc-ann '+(a.urgent?'urgent ':'')+s+'"><div class="sc-tags" style="justify-content:flex-start">'+(a.pinned?'<span class="sc-pill">📌 مثبّت</span>':'')+(a.urgent?'<span class="sc-pill sc-pill-urgent">عاجل</span>':'')+'<span class="sc-pill">'+esc(a.category)+'</span>'+(s==='draft'?'<span class="sc-pill sc-pill-progress">مسودة</span>':'')+(s==='expired'?'<span class="sc-pill">منتهي</span>':'')+'</div><h3>'+esc(a.title)+'</h3><div class="sc-ann-body">'+esc(a.body)+'</div><div class="sc-ann-meta"><span>🕒 '+fmtDate(a.createdAt)+'</span>'+(a.expires?'<span>⏳ حتى '+fmtDate(a.expires)+'</span>':'')+'</div><div class="sc-actions"><button class="btn sc-wa" data-sc="awa" data-id="'+esc(a.id)+'" type="button">واتساب</button><button class="btn" data-sc="acopy" data-id="'+esc(a.id)+'" type="button">نسخ</button><button class="btn" data-sc="aedit" data-id="'+esc(a.id)+'" type="button">تعديل</button><button class="btn" data-sc="apin" data-id="'+esc(a.id)+'" type="button">'+(a.pinned?'إلغاء التثبيت':'تثبيت')+'</button><button class="btn" data-sc="apub" data-id="'+esc(a.id)+'" type="button">'+(a.status==='draft'?'نشر':'إلغاء النشر')+'</button><button class="btn" data-sc="aprint" data-id="'+esc(a.id)+'" type="button">طباعة</button><button class="btn danger" data-sc="adel" data-id="'+esc(a.id)+'" type="button">حذف</button><button class="btn" data-sc="amore" type="button">عرض الكل</button></div></article>'}).join(''):'<div class="sc-empty">لا توجد إعلانات هنا.<br>اضغط «إعلان جديد» لإنشاء أول إعلان.</div>';
+}
+function getAnn(id){return anns.find(function(a){return a.id===id})}
+function annModal(id){
+ var a=id?getAnn(id):{title:'',body:'',category:'عام',urgent:false,pinned:false,status:'published',expires:''};if(!a)return;ui.editA=id||null;
+ modal(id?'تعديل إعلان':'إعلان جديد','<div class="sc-form"><div><label>العنوان *</label><input id="an_title" maxlength="120" value="'+esc(a.title)+'"></div><div><label>نص الإعلان *</label><textarea id="an_body" rows="7">'+esc(a.body)+'</textarea><div class="sc-actions" style="margin-top:6px"><button class="btn" data-sc="agreet" type="button">إدراج صيغة افتتاحية رسمية</button></div></div><div class="sc-row2"><div><label>التصنيف</label><select id="an_cat">'+ACATS.map(function(c){return '<option'+(c===a.category?' selected':'')+'>'+c+'</option>'}).join('')+'</select></div><div><label>تاريخ الانتهاء (اختياري)</label><input id="an_exp" type="date" value="'+esc(a.expires)+'"></div></div><div class="sc-row2"><label class="sc-check"><input type="checkbox" id="an_urg"'+(a.urgent?' checked':'')+'> إعلان عاجل</label><label class="sc-check"><input type="checkbox" id="an_pin"'+(a.pinned?' checked':'')+'> تثبيت في الأعلى</label></div><div><label>الحالة</label><select id="an_st"><option value="published"'+(a.status!=='draft'?' selected':'')+'>منشور</option><option value="draft"'+(a.status==='draft'?' selected':'')+'>مسودة</option></select></div><div><label>معاينة رسالة واتساب</label><div class="sc-preview" id="an_prev"></div></div></div>','<button class="btn primary" data-sc="asave" type="button">حفظ الإعلان</button><button class="btn" data-sc="close" type="button">إلغاء</button>');
+ prevAnn();
+}
+function curAnn(){return {title:$('#an_title').value.trim(),body:$('#an_body').value.trim(),urgent:$('#an_urg').checked,createdAt:Date.now(),expires:$('#an_exp').value}}
+function prevAnn(){var e=$('#an_prev');if(!e)return;var a=curAnn();e.textContent=shareText({title:a.title||'عنوان الإعلان',body:a.body||'نص الإعلان...',urgent:a.urgent,createdAt:a.createdAt,expires:a.expires})}
+function saveAnn(){
+ var c=curAnn();if(!c.title||!c.body){toast('العنوان والنص مطلوبان');return}
+ var a=ui.editA?getAnn(ui.editA):null,t=Date.now();
+ var o={id:a?a.id:uid(),title:c.title,body:c.body,category:$('#an_cat').value,urgent:c.urgent,pinned:$('#an_pin').checked,status:$('#an_st').value,expires:c.expires,createdAt:a?a.createdAt:t,updatedAt:t,dirty:true};
+ if(a)anns[anns.indexOf(a)]=o;else anns.push(o);
+ save(K.ann,anns);closeModal();renderAnn();toast('تم حفظ الإعلان');sync(false)}
+function touchAnn(a){a.updatedAt=Date.now();a.dirty=true;save(K.ann,anns);renderAnn();sync(false)}
+function printAnn(a){
+ var w=window.open('','_blank');if(!w){toast('اسمح بالنوافذ المنبثقة للطباعة');return}
+ w.document.write('<!doctype html><html dir="rtl" lang="ar"><meta charset="utf-8"><title>'+esc(a.title)+'</title><body style="font-family:Cairo,Tahoma,Arial,sans-serif;padding:36px;line-height:2"><div style="text-align:center;border-bottom:2px solid #111;padding-bottom:10px"><h2 style="margin:0">إدارة مخيم أبو عريبان</h2><div>'+(a.urgent?'إعلان عاجل':'إعلان')+'</div></div><h1 style="text-align:center;margin:22px 0">'+esc(a.title)+'</h1><div style="white-space:pre-wrap;font-size:18px">'+esc(a.body)+'</div><p style="margin-top:30px;color:#444">التاريخ: '+fmtDate(a.createdAt)+(a.expires?' — ساري حتى: '+fmtDate(a.expires):'')+'</p><script>onload=function(){print()}<\/script></body></html>');w.document.close()}
+function copyText(t){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(function(){toast('تم النسخ')},function(){fb()})}else fb();function fb(){var x=document.createElement('textarea');x.value=t;document.body.appendChild(x);x.select();try{document.execCommand('copy');toast('تم النسخ')}catch(e){toast('تعذر النسخ')}x.remove()}}
+
+/* ---------- الأحداث ---------- */
+function renderAll(){renderSupport();renderAnn()}
+document.addEventListener('click',function(e){
+ if(e.target.id==='scDashAlert'||(e.target.closest&&e.target.closest('#scDashAlert'))){scShow('scSupport');return}
+ var t=e.target.closest&&e.target.closest('[data-sc]');if(!t)return;
+ var a=t.dataset.sc,id=t.dataset.id;
+ switch(a){
+  case 'close':closeModal();break;
+  case 'open':openReq(id);break;
+  case 'first':var f=reqs.filter(function(r){return r.status==='new'&&!r.readAt}).sort(function(x,y){return y.createdAt-x.createdAt})[0];if(f)openReq(f.id);break;
+  case 'st':e.stopPropagation();setStatus(id,t.dataset.v);break;
+  case 'wa':e.stopPropagation();var r=getReq(id);if(r&&r.phone)window.open('https://wa.me/'+waPhone(r.phone),'_blank');break;
+  case 'fst':ui.st=t.dataset.v;renderSupport();break;
+  case 'qr':var ta=$('#scReply');if(ta){ta.value=QR[+t.dataset.i];ta.focus()}break;
+  case 'reply':addReply(id,false);break;
+  case 'replywa':addReply(id,true);break;
+  case 'note':addNote(id);break;
+  case 'delreq':if(confirm('حذف هذا الطلب نهائيًا؟')){reqs=reqs.filter(function(q){return q.id!==id});save(K.req,reqs);closeModal();badges();renderSupport()}break;
+  case 'newreq':newReqModal();break;
+  case 'savereq':saveReq();break;
+  case 'sync':sync(true);break;
+  case 'export':exportReqs();break;
+  case 'cfg':cfgModal();break;
+  case 'savecfg':cfg.base=$('#cf_base').value.trim();cfg.token=$('#cf_tok').value.trim();cfg.sound=$('#cf_snd').checked;save(K.cfg,cfg);closeModal();sync(true);break;
+  case 'newann':annModal();break;
+  case 'afst':ui.aSt=t.dataset.v;renderAnn();break;
+  case 'aedit':annModal(id);break;
+  case 'asave':saveAnn();break;
+  case 'agreet':var b=$('#an_body');if(b&&b.value.indexOf('السلام عليكم')<0){b.value='السلام عليكم ورحمة الله وبركاته،\nتعلن إدارة مخيم أبو عريبان لأهلنا الكرام أنّ:\n\n'+b.value;prevAnn()}break;
+  case 'awa':var x=getAnn(id);if(x)window.open('https://wa.me/?text='+encodeURIComponent(shareText(x)),'_blank');break;
+  case 'acopy':var y=getAnn(id);if(y)copyText(shareText(y));break;
+  case 'apin':var p=getAnn(id);if(p){p.pinned=!p.pinned;touchAnn(p)}break;
+  case 'apub':var q=getAnn(id);if(q){q.status=q.status==='draft'?'published':'draft';touchAnn(q)}break;
+  case 'aprint':var z=getAnn(id);if(z)printAnn(z);break;
+  case 'adel':if(confirm('حذف هذا الإعلان نهائيًا؟')){anns=anns.filter(function(n){return n.id!==id});save(K.ann,anns);delA.push(id);save(K.delA,delA);renderAnn();sync(false)}break;
+  case 'amore':var card=t.closest('.sc-ann');if(card){card.classList.toggle('open');t.textContent=card.classList.contains('open')?'طيّ':'عرض الكل'}break;
+ }
+});
+document.addEventListener('keydown',function(e){if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('.sc-item')){e.preventDefault();openReq(e.target.dataset.id)}if(e.key==='Escape')closeModal()});
+document.addEventListener('input',function(e){
+ if(e.target.id==='scQ'){ui.q=e.target.value;renderSupport()}
+ else if(e.target.id==='an_title'||e.target.id==='an_body'||e.target.id==='an_urg'||e.target.id==='an_exp')prevAnn()});
+document.addEventListener('change',function(e){if(e.target.id==='scPri'){ui.pri=e.target.value;renderSupport()}else if(e.target.id==='scCat'){ui.cat=e.target.value;renderSupport()}else if(e.target.id==='an_urg'||e.target.id==='an_exp')prevAnn()});
+window.addEventListener('online',function(){sync(false)});window.addEventListener('offline',function(){setSync('off')});
+document.addEventListener('visibilitychange',function(){if(!document.hidden)sync(false)});
+setInterval(function(){if(!document.hidden)sync(false)},20000);
+
+/* ---------- تهيئة ---------- */
+(function init(){
+ var cs=$('#scCat');if(cs)cs.innerHTML='<option value="">كل التصنيفات</option>'+CATS.map(function(c){return '<option>'+c+'</option>'}).join('');
+ var mb=$('#mobileDrawerOpen');if(mb&&!$('.sc-badge-float',mb)){var s=document.createElement('i');s.className='sc-badge sc-badge-support sc-badge-float';s.hidden=true;s.textContent='0';mb.appendChild(s)}
+ setSync(cfg.base?(navigator.onLine?'ok':'off'):'local');
+ badges();renderAll();
+ setTimeout(function(){sync(false)},1200);
+})();
+window.SC={sync:sync,reqs:function(){return reqs},ingest:function(x){var n=normReq(x);if(!reqs.some(function(r){return r.id===n.id})){reqs.push(n);save(K.req,reqs);badges();renderSupport();alertNew(1)}}};
+})();
+
+</script></body>
 </html>
 <style>.original-governorate-card .housing-chart-item{cursor:pointer}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-track{box-shadow:0 0 0 3px rgba(59,130,246,.18),0 4px 14px rgba(37,99,235,.13);transform:translateY(-1px)}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-fill{filter:brightness(1.16)}</style>
