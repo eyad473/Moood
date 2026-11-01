@@ -1031,16 +1031,20 @@ html[data-theme="dark"] .abu-badge-float{border-color:#141e2b}
 .ll-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
 @media(min-width:701px){.ll-stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .ll-status{margin:10px 0 0;font-size:12px}
-.ll-list{display:grid;gap:8px;margin-top:6px}
-.ll-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:11px 12px;border:1px solid var(--line,#e2e8f0);border-radius:14px;background:var(--card,#fff)}
-.ll-dot{width:10px;height:10px;border-radius:50%;background:#94a3b8}
-.ll-row.ev-login .ll-dot{background:#16a34a}.ll-row.ev-return .ll-dot{background:#2563eb}.ll-row.ev-logout .ll-dot{background:#94a3b8}.ll-row.ev-failed .ll-dot{background:#dc2626}
-.ll-main{min-width:0}.ll-name{font-weight:800;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ll-sub{font-size:11px;color:var(--muted,#64748b);margin-top:3px;line-height:1.7}
-.ll-time{text-align:left;direction:ltr;white-space:nowrap}.ll-time b{display:block;font-size:13px}.ll-time small{display:block;font-size:11px;color:var(--muted,#64748b);margin-top:2px;direction:rtl;text-align:left}
-.ll-badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;margin-inline-start:6px;vertical-align:middle}
+.ll-list{display:grid;gap:10px;margin-top:8px}
+.ll-row{padding:13px 14px;border:1px solid var(--line,#e2e8f0);border-inline-start:5px solid #94a3b8;border-radius:14px;background:var(--card,#fff)}
+.ll-row.ev-login{border-inline-start-color:#16a34a}.ll-row.ev-return{border-inline-start-color:#2563eb}.ll-row.ev-logout{border-inline-start-color:#94a3b8}.ll-row.ev-failed{border-inline-start-color:#dc2626}
+.ll-top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.ll-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:800}
+.ll-badge:before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
 .ev-login .ll-badge{background:#dcfce7;color:#166534}.ev-return .ll-badge{background:#dbeafe;color:#1e40af}.ev-logout .ll-badge{background:#f1f5f9;color:#475569}.ev-failed .ll-badge{background:#fee2e2;color:#991b1b}
+.ll-time{text-align:end;line-height:1.5}.ll-time b{font-size:14px;direction:ltr;unicode-bidi:isolate}.ll-time small{display:block;font-size:11px;color:var(--muted,#64748b)}
+.ll-name{margin:10px 0 8px;font-weight:800;font-size:16px;line-height:1.6;white-space:normal;overflow-wrap:anywhere}
+.ll-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px 12px;font-size:12px}
+.ll-meta div{min-width:0}.ll-meta span{display:block;color:var(--muted,#64748b);font-size:11px}.ll-meta b{display:block;font-weight:700;direction:ltr;text-align:right;unicode-bidi:isolate;overflow-wrap:anywhere}
 .ll-empty{padding:26px 12px;text-align:center;color:var(--muted,#64748b);font-size:13px;line-height:1.9}
+.ll-legend{margin-top:12px;padding:12px 14px;border:1px solid var(--line,#e2e8f0);border-radius:14px;font-size:12px;line-height:1.9}
+.ll-legend>b{display:block;margin-bottom:4px;font-size:13px}.ll-legend p{margin:0;display:flex;gap:8px;align-items:flex-start}.ll-legend i{flex:0 0 11px;height:11px;margin-top:7px;border-radius:50%}
 html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 </style>
 <section class="view" id="loginLog">
@@ -1052,6 +1056,11 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 <div class="mini-stat"><span class="muted">أسر نشطة اليوم</span><b id="llFamilies">—</b><small class="muted">عدد الأسر المختلفة</small></div>
 <div class="mini-stat"><span class="muted">محاولات فاشلة اليوم</span><b id="llFailed">—</b><small class="muted" id="llLast">آخر نشاط: —</small></div>
 </div>
+<div class="ll-legend"><b>ماذا تعني الألوان؟</b>
+<p><i style="background:#16a34a"></i><span><b style="display:inline">أخضر - دخول جديد:</b> رب الأسرة أدخل بياناته وتحقق من هويته بنجاح (دخول فعلي جديد).</span></p>
+<p><i style="background:#2563eb"></i><span><b style="display:inline">أزرق - عودة:</b> رب الأسرة فتح البوابة مرة أخرى وهو ما زال مسجّلًا من دخوله السابق (الجلسة صالحة 30 يومًا)، دون إعادة التحقق.</span></p>
+<p><i style="background:#94a3b8"></i><span><b style="display:inline">رمادي - خروج:</b> ضغط "تسجيل الخروج" وأنهى جلسته.</span></p>
+<p><i style="background:#dc2626"></i><span><b style="display:inline">أحمر - محاولة فاشلة:</b> أجاب إجابات تحقق خاطئة؛ إن تكررت فقد يكون شخص يحاول الدخول بهوية غيره.</span></p></div>
 <div class="ll-toolbar no-print">
 <input id="llSearch" type="search" placeholder="بحث باسم رب الأسرة أو رقم الهوية" autocomplete="off">
 <select id="llEvent"><option value="">كل العمليات</option><option value="login">دخول جديد</option><option value="return">عودة للجلسة</option><option value="logout">خروج</option><option value="failed">محاولة فاشلة</option></select>
@@ -1355,8 +1364,10 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
   list.innerHTML=items.map(function(r){
    var ev=LABEL[r.event]?r.event:'login';
    var name=r.familyName||'غير معروف';
-   var sub=['الهوية: '+esc(r.familyId)];if(r.device)sub.push(esc(r.device));if(r.country)sub.push(esc(r.country));
-   return '<div class="ll-row ev-'+ev+'"><span class="ll-dot"></span><div class="ll-main"><div class="ll-name">'+esc(name)+'<span class="ll-badge">'+LABEL[ev]+'</span></div><div class="ll-sub">'+sub.join(' · ')+'</div></div><div class="ll-time"><b>'+esc(tFmt.format(new Date(r.at)))+'</b><small>'+esc(dFmt.format(new Date(r.at)))+' · '+esc(ago(r.at))+'</small></div></div>';
+   var meta='<div><span>رقم الهوية</span><b>'+esc(r.familyId)+'</b></div>';
+   if(r.device)meta+='<div><span>الجهاز والمتصفح</span><b>'+esc(r.device)+'</b></div>';
+   if(r.country)meta+='<div><span>الدولة (حسب الاتصال)</span><b>'+esc(r.country)+'</b></div>';
+   return '<div class="ll-row ev-'+ev+'"><div class="ll-top"><span class="ll-badge">'+LABEL[ev]+'</span><div class="ll-time"><b>'+esc(tFmt.format(new Date(r.at)))+'</b><small>'+esc(dFmt.format(new Date(r.at)))+' · '+esc(ago(r.at))+'</small></div></div><div class="ll-name">'+esc(name)+'</div><div class="ll-meta">'+meta+'</div></div>';
   }).join('');
  }
  function load(){
