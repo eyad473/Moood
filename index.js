@@ -1098,6 +1098,73 @@ async function supportNotifications(request, env) {
     createdAt:Number(r.created_at),updatedAt:Number(r.updated_at)
   }))});
 }
+
+/* ===== واتساب العائلات: رقم واحد إلزامي لكل أسرة ===== */
+async function ensureFamilyWhatsappSchema(env) {
+  await ensureSupportSchema(env);
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS family_whatsapp (
+    family_id TEXT PRIMARY KEY,
+    family_name TEXT NOT NULL DEFAULT '',
+    whatsapp_number TEXT NOT NULL,
+    country_code TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`).run();
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_family_whatsapp_name ON family_whatsapp(family_name)`).run();
+}
+function normalizeWhatsappNumber(countryCode, localNumber) {
+  const code = countryCode === '+972' ? '+972' : countryCode === '+970' ? '+970' : '';
+  const digits = String(localNumber || '').replace(/[٠-٩۰-۹]/g, d => String('٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹'.indexOf(d) % 10)).replace(/\D/g, '');
+  if (!code || digits.length < 7 || digits.length > 12) return null;
+  return { code, number: code + digits };
+}
+async function supportSaveWhatsapp(request, env) {
+  await ensureFamilyWhatsappSchema(env);
+  const token = cleanString(request.headers.get('X-Support-Session') || '', 200);
+  const session = await supportSession(env, token);
+  if (!session) return json({ok:false,error:'انتهت جلسة التحقق. أعد التحقق من بيانات الأسرة.'},401);
+  let body; try { body = await request.json(); } catch { return json({ok:false,error:'البيانات المرسلة غير صالحة'},400); }
+  let parsed = normalizeWhatsappNumber(cleanString(body.countryCode,8), cleanString(body.phone,30));
+  const supplied = String(body.whatsappNumber || '').replace(/[\s()-]/g,'');
+  if (!parsed && /^\+97[02]\d{7,12}$/.test(supplied)) {
+    parsed = { code: supplied.startsWith('+972') ? '+972' : '+970', number: supplied };
+  }
+  if (!parsed) return json({ok:false,error:'أدخل رقم واتساب صحيحًا مع اختيار رمز الدولة.'},400);
+  const rows = await supportRowsForFamily(env, session.family_id);
+  if (!rows.length) return json({ok:false,error:'تعذر العثور على بيانات الأسرة.'},404);
+  const first = rows.find(r => supportNorm(r['صلة القرابة']) === supportNorm('رب الأسرة')) || rows[0];
+  const familyName = cleanString(first['اسم رب الأسرة'] || '',200);
+  await env.DB.prepare(`INSERT INTO family_whatsapp(family_id,family_name,whatsapp_number,country_code,updated_at)
+    VALUES(?,?,?,?,?) ON CONFLICT(family_id) DO UPDATE SET
+    family_name=excluded.family_name,whatsapp_number=excluded.whatsapp_number,
+    country_code=excluded.country_code,updated_at=excluded.updated_at`)
+    .bind(String(session.family_id),familyName,parsed.number,parsed.code,now()).run();
+  return json({ok:true,whatsappNumber:parsed.number,message:'تم حفظ رقم واتساب الأسرة بنجاح.'});
+}
+async function listFamilyWhatsapp(request, env) {
+  const auth = await requirePrimaryDevice(request, env);
+  if (!auth.ok) return json({ok:false,error:auth.error,code:auth.code||'AUTH'},auth.code==='READ_ONLY'?403:401);
+  await ensureFamilyWhatsappSchema(env);
+  const records = await env.DB.prepare(`SELECT record_id,data_json FROM sync_records WHERE deleted=0 AND record_id LIKE 'r-%' ORDER BY record_id ASC LIMIT 10000`).all();
+  const families = new Map();
+  for (const item of (records.results || [])) {
+    try {
+      const row = JSON.parse(item.data_json || '{}');
+      const familyId = supportNorm(row['رقم هوية الأسرة']);
+      if (!familyId) continue;
+      const old = families.get(familyId) || {familyId,name:''};
+      if (!old.name || supportNorm(row['صلة القرابة']) === supportNorm('رب الأسرة')) old.name = cleanString(row['اسم رب الأسرة'] || old.name,200);
+      families.set(familyId,old);
+    } catch {}
+  }
+  const saved = await env.DB.prepare(`SELECT family_id,family_name,whatsapp_number,updated_at FROM family_whatsapp ORDER BY family_name COLLATE NOCASE`).all();
+  const byId = new Map((saved.results||[]).map(x=>[String(x.family_id),x]));
+  const items = [...families.values()].map(f=>{
+    const w=byId.get(String(f.familyId));
+    return {familyId:f.familyId,familyName:f.name||w?.family_name||'أسرة بدون اسم',whatsappNumber:w?.whatsapp_number||'',updatedAt:w?Number(w.updated_at):null};
+  }).sort((a,b)=>a.familyName.localeCompare(b.familyName,'ar'));
+  return json({ok:true,items,summary:{total:items.length,withWhatsapp:items.filter(x=>x.whatsappNumber).length,missing:items.filter(x=>!x.whatsappNumber).length}});
+}
+
 async function supportLookup(request, env) {
   await ensureSupportSchema(env);
   const token=cleanString(request.headers.get('X-Support-Session')||'',200);
@@ -1108,7 +1175,8 @@ async function supportLookup(request, env) {
   const first=rows.find(r=>supportNorm(r['صلة القرابة'])===supportNorm('رب الأسرة'))||rows[0];
   const familyName=String(first['اسم رب الأسرة']||rows[0]['اسم رب الأسرة']||'');
   await logSupportLogin(env,request,session.family_id,'return',familyName);
-  return json({ok:true,family:{name:familyName,fields:supportPublicRecord(first),members:rows.map(supportPublicRecord),count:rows.length}});
+  const wa=await env.DB.prepare(`SELECT whatsapp_number FROM family_whatsapp WHERE family_id=? LIMIT 1`).bind(String(session.family_id)).first().catch(()=>null);
+  return json({ok:true,family:{name:familyName,fields:supportPublicRecord(first),members:rows.map(supportPublicRecord),count:rows.length,whatsappNumber:wa?.whatsapp_number||''}});
 }
 async function supportSubmit(request, env) {
   await ensureSupportSchema(env);
@@ -1224,6 +1292,8 @@ export default {
       if (url.pathname === "/announcements/admin" && request.method === "POST") return await saveAnnouncement(request, env);
       if (url.pathname === "/support/challenge" && request.method === "POST") return await supportChallenge(request, env);
       if (url.pathname === "/support/verify" && request.method === "POST") return await supportVerify(request, env);
+      if (url.pathname === "/support/contact" && request.method === "POST") return await supportSaveWhatsapp(request, env);
+      if (url.pathname === "/support/whatsapp/admin" && request.method === "GET") return await listFamilyWhatsapp(request, env);
       if (url.pathname === "/support/lookup" && request.method === "POST") return await supportLookup(request, env);
       if (url.pathname === "/support/submit" && request.method === "POST") return await supportSubmit(request, env);
       if (url.pathname === "/support/notifications" && request.method === "GET") return await supportNotifications(request, env);
