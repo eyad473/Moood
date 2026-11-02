@@ -874,9 +874,23 @@ function supportNorm(v) {
 }
 function supportPhone(v) { return String(v ?? '').replace(/[^\d٠-٩۰-۹]/g,'').replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))); }
 function supportPublicRecord(r) {
+  // الحقول الأساسية التي تعرضها بوابة الأهالي.
   const allow = ["اسم رب الأسرة","رقم هوية الأسرة","رقم الجوال","رقم جوال بديل","العنوان","داخل/خارج المخيم","حالة اكتمال بيانات الأسرة","المحافظة الأصلية","حالة المسكن الأصلي","نوع السكن الحالي","اسم الفرد","صلة القرابة","الجنس","الحالة الاجتماعية","تاريخ الميلاد","العمر التقريبي","رقم هوية الفرد","مرض مزمن؟","نوع المرض","إصابة؟","إصابة?","سبب الإصابة","تفاصيل الإصابة","إعاقة؟","نوع الإعاقة","يتيم/منفصل عن ذويه؟","حامل؟","مرضعة؟","ملاحظات الفرد","ملاحظات الأسرة"];
   const out={};
-  for(const k of allow) if(r && r[k] !== undefined && r[k] !== null && String(r[k]).trim() !== "") out[k]=r[k];
+  if(!r || typeof r !== "object") return out;
+
+  // لا نعتمد على اسم عمود واحد فقط: نمرر كل أعمدة الحالة الصحية الموجودة فعلياً
+  // في السجل الرسمي، بما فيها صيغ الأسئلة والتفاصيل المختلفة التي قد يستخدمها
+  // إصدار البرنامج الرسمي (مع الحفاظ على اسم الحقل الأصلي حتى تتعرف عليه الواجهة).
+  const healthKey = /مرض|إصابة|اصابة|إعاقة|اعاقة|معاق|حامل|حمل|مرضعة|رضاعة|يرضع|صحي|health|injur|disab|pregnan|breastfeed/i;
+  const selected = new Set(allow);
+  for(const key of Object.keys(r)) {
+    if(healthKey.test(String(key))) selected.add(key);
+  }
+  for(const k of selected) {
+    const value=r[k];
+    if(value !== undefined && value !== null && String(value).trim() !== "") out[k]=value;
+  }
   return out;
 }
 function supportYear(v) {
