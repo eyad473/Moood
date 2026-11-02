@@ -671,6 +671,12 @@ html[data-theme="dark"] .tabx{background:#202d3d;color:#cbd6e4;border:1px solid 
 html[data-theme="dark"] .abu-badge-float{border-color:#141e2b}
 @keyframes abuBadgePulse{0%{box-shadow:0 0 0 0 rgba(220,38,38,.5)}70%{box-shadow:0 0 0 8px rgba(220,38,38,0)}100%{box-shadow:0 0 0 0 rgba(220,38,38,0)}}
 @media(prefers-reduced-motion:reduce){.abu-badge{animation:none}}
+
+.wa-family-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:13px;padding:13px;background:#fff}
+.wa-family-main{min-width:0}.wa-family-main b{display:block;font-size:14px}.wa-family-main small{display:block;color:var(--muted);margin-top:3px;direction:ltr;text-align:right}
+.wa-family-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.wa-phone{direction:ltr;font-weight:800;white-space:nowrap}.wa-send{background:#16a34a;color:#fff;border:1px solid #16a34a;border-radius:10px;padding:9px 13px;font-weight:800;text-decoration:none;white-space:nowrap}.wa-send:hover{background:#15803d}
+.wa-missing{color:#92400e;background:#fef3c7;border-radius:999px;padding:5px 9px;font-size:11px;font-weight:800}
+@media(max-width:600px){.wa-family-row{align-items:flex-start;flex-direction:column}.wa-family-actions{width:100%;justify-content:space-between}.wa-send{flex:1;text-align:center}.grid.stats{grid-template-columns:repeat(3,minmax(0,1fr))!important}.grid.stats .stat{padding:10px}.grid.stats .num{font-size:21px}}
 </style>
 </head>
 <body>
@@ -696,6 +702,7 @@ html[data-theme="dark"] .abu-badge-float{border-color:#141e2b}
 <button class="tab" data-view="distributions">إدارة التوزيعات</button>
 <button class="tabx" type="button" data-menu-action="supportInbox">🛠️ طلبات الدعم الفني<i class="abu-badge abu-support-badge abu-badge-tab" hidden>0</i></button>
 <button class="tabx" type="button" data-menu-action="campAnnouncements">📢 إعلانات المخيم</button>
+<button class="tab" data-view="whatsapp">🟢 واتساب العائلات</button>
 <button class="tab" data-view="loginLog">🔐 سجل دخول الأهالي</button>
 <button class="tab" data-view="records">السجلات</button>
 <button class="tab" data-view="classified">الكشوفات المصنفة</button>
@@ -703,6 +710,25 @@ html[data-theme="dark"] .abu-badge-float{border-color:#141e2b}
 <button class="tab" data-view="settings">الحماية والبيانات</button>
 <button class="tabx" type="button" onclick="displayAuthLogout()">⎋ تسجيل الخروج</button>
 </nav>
+<section class="view" id="whatsapp">
+ <div class="section-head">
+  <div><h2>واتساب العائلات</h2><p class="muted">أرقام التواصل التي أدخلتها الأسر في بوابة الأهالي بعد التحقق من هويتها.</p></div>
+  <button class="btn primary" id="waRefresh" type="button">↻ تحديث القائمة</button>
+ </div>
+ <div class="grid stats" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+  <div class="stat"><div class="label">إجمالي العائلات</div><div class="num" id="waTotal">—</div></div>
+  <div class="stat"><div class="label">لديها رقم واتساب</div><div class="num" id="waHas">—</div></div>
+  <div class="stat"><div class="label">لم تضف رقمًا بعد</div><div class="num" id="waMissing">—</div></div>
+ </div>
+ <div class="card">
+  <div class="filters" style="grid-template-columns:2fr 1fr">
+   <div class="field"><label for="waSearch">بحث باسم الأسرة أو رقم الهوية</label><input id="waSearch" type="search" placeholder="اكتب اسم رب الأسرة أو رقم الهوية"></div>
+   <div class="field"><label for="waFilter">حالة الرقم</label><select id="waFilter"><option value="all">جميع الأسر</option><option value="has">لديها واتساب</option><option value="missing">بدون رقم</option></select></div>
+  </div>
+  <div id="waStatus" class="notice" style="margin:12px 0">بانتظار الاتصال بالخادم...</div>
+  <div id="waList" class="grid" style="gap:9px"></div>
+ </div>
+</section>
 <section class="view" id="familySearch">
 <div class="section-head">
 <div>
@@ -1407,6 +1433,51 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
    }
   },80);
  });
+})();
+</script>
+<script id="family-whatsapp-admin-module">
+(function(){
+ 'use strict';
+ var DEFAULT_BASE='https://moood.eyad2000515.workers.dev',CAP={base:'',auth:'',device:''};
+ var priorFetch=window.fetch;
+ function header(h,n){try{if(!h)return '';if(typeof h.get==='function')return h.get(n)||'';if(Array.isArray(h)){var x=h.find(function(a){return String(a[0]).toLowerCase()===n.toLowerCase()});return x?x[1]:''}var k=Object.keys(h).find(function(x){return x.toLowerCase()===n.toLowerCase()});return k?h[k]:''}catch(e){return ''}}
+ window.fetch=function(input,init){
+  try{var raw=typeof input==='string'?input:((input&&input.url)||String(input));var u=new URL(raw,location.href);
+   if(/^\/(sync|support|announcements)\//.test(u.pathname)){var h=(init&&init.headers)||(input&&input.headers);var d=header(h,'X-Device-Id'),a=header(h,'Authorization');if(d||a){CAP.base=u.origin;if(d)CAP.device=d;if(a)CAP.auth=a;}}
+  }catch(e){}
+  return priorFetch.apply(this,arguments);
+ };
+ var $=function(id){return document.getElementById(id)},items=[],busy=false;
+ function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+ function status(t,err){var e=$('waStatus');if(e){e.textContent=t;e.style.background=err?'#fff1f2':'';e.style.color=err?'#991b1b':''}}
+ function render(){
+  var q=($('waSearch').value||'').trim().toLowerCase(),f=$('waFilter').value;
+  var rows=items.filter(function(x){var hit=!q||(String(x.familyName||'').toLowerCase().includes(q)||String(x.familyId||'').toLowerCase().includes(q));return hit&&(f==='all'||(f==='has'?!!x.whatsappNumber:!x.whatsappNumber));});
+  $('waList').innerHTML=rows.length?rows.map(function(x){
+   var action=x.whatsappNumber?'<a class="wa-send" target="_blank" rel="noopener" href="https://wa.me/'+encodeURIComponent(x.whatsappNumber.replace(/\D/g,''))+'">إرسال رسالة واتساب ↗</a>':'<span class="wa-missing">لم يُسجّل رقم بعد</span>';
+   return '<article class="wa-family-row"><div class="wa-family-main"><b>'+esc(x.familyName||'أسرة بدون اسم')+'</b><small>رقم هوية الأسرة: '+esc(x.familyId)+'</small></div><div class="wa-family-actions">'+(x.whatsappNumber?'<span class="wa-phone">'+esc(x.whatsappNumber)+'</span>':'')+action+'</div></article>';
+  }).join(''):'<div class="empty">لا توجد أسر مطابقة لخيارات البحث.</div>';
+ }
+ async function load(){
+  if(busy)return;
+  if(!CAP.auth&&!CAP.device){status('بانتظار اتصال البرنامج الرئيسي بالخادم...',false);return;}
+  busy=true;status('جارٍ تحميل أرقام واتساب الأسر...');
+  try{
+   var h={Accept:'application/json'};if(CAP.auth)h.Authorization=CAP.auth;if(CAP.device)h['X-Device-Id']=CAP.device;
+   var r=await priorFetch.call(window,(CAP.base||DEFAULT_BASE)+'/support/whatsapp/admin',{method:'GET',headers:h,cache:'no-store'});
+   var b=await r.json().catch(function(){return {}});
+   if(!r.ok||!b.ok)throw new Error(b.error||'تعذر تحميل الأرقام. افتح البرنامج من الحساب الرئيسي وتأكد من تحديث Worker.');
+   items=b.items||[];$('waTotal').textContent=b.summary.total;$('waHas').textContent=b.summary.withWhatsapp;$('waMissing').textContent=b.summary.missing;
+   render();status('تم تحديث القائمة — '+items.length+' أسرة. الأرقام محفوظة في قاعدة بيانات البرنامج الرئيسي.');
+  }catch(e){status(e.message||'تعذر الاتصال بالخادم.',true)}
+  finally{busy=false;}
+ }
+ $('waRefresh').addEventListener('click',load);$('waSearch').addEventListener('input',render);$('waFilter').addEventListener('change',render);
+ var sec=$('whatsapp'),timer=null;
+ function watch(){if(!sec)return;if(sec.classList.contains('active'))load()}
+ if(sec){new MutationObserver(watch).observe(sec,{attributes:true,attributeFilter:['class']});}
+ document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-view="whatsapp"],[data-drawer-view="whatsapp"]');if(!b)return;setTimeout(function(){var target=$('whatsapp');if(target){document.querySelectorAll('.view.active').forEach(function(v){v.classList.remove('active')});document.querySelectorAll('.tab.active').forEach(function(t){t.classList.remove('active')});target.classList.add('active');var mainTab=document.querySelector('.tab[data-view="whatsapp"]');if(mainTab)mainTab.classList.add('active');var drawer=$('mobileDrawerBackdrop');if(drawer)drawer.classList.remove('open');window.scrollTo(0,0);watch();}},80);});
+ window.addEventListener('online',watch);
 })();
 </script>
 <script src="./app.js?v=71.0-admin-login"></script></body>
