@@ -245,6 +245,7 @@ async function deleteFamily(name){
  if(await confirmUI(`سيتم حذف عائلة «${name}» وجميع أفرادها (${n} سجل).
 
 لن يتم تنفيذ الحذف إلا بعد تأكيدك.`,{title:"حذف العائلة",okText:"حذف العائلة",danger:true})){
+  syncMarkExplicitDelete(data.filter(r=>r["اسم رب الأسرة"]===name));
   data=data.filter(r=>r["اسم رب الأسرة"]!==name);renumber();autoSave();rebuildFilters();renderAll();toast("تم حذف العائلة وجميع أفرادها");
  }
 }
@@ -281,6 +282,7 @@ async function deletePerson(idx){
    const ok=await confirmUI(`هل تريد حذف الفرد «${r?.["اسم الفرد"]||""}»؟\n\nسيتم حفظ العملية محليًا ثم مزامنتها مع السحابة.`,{title:"حذف الفرد",okText:"حذف الفرد",danger:true});
    if(!ok)return;
  }
+ syncMarkExplicitDelete([r]);
  data.splice(idx,1);renumber();autoSave();rebuildFilters();renderAll();toast("تم حذف الفرد");
 }
 function emptyRecord(){const r={};COLUMNS.forEach(k=>r[k]="");return r}
@@ -1686,6 +1688,12 @@ const DISPLAY_PERMS_CACHE_KEY="aboreiban_display_permissions_v54_0";
 const PRIMARY_RECONCILE_KEY="aboreiban_primary_reconcile_v52";
 const AUTH_GEN_KEY="aboreiban_authoritative_generation_v52_2";
 const AUTH_NOTICE_GEN_KEY="aboreiban_authoritative_notice_generation_v52_2";
+const SYNC_EXPL_DEL_KEY="aboreiban_explicit_deletes_v72";
+const SYNC_DEDUP_REMOVED_KEY="aboreiban_dedup_removed_v72";
+function syncReadIdSet(k){try{return new Set(JSON.parse(localStorage.getItem(k)||"[]"))}catch(e){return new Set()}}
+function syncWriteIdSet(k,s){try{localStorage.setItem(k,JSON.stringify([...s].slice(-5000)))}catch(e){}}
+/* V72: الحذف إلى السحابة لا يُرسل إلا للسجلات التي حذفها المستخدم صراحةً (زر حذف عائلة/فرد). غياب سجل محلياً لأي سبب آخر لا يُعد حذفاً. */
+function syncMarkExplicitDelete(rows){const s=syncReadIdSet(SYNC_EXPL_DEL_KEY);(rows||[]).forEach(r=>{if(r&&r.__syncId)s.add(r.__syncId)});syncWriteIdSet(SYNC_EXPL_DEL_KEY,s)}
 const AUTH_SNAPSHOT_CACHE_KEY="aboreiban_authoritative_snapshot_cache_v52_2";
 const SYNC_ROLE_CACHE_KEY="aboreiban_sync_role_cache_v52_2";
 let appReadOnly=true;
@@ -1914,6 +1922,7 @@ function smartDeduplicateData(reason="auto"){
   }
   if(!remove.size) return {removed:0,groups:0,kept:data.length};
   const before=data.length;
+  try{const dr=syncReadIdSet(SYNC_DEDUP_REMOVED_KEY);remove.forEach(i=>{if(data[i]?.__syncId)dr.add(data[i].__syncId)});syncWriteIdSet(SYNC_DEDUP_REMOVED_KEY,dr)}catch(e){}
   const next=[];
   data.forEach((r,i)=>{if(merged.has(i)) next.push(merged.get(i)); else if(!remove.has(i)) next.push(r);});
   data=next;
@@ -1960,8 +1969,10 @@ function syncBuildChanges(){
       changes.push({opId:samePending?prev.opId:crypto.randomUUID(),recordId:r.__syncId,operation:"upsert",updatedAt:(samePending?Number(prev.updatedAt||Date.now()):Date.now()),baseVersion:Number(old?.__syncVersion||0),data:structuredClone(r)});
     }
   }
+  const __expl=syncReadIdSet(SYNC_EXPL_DEL_KEY);
   for(const old of syncShadow){
     if(!newMap.has(old.__syncId)){
+      if(String(old.__syncId||"").startsWith("r-") && !__expl.has(old.__syncId))continue;
       const key=old.__syncId+"|delete",prev=prevMap.get(key);
       changes.push({opId:prev?.opId||crypto.randomUUID(),recordId:old.__syncId,operation:"delete",updatedAt:Number(prev?.updatedAt||Date.now()),baseVersion:Number(old?.__syncVersion||0)});
     }
@@ -2035,6 +2046,25 @@ async function syncInitialMerge(){
 async function syncPush(){
   let pending=syncLoadPending();
   if(!pending.length)pending=syncRebuildPending();
+  /* V72: حذف أسر إلى السحابة فقط إذا كان صريحاً (من زر الحذف) وبحد أقصى 30 في الإرسال الواحد.
+     أي حذف غير صريح أو جماعي مشبوه لا يُرسل، وتُستعاد السجلات محلياً من آخر نسخة متزامنة. */
+  const __expl=syncReadIdSet(SYNC_EXPL_DEL_KEY), __dedupRm=syncReadIdSet(SYNC_DEDUP_REMOVED_KEY);
+  const __famDel=pending.filter(c=>c.operation==="delete"&&String(c.recordId||"").startsWith("r-"));
+  const __explicitDel=__famDel.filter(c=>__expl.has(c.recordId));
+  let __blocked=__famDel.filter(c=>!__expl.has(c.recordId));
+  if(__explicitDel.length>30)__blocked=__blocked.concat(__explicitDel);
+  if(__blocked.length){
+    const blockedIds=new Set(__blocked.map(c=>c.recordId));
+    const have=new Set(data.map(r=>r.__syncId));
+    const restoreIds=new Set(__blocked.filter(c=>!__dedupRm.has(c.recordId)).map(c=>c.recordId));
+    const restore=syncShadow.filter(r=>restoreIds.has(r.__syncId)&&!have.has(r.__syncId)).map(r=>structuredClone(r));
+    if(restore.length){data=data.concat(restore);renumber();localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}
+    pending=pending.filter(c=>!blockedIds.has(c.recordId)||c.operation!=="delete");
+    syncSavePending(pending);
+    const ex=syncReadIdSet(SYNC_EXPL_DEL_KEY);blockedIds.forEach(id=>ex.delete(id));syncWriteIdSet(SYNC_EXPL_DEL_KEY,ex);
+    if(restore.length){rebuildFilters();renderAll();toast(`تم منع حذف غير صريح/جماعي (${restore.length} سجل) — لم يُرسل للسحابة واستُعيدت السجلات`);}
+    console.warn("V72 deletes blocked",__blocked.length,"restored",restore.length);
+  }
   const originalTotal=pending.length;
   if(!pending.length)return {accepted:0,total:0,remaining:0,conflicts:[]};
   let accepted=0, conflicts=[];
@@ -2045,6 +2075,7 @@ async function syncPush(){
       const r=await syncFetch("/sync/push",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),changes:batch})});
       const okIds=new Set((r.accepted||[]).map(x=>typeof x==="string"?x:x.opId));
       accepted+=okIds.size;
+      try{const done=batch.filter(c=>okIds.has(c.opId)&&c.operation==="delete").map(c=>c.recordId);if(done.length){const ex=syncReadIdSet(SYNC_EXPL_DEL_KEY);done.forEach(id=>ex.delete(id));syncWriteIdSet(SYNC_EXPL_DEL_KEY,ex);}}catch(e){}
       conflicts.push(...(r.conflicts||[]));
       if(okIds.size){
         pending=pending.filter(c=>!okIds.has(c.opId));
@@ -2155,8 +2186,9 @@ async function syncPrimaryPullMissing(pulse){
   const pidOf=r=>[r["رقم هوية الأسرة"]||"",r["رقم هوية الفرد"]||"",r["اسم الفرد"]||""].join("|");
   const havePid=new Set(data.filter(r=>r["رقم هوية الفرد"]).map(pidOf));
   let added=0,skippedDup=0;
+  const dedupRm=syncReadIdSet(SYNC_DEDUP_REMOVED_KEY);
   for(const x of snap.records){
-    if(!x.recordId||have.has(x.recordId))continue;
+    if(!x.recordId||have.has(x.recordId)||dedupRm.has(x.recordId))continue;
     const r=structuredClone(x.data||{});
     if(!r||typeof r!=="object"||!Object.keys(r).length)continue;
     if(r["رقم هوية الفرد"]&&havePid.has(pidOf(r))){skippedDup++;continue;}
@@ -2201,7 +2233,7 @@ async function syncOnlineReconcile(reason="auto"){
           diag=JSON.stringify(pr);
         }catch(e){console.warn("V72 pull-missing:",e);diag="خطأ: "+(e?.message||e);}
       }
-      if(!window.__v72Shown){window.__v72Shown=true;toast("V72 تشخيص — "+diag+" | محلي "+data.length);}
+      if(diag&&/خطأ|فشل|غير مكتمل/.test(diag)&&!window.__v72Shown){window.__v72Shown=true;toast("تعذر سحب السجلات الناقصة — "+diag);}
       syncInitialized=true;
       return;
     }
