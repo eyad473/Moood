@@ -2048,8 +2048,21 @@ function requirePrimaryForEdit(){if(!appReadOnly)return true;toast("هذا ال�
 
 async function syncFetch(path,options={}){const headers={"Content-Type":"application/json","X-Device-Id":syncDeviceId(),...displayAuthHeader(),...(options.headers||{})};const res=await fetch(SYNC_API_URL+path,{...options,headers,cache:"no-store"});let body=null;try{body=await res.json()}catch(e){const er=Error("استجابة غير صالحة من الخادم");er.status=res.status;throw er}if(!res.ok||body?.ok===false){const er=Error(body?.error||("HTTP "+res.status));er.status=res.status;er.code=body?.code||"";throw er}return body}
 function applyChangeToMap(map,c){if(c.operation==="delete")map.delete(c.recordId);else if(c.operation==="upsert"&&c.data){const x=structuredClone(c.data);x.__syncId=c.recordId;x.__syncVersion=Number(c.version||0);map.set(c.recordId,x)}}
-function syncApplyChanges(changes,{protectIds=null}={}){let changed=false;const byId=new Map(data.map((r,i)=>[r.__syncId,i]));for(const c of changes||[]){if(protectIds?.has(c.recordId))continue;if(c.operation==="delete"){const idx=byId.get(c.recordId);if(idx!==undefined){data.splice(idx,1);changed=true;byId.clear();data.forEach((r,i)=>byId.set(r.__syncId,i))}}else if(c.operation==="upsert"&&c.data){const incoming=structuredClone(c.data);incoming.__syncId=c.recordId;incoming.__syncVersion=Number(c.version||0);const idx=byId.get(c.recordId);if(idx===undefined){data.push(incoming);byId.set(c.recordId,data.length-1);changed=true}else if(syncComparable(data[idx])!==syncComparable(incoming)){data[idx]=incoming;changed=true}}}return changed}
-async function syncPullApply(){let cursor=syncCursor,loops=0,all=[];while(loops++<30){const r=await syncFetch(`/sync/pull?since=${encodeURIComponent(cursor)}&limit=500`,{method:"GET"});all=all.concat(r.changes||[]);cursor=Number(r.nextSince||cursor);syncCursor=cursor;localStorage.setItem(SYNC_CURSOR_KEY,String(cursor));if(!r.hasMore)break}return all}
+function syncApplyChanges(changes,{protectIds=null}={}){let changed=false;const byId=new Map(data.map((r,i)=>[r.__syncId,i]));for(const c of changes||[]){if(protectIds?.has(c.recordId))continue;if(c.operation==="delete"){if(String(c.recordId||"").startsWith("r-")){console.warn("B1: family delete event quarantined",c.recordId);continue;}const idx=byId.get(c.recordId);if(idx!==undefined){data.splice(idx,1);changed=true;byId.clear();data.forEach((r,i)=>byId.set(r.__syncId,i))}}else if(c.operation==="upsert"&&c.data){const incoming=structuredClone(c.data);incoming.__syncId=c.recordId;incoming.__syncVersion=Number(c.version||0);const idx=byId.get(c.recordId);if(idx===undefined){data.push(incoming);byId.set(c.recordId,data.length-1);changed=true}else if(syncComparable(data[idx])!==syncComparable(incoming)){data[idx]=incoming;changed=true}}}return changed}
+async function syncPullApply(){
+  // B1: Never advance the durable cursor while pages are still in flight.
+  // The caller must apply/commit the returned changes before persisting a new cursor.
+  let cursor=syncCursor,loops=0,all=[];
+  while(loops++<30){
+    const r=await syncFetch(`/sync/pull?since=${encodeURIComponent(cursor)}&limit=500`,{method:"GET"});
+    const next=Number(r.nextSince??cursor);
+    if(!Number.isSafeInteger(next)||next<cursor)throw Error("تسلسل مزامنة غير صالح");
+    if(r.hasMore && next===cursor)throw Error("توقف تقدم صفحات المزامنة");
+    all=all.concat(r.changes||[]);cursor=next;
+    if(!r.hasMore)return all;
+  }
+  throw Error("تم تجاوز حد صفحات المزامنة — لم يُعتمد مؤشر جديد");
+}
 async function syncInitialMerge(){
   // Legacy compatibility only. V51 uses the authoritative snapshot for secondary devices.
   return await syncAdoptAuthoritativeSnapshot(true);
@@ -2132,6 +2145,15 @@ async function syncAdoptAuthoritativeSnapshot(force=false){
   }
   const snap=await syncFetchAuthoritativeSnapshot();
   if(!force && snap.generation<=currentGen)return {changed:false,generation:snap.generation,count:data.length};
+  // B1: A valid HTTP response may still represent a bad authoritative generation.
+  // Never silently replace a substantially larger local snapshot with a smaller one.
+  const oldIds=new Set(data.map(r=>r.__syncId).filter(Boolean));
+  const newIds=new Set(snap.records.map(r=>r.recordId));
+  const missing=[...oldIds].filter(id=>String(id).startsWith("r-")&&!newIds.has(id));
+  if(missing.length){
+    console.error("B1: authoritative snapshot omits locally held family records",missing.length);
+    throw Error(`حماية البيانات: نسخة السحابة لا تحتوي ${missing.length} سجل أسرة موجود محلياً؛ تم إيقاف الاستبدال`);
+  }
   const next=snap.records.map((x,i)=>{const r=structuredClone(x.data||{});r.__syncId=x.recordId;r.__syncVersion=Number(x.version||0);r["#"]=String(i+1);return r;});
   // Persist the complete authoritative snapshot BEFORE replacing the live UI data.
   // This is the offline source of truth for display devices.
@@ -2218,7 +2240,7 @@ async function syncOnlineReconcile(reason="auto"){
   try{
     await fetchSyncRole(true);
     if(!syncRole.configured){
-      if(syncRole.isPrimary){} else {syncSavePending([]);return;}
+      if(syncRole.isPrimary){} else {console.warn("B1: unconfigured secondary; pending changes preserved");return;}
     }
     if(syncRole.isPrimary){
       let pulseP=null;
@@ -2277,7 +2299,7 @@ async function syncOnlineReconcile(reason="auto"){
     applyDisplayPermissions();
     const seen=Number(localStorage.getItem(AUTH_GEN_KEY)||0);
     const serverGen=Number(pulse.authoritativeGeneration||0);
-    if(!pulse.authoritativeReady){syncSavePending([]);return;}
+    if(!pulse.authoritativeReady){return;}
     if(!syncInitialized || serverGen!==seen || permissionsChanged){
       const snap=await syncAdoptAuthoritativeSnapshot(true);
       if(snap.changed){
@@ -2288,7 +2310,7 @@ async function syncOnlineReconcile(reason="auto"){
         }
       }
     }
-    syncSavePending([]);
+    // B1: do not discard offline edits just because a display refresh completed.
     syncInitialized=true;
   }catch(e){
     console.warn("Cloud sync V51.4:",e);
