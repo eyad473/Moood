@@ -2071,16 +2071,23 @@ async function syncPush(){
   return {accepted,total:originalTotal,remaining:pending.length,conflicts};
 }
 async function syncFetchAuthoritativeSnapshot(){
-  let after="", all=[], generation=0, loops=0;
-  while(loops++<20){
-    const q=`/sync/authoritative?after=${encodeURIComponent(after)}&limit=300`;
-    const r=await syncFetch(q,{method:"GET"});
-    generation=Number(r.generation||generation);
-    all=all.concat(r.records||[]);
-    after=r.nextAfter||after;
-    if(!r.hasMore)break;
+  /* V72: لقطة مُتحقق منها. لا تُقبل لقطة ناقصة: يُفحص العدد الفعلي من الخادم، ويُعاد المحاولة مرة، ثم يُرمى خطأ (لا اعتماد صامت). */
+  for(let attempt=0;attempt<2;attempt++){
+    let after="", all=[], generation=0, loops=0, serverCount=null, exhausted=true;
+    while(loops++<200){
+      const q=`/sync/authoritative?after=${encodeURIComponent(after)}&limit=300`;
+      const r=await syncFetch(q,{method:"GET"});
+      generation=Number(r.generation||generation);
+      if(r.actualRecordCount!==undefined)serverCount=Number(r.actualRecordCount);
+      all=all.concat(r.records||[]);
+      after=r.nextAfter||after;
+      if(!r.hasMore){exhausted=false;break;}
+    }
+    const ids=new Set(all.map(x=>x.recordId));
+    const complete=!exhausted && ids.size===all.length && (serverCount===null || serverCount===all.length);
+    if(complete)return {generation,records:all,serverCount};
+    if(attempt===1)throw Error(`لقطة السحابة غير مكتملة (${all.length} من ${serverCount===null?"؟":serverCount}) — لم يتم اعتمادها`);
   }
-  return {generation,records:all};
 }
 async function syncAdoptAuthoritativeSnapshot(force=false){
   const currentGen=Number(localStorage.getItem(AUTH_GEN_KEY)||0);
@@ -2115,19 +2122,55 @@ function syncLoadOfflineAuthoritativeCache(){
   }catch(e){return false}
 }
 async function syncAdoptCloudState(){return await syncAdoptAuthoritativeSnapshot(true)}
+let __primaryReconcileDiagDone=false;
 async function syncPrimaryReconcileOnce(){
+  /* V72: لم يعد اعتماد الجهاز الرئيسي يكتب أو يحذف أي شيء. يُرسل تقرير مقارنة (dryRun) مرة واحدة لكل جلسة للتشخيص فقط،
+     ولا يُضبط PRIMARY_RECONCILE_KEY ولا يُلمس. المزامنة العادية (syncPush) هي المسار الوحيد للكتابة. */
   if(!syncRole.isPrimary)return {ok:false,skipped:true};
-  if(localStorage.getItem(PRIMARY_RECONCILE_KEY)==="done")return {ok:true,skipped:true};
-  data=syncNormalizeRows(data);
-  const records=data.map((r,i)=>({recordId:syncRecordId(r,i),data:r}));
-  const r=await syncFetch("/sync/primary-reconcile",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),records})});
-  if(!r?.ok)throw Error(r?.error||"تعذر اعتماد بيانات الجهاز الرئيسي");
-  localStorage.setItem(PRIMARY_RECONCILE_KEY,"done");
-  syncCursor=Number(r.latestSeq||0);localStorage.setItem(SYNC_CURSOR_KEY,String(syncCursor));
-  syncSaveShadow(data);syncSavePending([]);
-  localStorage.setItem(AUTH_GEN_KEY,String(Number(r.authoritativeGeneration||0)));
-  syncInitialized=true;
-  return r;
+  if(__primaryReconcileDiagDone)return {ok:true,skipped:true};
+  __primaryReconcileDiagDone=true;
+  try{
+    const records=syncNormalizeRows(data).map((r,i)=>({recordId:syncRecordId(r,i),data:r}));
+    if(!records.length)return {ok:true,skipped:true};
+    const r=await syncFetch("/sync/primary-reconcile",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),dryRun:true,records})});
+    console.info("V72 reconcile dry-run:",{active:r?.actualActiveCount,missingFromIncoming:r?.missingFromIncomingCount,wouldInsert:r?.insertedIds?.length,differing:r?.differingCount});
+    return {ok:true,skipped:true,report:r};
+  }catch(e){console.warn("V72 reconcile dry-run failed",e);return {ok:true,skipped:true};}
+}
+/* V72: الجهاز الرئيسي يسحب السجلات النشطة الموجودة في الخادم وغير الموجودة محلياً (إضافة فقط، لا استبدال ولا حذف). */
+let __primaryPullSig="";
+async function syncPrimaryPullMissing(pulse){
+  if(!syncRole.isPrimary)return {added:0};
+  if(syncBuildChanges().length>0)return {added:0,skipped:"pending"};
+  const serverGen=Number(pulse?.authoritativeGeneration||0);
+  const serverCount=Number(pulse?.actualRecordCount??-1);
+  const local=data.filter(r=>String(r.__syncId||"").startsWith("r-")).length;
+  const seen=Number(localStorage.getItem(AUTH_GEN_KEY)||0);
+  const sig=serverGen+":"+serverCount+":"+local;
+  if(serverGen===seen && !(serverCount>local))return {added:0};
+  if(sig===__primaryPullSig)return {added:0};
+  const snap=await syncFetchAuthoritativeSnapshot();
+  const have=new Set(data.map(r=>r.__syncId).filter(Boolean));
+  const pidOf=r=>[r["رقم هوية الأسرة"]||"",r["رقم هوية الفرد"]||"",r["اسم الفرد"]||""].join("|");
+  const havePid=new Set(data.filter(r=>r["رقم هوية الفرد"]).map(pidOf));
+  let added=0,skippedDup=0;
+  for(const x of snap.records){
+    if(!x.recordId||have.has(x.recordId))continue;
+    const r=structuredClone(x.data||{});
+    if(!r||typeof r!=="object"||!Object.keys(r).length)continue;
+    if(r["رقم هوية الفرد"]&&havePid.has(pidOf(r))){skippedDup++;continue;}
+    r.__syncId=x.recordId;r.__syncVersion=Number(x.version||0);
+    data.push(r);have.add(x.recordId);added++;
+  }
+  __primaryPullSig=sig;
+  if(added>0){
+    renumber();
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+    syncSaveShadow(data);syncSavePending([]);
+    rebuildFilters();renderAll();
+  }
+  localStorage.setItem(AUTH_GEN_KEY,String(snap.generation));
+  return {added,skippedDup,serverCount:snap.serverCount};
 }
 async function syncOnlineReconcile(reason="auto"){
   if(syncBusy||!navigator.onLine)return;syncBusy=true;
@@ -2137,15 +2180,21 @@ async function syncOnlineReconcile(reason="auto"){
       if(syncRole.isPrimary){} else {syncSavePending([]);return;}
     }
     if(syncRole.isPrimary){
-      const rec=await syncPrimaryReconcileOnce();
-      if(rec?.ok && !rec?.skipped){
-        toast("تم اعتماد بيانات الجهاز الرئيسي — أصبحت هذه النسخة المرجع الرسمي");
-      }
+      let pulseP=null;
+      try{pulseP=await syncFetch("/sync/pulse",{method:"GET"});}catch(e){pulseP=null;}
+      /* لا يُرسل أي تقرير مقارنة إلا لعامل آمن (safeReconcile) — حماية من تشغيل تطبيق جديد مع Worker قديم */
+      if(pulseP?.safeReconcile===true)await syncPrimaryReconcileOnce();
       syncLoadShadow();syncRebuildPending();
       const pushed=await syncPush();
       if(pushed.total>0 && pushed.remaining===0){
         const h=await syncFetch("/health",{method:"GET"});__syncHealthCache=h;__syncHealthAt=Date.now();
         syncSaveShadow(data);syncSavePending([]);localStorage.setItem(AUTH_GEN_KEY,String(Number(h.authoritativeGeneration||localStorage.getItem(AUTH_GEN_KEY)||0)));
+      }
+      if(pulseP?.ok && pushed.remaining===0){
+        try{
+          const pr=await syncPrimaryPullMissing(pulseP);
+          if(pr.added>0)toast(`تم سحب ${pr.added} سجل موجود في السحابة وغير موجود على هذا الجهاز`);
+        }catch(e){console.warn("V72 pull-missing:",e);}
       }
       syncInitialized=true;
       return;
