@@ -359,8 +359,8 @@ async function syncPulse(request, env) {
   const isDisp = display.ok && display.role !== "admin";
   const ready = (await getMeta(env,"authoritative_snapshot_at")) !== "";
   const generation = Number(await getMeta(env,"authoritative_generation") || 0);
-  const count = Number(await getMeta(env,"authoritative_record_count") || 0);
-  return json({ok:true,isPrimary,authoritativeReady:ready,authoritativeGeneration:generation,authoritativeRecordCount:count,displayAuthenticated:!!display.ok,displayPermissions:isDisp?display.permissions:null,displaySessionExpiresAt:display.ok?display.expiresAt:null,serverTime:now()});
+  const count = await activeAuthoritativeCount(env);
+  return json({ok:true,isPrimary,authoritativeReady:ready,authoritativeGeneration:generation,authoritativeRecordCount:count,actualRecordCount:count,safeReconcile:true,displayAuthenticated:!!display.ok,displayPermissions:isDisp?display.permissions:null,displaySessionExpiresAt:display.ok?display.expiresAt:null,serverTime:now()});
 }
 
 async function claimPrimary(request, env) {
@@ -379,12 +379,13 @@ async function claimPrimary(request, env) {
 async function health(env) {
   try {
     await ensureSchema(env);
-    const count = Number(await getMeta(env,"authoritative_record_count") || 0);
+    const count = await activeAuthoritativeCount(env);
+    const metaCount = Number(await getMeta(env,"authoritative_record_count") || 0);
     const seq = Number(await getMeta(env,"latest_seq") || 0);
     const ready = (await getMeta(env,"authoritative_snapshot_at")) !== "";
     return json({
       ok: true, worker: "moood", database: "mood", binding: "DB",
-      records: count, activeRecords: count, latestSeq: seq,
+      safeReconcile: true, records: count, activeRecords: count, metaRecordCount: metaCount, latestSeq: seq,
       authoritativeReady: ready, authoritativeGeneration:Number(await getMeta(env,"authoritative_generation") || 0), time: new Date().toISOString()
     });
   } catch (e) {
@@ -671,67 +672,121 @@ async function push(request, env) {
     authoritativeGeneration += 1;
     await setMeta(env,"authoritative_generation", authoritativeGeneration);
     await setMeta(env,"authoritative_snapshot_at", now());
+    await setMeta(env,"authoritative_record_count", await activeAuthoritativeCount(env));
   }
   return json({ ok:true, accepted, conflicts, skipped, latestSeq:Number(latest?.seq||0), authoritativeGeneration });
 }
 
+/* ===== V72: primary-reconcile آمن =====
+   - لا حذف نهائياً ولا حذف منطقي بسبب غياب السجل عن incoming.
+   - لا إحياء لسجل محذوف، ولا استبدال لسجل موجود.
+   - يُدخل فقط سجلاً غير موجود إطلاقاً في sync_records (بقيد ON CONFLICT DO NOTHING لمنع التكرار).
+   - كل الأعداد المعادة وقيم authoritative_* مصدرها قاعدة البيانات لا الجهاز.
+   - kill switch: المتغير PRIMARY_RECONCILE_MODE=off أو sync_meta.primary_reconcile_mode=off => لا كتابة إطلاقاً.
+   - body.dryRun=true => تقرير مقارنة فقط دون أي كتابة. */
+async function activeAuthoritativeCount(env) {
+  const r = await env.DB.prepare("SELECT COUNT(*) AS c FROM sync_records WHERE deleted=0 AND record_id LIKE 'r-%'").first();
+  return Number(r?.c || 0);
+}
+async function primaryReconcileMode(env) {
+  const fromEnv = cleanString(env.PRIMARY_RECONCILE_MODE || "", 20).toLowerCase();
+  const m = fromEnv || (await getMeta(env, "primary_reconcile_mode")).toLowerCase();
+  return m === "off" ? "off" : "safe";
+}
+function reconcileLabel(id, data) {
+  return { recordId: id, headName: cleanString(data?.["اسم رب الأسرة"], 120), name: cleanString(data?.["اسم الفرد"], 120) };
+}
 async function primaryReconcile(request, env) {
   const auth = await requirePrimaryDevice(request, env);
   if (!auth.ok) return json({ok:false,error:auth.error,code:auth.code||"AUTH"}, auth.code==="READ_ONLY"?403:409);
   await ensureSchema(env);
   let body; try { body=await request.json(); } catch { return json({ok:false,error:"JSON غير صالح"},400); }
   const records=Array.isArray(body.records)?body.records:[];
-  if(!records.length) return json({ok:false,error:"لا توجد سجلات لاعتمادها"},400);
-  if(records.length>2000) return json({ok:false,error:"عدد السجلات كبير"},413);
+  if(records.length>5000) return json({ok:false,error:"عدد السجلات كبير"},413);
+  const mode = await primaryReconcileMode(env);
+  const dryRun = body.dryRun === true || mode === "off";
 
-  // Read the current authoritative record IDs once. This endpoint is run once after deployment,
-  // not on every 2.5-second sync cycle. Distributions (dist:*) are never touched.
   const current=await env.DB.prepare("SELECT record_id,data_json,version,deleted FROM sync_records WHERE record_id LIKE 'r-%'").all();
   const existing=new Map((current.results||[]).map(r=>[String(r.record_id),r]));
   const incoming=new Map();
   for(const item of records){
-    const id=cleanString(item.recordId,200);
+    const id=cleanString(item?.recordId,200);
     if(!id || !id.startsWith("r-")) continue;
-    incoming.set(id,item.data||{});
+    if(!item.data || typeof item.data!=="object") continue;
+    incoming.set(id,item.data);
   }
-  const statements=[]; const t=now(); let changed=0,deleted=0;
+
+  const toInsert=[], deletedOnServer=[], differing=[], missingFromIncoming=[];
   for(const [id,data] of incoming){
     const old=existing.get(id);
-    const dataJson=JSON.stringify(data);
-    if(old && Number(old.deleted)===0 && old.data_json===dataJson) continue;
-    const nextVersion=old?Number(old.version||0)+1:1;
-    const opId=crypto.randomUUID();
-    statements.push(
-      env.DB.prepare(`INSERT INTO sync_records(record_id,data_json,updated_at,version,deleted,updated_by,created_at) VALUES(?,?,?,?,0,?,?) ON CONFLICT(record_id) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at,version=excluded.version,deleted=0,updated_by=excluded.updated_by`).bind(id,dataJson,t,nextVersion,auth.deviceId,t),
-      env.DB.prepare(`INSERT INTO sync_changes(op_id,record_id,operation,data_json,updated_at,version,device_id,created_at) VALUES(?,?,?,?,?,?,?,?)`).bind(opId,id,"upsert",dataJson,t,nextVersion,auth.deviceId,t)
-    );
-    changed++;
-    if(statements.length>=100){await env.DB.batch(statements.splice(0,100));}
+    if(!old) toInsert.push([id,data]);
+    else if(Number(old.deleted)===1) deletedOnServer.push(id);
+    else if(old.data_json!==JSON.stringify(data)) differing.push(id);
   }
   for(const [id,old] of existing){
-    if(incoming.has(id) || Number(old.deleted)===1) continue;
-    const nextVersion=Number(old.version||0)+1; const opId=crypto.randomUUID();
-    statements.push(
-      env.DB.prepare(`UPDATE sync_records SET data_json='{}',updated_at=?,version=?,deleted=1,updated_by=? WHERE record_id=?`).bind(t,nextVersion,auth.deviceId,id),
-      env.DB.prepare(`INSERT INTO sync_changes(op_id,record_id,operation,data_json,updated_at,version,device_id,created_at) VALUES(?,?,?,?,?,?,?,?)`).bind(opId,id,"delete",null,t,nextVersion,auth.deviceId,t)
-    );
-    deleted++;
-    if(statements.length>=100){await env.DB.batch(statements.splice(0,100));}
+    if(Number(old.deleted)===1 || incoming.has(id)) continue;
+    let d={}; try{ d=JSON.parse(old.data_json||"{}"); }catch{}
+    missingFromIncoming.push(reconcileLabel(id,d));
   }
-  if(statements.length) await env.DB.batch(statements);
-  await setMeta(env,"authoritative_snapshot_at",t);
-  await setMeta(env,"authoritative_record_count",incoming.size);
-  // Advance the authoritative generation only when the primary data actually changed.
-  // This prevents display devices from re-downloading the full snapshot and showing
-  // a repeated "تم تحديث جهاز العرض تلقائياً" notification on every polling cycle.
+
+  const t=now(); let inserted=0;
+  if(!dryRun && toInsert.length){
+    for(let i=0;i<toInsert.length;i+=50){
+      const stmts=[];
+      for(const [id,data] of toInsert.slice(i,i+50)){
+        const dataJson=JSON.stringify(data);
+        stmts.push(
+          env.DB.prepare(`INSERT INTO sync_records(record_id,data_json,updated_at,version,deleted,updated_by,created_at) VALUES(?,?,?,1,0,?,?) ON CONFLICT(record_id) DO NOTHING`).bind(id,dataJson,t,auth.deviceId,t),
+          env.DB.prepare(`INSERT INTO sync_changes(op_id,record_id,operation,data_json,updated_at,version,device_id,created_at) VALUES(?,?,'upsert',?,?,1,?,?)`).bind(crypto.randomUUID(),id,dataJson,t,auth.deviceId,t)
+        );
+      }
+      await env.DB.batch(stmts);
+      inserted+=stmts.length/2;
+    }
+  }
+
+  const actualActive=await activeAuthoritativeCount(env);
   let authoritativeGeneration = Number(await getMeta(env,"authoritative_generation") || 0);
-  if(changed || deleted){
-    authoritativeGeneration += 1;
-    await setMeta(env,"authoritative_generation",authoritativeGeneration);
+  if(!dryRun){
+    // قيم metadata تُحسب من قاعدة البيانات فقط، لا من incoming.
+    if(inserted>0){
+      authoritativeGeneration += 1;
+      await setMeta(env,"authoritative_generation",authoritativeGeneration);
+      await setMeta(env,"authoritative_snapshot_at",t);
+    } else if((await getMeta(env,"authoritative_snapshot_at"))===""){
+      await setMeta(env,"authoritative_snapshot_at",t);
+    }
+    await setMeta(env,"authoritative_record_count",actualActive);
   }
   const latest=await env.DB.prepare("SELECT seq FROM sync_changes ORDER BY seq DESC LIMIT 1").first();
-  await setMeta(env,"latest_seq",Number(latest?.seq||0));
-  return json({ok:true,authoritativeReady:true,recordCount:incoming.size,authoritativeGeneration,changed,deleted,latestSeq:Number(latest?.seq||0)});
+  if(!dryRun) await setMeta(env,"latest_seq",Number(latest?.seq||0));
+  return json({
+    ok:true, safeMode:true, mode, dryRun, skipped: mode==="off",
+    authoritativeReady:true, actualActiveCount:actualActive, recordCount:actualActive,
+    incomingCount:incoming.size, inserted, deleted:0, changed:inserted,
+    insertedIds: toInsert.slice(0,200).map(x=>x[0]),
+    missingFromIncomingCount:missingFromIncoming.length, missingFromIncoming,
+    deletedOnServerCount:deletedOnServer.length, deletedOnServerIds:deletedOnServer.slice(0,200),
+    differingCount:differing.length, differingIds:differing.slice(0,200),
+    authoritativeGeneration, latestSeq:Number(latest?.seq||0)
+  });
+}
+
+/* مسار إداري منفصل وصريح: لا يلمس أي سجل. يقارن metadata بالعدد الفعلي، وعند confirm يصحّح العدد ويزيد generation
+   ليجبر الأجهزة على إعادة سحب اللقطة (مثلاً بعد استعادة سجلات مباشرة في D1). */
+async function refreshAuthoritativeMeta(request, env) {
+  const auth = await requirePrimaryDevice(request, env);
+  if (!auth.ok) return json({ok:false,error:auth.error,code:auth.code||"AUTH"}, auth.code==="READ_ONLY"?403:409);
+  await ensureSchema(env);
+  let body={}; try { body=await request.json(); } catch {}
+  const actual=await activeAuthoritativeCount(env);
+  const before={ generation:Number(await getMeta(env,"authoritative_generation")||0), recordCount:Number(await getMeta(env,"authoritative_record_count")||0) };
+  if(body.confirm!=="REFRESH_AUTHORITATIVE_META") return json({ok:true,applied:false,before,actualActiveCount:actual,note:"تقرير فقط. أرسل confirm=REFRESH_AUTHORITATIVE_META للتطبيق (يكتب metadata فقط)."});
+  const generation=before.generation+1;
+  await setMeta(env,"authoritative_generation",generation);
+  await setMeta(env,"authoritative_record_count",actual);
+  await setMeta(env,"authoritative_snapshot_at",now());
+  return json({ok:true,applied:true,before,after:{generation,recordCount:actual}});
 }
 
 async function authoritativeSnapshot(request, env) {
@@ -754,7 +809,8 @@ async function authoritativeSnapshot(request, env) {
     version:Number(r.version)
   }));
   const nextAfter = rows.length ? rows[rows.length-1].recordId : after;
-  return json({ok:true,generation,records:rows,nextAfter,hasMore:rows.length===limit,recordCount:Number(await getMeta(env,"authoritative_record_count")||0)});
+  const actualRecordCount = await activeAuthoritativeCount(env);
+  return json({ok:true,generation,records:rows,nextAfter,hasMore:rows.length===limit,recordCount:actualRecordCount,actualRecordCount,metaRecordCount:Number(await getMeta(env,"authoritative_record_count")||0)});
 }
 
 async function bootstrap(request, env) {
@@ -1322,6 +1378,7 @@ export default {
       if (url.pathname === "/sync/pull" && request.method === "GET") return await pull(request, env);
       if (url.pathname === "/sync/push" && request.method === "POST") return await push(request, env);
       if (url.pathname === "/sync/primary-reconcile" && request.method === "POST") return await primaryReconcile(request, env);
+      if (url.pathname === "/sync/admin/refresh-authoritative-meta" && request.method === "POST") return await refreshAuthoritativeMeta(request, env);
       if (url.pathname === "/sync/authoritative" && request.method === "GET") return await authoritativeSnapshot(request, env);
       if (url.pathname === "/sync/bootstrap" && request.method === "POST") return await bootstrap(request, env);
       if (env.ASSETS) return await env.ASSETS.fetch(request);
