@@ -1423,7 +1423,58 @@ async function supportUpdate(request, env) {
   return json({ok:true});
 }
 
+
+// Phase D2: private R2 backup. Never restores or modifies D1 data.
+async function d2Snapshot(env) {
+  if (!env.BACKUP_BUCKET) throw Error('BACKUP_BUCKET binding is not configured');
+  const prefix='moood-d1/'+new Date().toISOString().replace(/[:.]/g,'-')+'-'+crypto.randomUUID();
+  const manifest={format:'moood-d2-v1',createdAt:new Date().toISOString(),status:'complete',tables:{},parts:[],notes:'Private backup. Do not publish or import into production without validation.'};
+  const configs=[
+    {name:'sync_records',key:'record_id',sql:'SELECT * FROM sync_records WHERE record_id > ? ORDER BY record_id LIMIT 200'},
+    {name:'sync_changes',key:'seq',sql:'SELECT * FROM sync_changes WHERE seq > ? ORDER BY seq LIMIT 200'}
+  ];
+  for(const cfg of configs){
+    let cursor=cfg.name==='sync_changes'?0:'';let count=0,part=0;
+    while(true){
+      const rows=(await env.DB.prepare(cfg.sql).bind(cursor).all()).results||[];
+      if(!rows.length)break;
+      const payload=rows.map(x=>JSON.stringify(x)).join('\n')+'\n';
+      const bytes=new TextEncoder().encode(payload);
+      const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(x=>x.toString(16).padStart(2,'0')).join('');
+      const key=prefix+'/'+cfg.name+'/'+String(part).padStart(6,'0')+'.jsonl';
+      await env.BACKUP_BUCKET.put(key,bytes,{httpMetadata:{contentType:'application/x-ndjson'}});
+      manifest.parts.push({table:cfg.name,key,rows:rows.length,sha256:hash,bytes:bytes.byteLength});
+      count+=rows.length;part++;cursor=rows[rows.length-1][cfg.key];
+      if(part>1000)throw Error('Backup safety limit exceeded; manifest not written');
+      if(rows.length<200)break;
+    }
+    manifest.tables[cfg.name]={rows:count,parts:part};
+  }
+  // Manifest is written LAST: only complete snapshots are discoverable.
+  await env.BACKUP_BUCKET.put(prefix+'/manifest.json',JSON.stringify(manifest),{httpMetadata:{contentType:'application/json'}});
+  return {prefix,createdAt:manifest.createdAt,tables:manifest.tables,parts:manifest.parts.length};
+}
+async function d2BackupStatus(request,env){
+  const auth=await requirePrimaryDevice(request,env);
+  if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||'AUTH'},403);
+  if(!env.BACKUP_BUCKET)return json({ok:true,configured:false,backups:[],message:'اربط حاوية R2 خاصة باسم BACKUP_BUCKET'});
+  const list=await env.BACKUP_BUCKET.list({prefix:'moood-d1/',limit:1000});
+  const manifests=(list.objects||[]).filter(o=>o.key.endsWith('/manifest.json')).sort((a,b)=>b.key.localeCompare(a.key)).slice(0,12);
+  return json({ok:true,configured:true,backups:manifests.map(x=>({key:x.key,uploaded:x.uploaded,size:x.size})),truncated:list.truncated===true});
+}
+async function d2BackupCreate(request,env){
+  const auth=await requirePrimaryDevice(request,env);
+  if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||'AUTH'},403);
+  if(!env.BACKUP_BUCKET)return json({ok:false,error:'لم يتم ربط حاوية R2 الخاصة'},503);
+  const result=await d2Snapshot(env);
+  return json({ok:true,backup:result});
+}
+
 export default {
+  async scheduled(event,env,ctx) {
+    if(!env.BACKUP_BUCKET)return;
+    ctx.waitUntil(d2Snapshot(env).catch(e=>console.error('D2 backup failed:',String(e?.message||e))));
+  },
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
       return new Response(null, {
@@ -1467,6 +1518,8 @@ export default {
       if (url.pathname === "/auth/display-permissions" && request.method === "POST") return await setDisplayPermissions(request, env);
       if (url.pathname === "/auth/display-emergency-lock" && request.method === "POST") return await setDisplayEmergencyLock(request, env);
       if (url.pathname === "/auth/display-activity" && request.method === "GET") return await listDisplayActivity(request, env);
+      if (url.pathname === "/sync/admin/backup/status" && request.method === "GET") return await d2BackupStatus(request, env);
+      if (url.pathname === "/sync/admin/backup/create" && request.method === "POST") return await d2BackupCreate(request, env);
       if (url.pathname === "/sync/admin/integrity" && request.method === "GET") return await syncIntegrityDashboard(request, env);
       if (url.pathname === "/sync/admin/recovery/restore" && request.method === "POST") return await recoveryC3Restore(request, env);
       if (url.pathname === "/sync/admin/recovery/inspect" && request.method === "POST") return await recoveryInspect(request, env);
