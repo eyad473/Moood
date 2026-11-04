@@ -1678,7 +1678,7 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "68.0"
+const APP_RELEASE_VERSION = "72.1-safe-sync"
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
@@ -1980,7 +1980,17 @@ function syncBuildChanges(){
   }
   return changes;
 }
-function syncRebuildPending(){const c=syncBuildChanges();syncSavePending(c);return c}
+/* Preserve durable offline operations: a temporary shadow change must never erase them. */
+function syncRebuildPending(){
+  const computed=syncBuildChanges(), previous=syncLoadPending();
+  const byId=new Map(computed.map(c=>[c.recordId,c]));
+  for(const old of previous){
+    if(!old?.recordId||byId.has(old.recordId))continue;
+    if(old.operation==="upsert" && data.some(r=>r.__syncId===old.recordId))byId.set(old.recordId,old);
+    if(old.operation==="delete" && syncReadIdSet(SYNC_EXPL_DEL_KEY).has(old.recordId) && !data.some(r=>r.__syncId===old.recordId))byId.set(old.recordId,old);
+  }
+  const result=[...byId.values()];syncSavePending(result);return result;
+}
 
 async function fetchSyncRole(force=false,_retry=0){
   const nowTs=Date.now();
@@ -2084,15 +2094,9 @@ async function syncPush(){
       }
     }
     if(!conflicts.length)break;
-    const byOp=new Map(conflicts.map(c=>[c.opId,c]));
-    pending=pending.map(c=>{
-      const conflict=byOp.get(c.opId);
-      if(conflict&&Number.isFinite(Number(conflict.serverVersion))){
-        return {...c,baseVersion:Number(conflict.serverVersion)};
-      }
-      return c;
-    });
-    syncSavePending(pending);
+    /* Never force-retry a stale local change over a newer server version. */
+    console.warn("Sync conflict: pending edits retained for manual reconciliation",conflicts.length);
+    break;
   }
   // Never rebuild the queue from an old shadow after accepted operations: that used to
   // recreate already-accepted changes and leave the main device showing false pending edits.
@@ -2123,6 +2127,9 @@ async function syncFetchAuthoritativeSnapshot(){
 }
 async function syncAdoptAuthoritativeSnapshot(force=false){
   const currentGen=Number(localStorage.getItem(AUTH_GEN_KEY)||0);
+  if(syncRole.isPrimary || syncLoadPending().length || syncBuildChanges().length){
+    throw Error("حماية البيانات: لا يمكن استبدال نسخة محلية فيها تعديلات غير مرفوعة");
+  }
   const snap=await syncFetchAuthoritativeSnapshot();
   if(!force && snap.generation<=currentGen)return {changed:false,generation:snap.generation,count:data.length};
   const next=snap.records.map((x,i)=>{const r=structuredClone(x.data||{});r.__syncId=x.recordId;r.__syncVersion=Number(x.version||0);r["#"]=String(i+1);return r;});
@@ -2200,7 +2207,7 @@ async function syncPrimaryPullMissing(pulse){
   if(added>0){
     renumber();
     localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
-    syncSaveShadow(data);syncSavePending([]);
+    if(!syncLoadPending().length)syncSaveShadow(data);
     rebuildFilters();renderAll();
   }
   localStorage.setItem(AUTH_GEN_KEY,String(snap.generation));
@@ -2302,7 +2309,7 @@ function showProgramUpdateNotice(){
 
 function installCloudSync(){
   data=syncNormalizeRows(data);syncLoadShadow();syncLoadPending();
-  if(!navigator.onLine){ syncLoadOfflineAuthoritativeCache(); }
+  if(!navigator.onLine && !data.length && !syncLoadPending().length){ syncLoadOfflineAuthoritativeCache(); }
 
   window.saveNow=function(){try{syncLocalSave(false);syncRebuildPending();syncOnlineReconcile("manual")}catch(e){toast("تعذر حفظ البيانات محلياً")}};
   window.autoSave=function(){try{syncLocalSave(true);syncRebuildPending();clearTimeout(window.__syncSaveTimer);window.__syncSaveTimer=setTimeout(()=>syncOnlineReconcile("auto"),350)}catch(e){toast("تعذر الحفظ المحلي: مساحة التخزين ممتلئة")}};
