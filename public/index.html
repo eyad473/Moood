@@ -1114,6 +1114,13 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 <div><b>مزامنة آمنة</b><p class="muted">البيانات الحالية لا تُستبدل عشوائياً. التعديلات تُرسل للسحابة وتُجلب من الأجهزة الأخرى حسب نظام الإصدارات.</p></div>
 <div class="actions no-print"><button class="btn" onclick="syncCenterNow()">فحص السيرفر</button><button class="btn" onclick="syncPull().then(refreshSyncCenter).catch(e=&gt;toast('تعذر جلب التحديثات'))">جلب التحديثات</button><button class="btn" onclick="syncPush().then(refreshSyncCenter).catch(e=&gt;toast('تعذر رفع التعديلات'))">رفع التعديلات</button></div>
 </div>
+<div class="sync-panel no-print" id="integrityD1Panel" style="margin-top:16px;border:1px solid #cbd5e1;border-radius:14px;padding:15px;background:var(--card,#fff)">
+ <h3>مراقبة سلامة البيانات — المرحلة D1</h3>
+ <p class="muted">قراءة مباشرة من D1: الأعداد الحالية، آخر الحذف، ودفعات الحذف غير المعتادة. لا تغيّر هذه الأداة أي سجل.</p>
+ <button type="button" class="btn primary" onclick="integrityD1Load()">فحص سلامة السجلات</button>
+ <p id="integrityD1Status" class="muted" role="status" aria-live="polite">يتطلب الحساب الرئيسي.</p>
+ <div id="integrityD1Results" style="overflow-wrap:anywhere"></div>
+</div>
 <div class="sync-panel no-print" id="recoveryC2Panel" style="margin-top:16px;border:1px solid #cbd5e1;border-radius:14px;padding:15px;background:var(--card,#fff)">
   <div><b>مركز البحث عن السجلات المفقودة — المرحلة C2</b><p class="muted">بحث إداري للقراءة فقط في السحابة وسجل العمليات والنسخ الاحتياطية. لا يحذف أو يستعيد أو يغيّر أي سجل.</p></div>
   <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">

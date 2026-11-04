@@ -4193,3 +4193,27 @@ function recoveryC3WidowReview(){const p=document.getElementById('recoveryC3Wido
  const candidates=widowOrphanReviewCandidates();p.replaceChildren();const summary=document.createElement('p');summary.textContent='أبناء الأرامل غير المصنفين حاليًا: '+candidates.length+'. التصنيف التلقائي يشمل جميع الأعمار وفق قاعدة المخيم، ويُحفظ محليًا عند تطبيقه.';p.append(summary);
  candidates.slice(0,100).forEach(x=>{const line=document.createElement('div');line.textContent=x.family+' — '+x.name+' — العمر: '+(x.age??'غير معروف');p.append(line)});
 }
+
+// Phase D1: read-only integrity summary; textContent prevents untrusted record IDs being interpreted as HTML.
+async function integrityD1Load(){
+ const status=document.getElementById('integrityD1Status'),out=document.getElementById('integrityD1Results');
+ if(!status||!out)return;
+ status.textContent='جارٍ فحص قاعدة البيانات...';out.replaceChildren();
+ const add=(parent,tag,text)=>{const el=document.createElement(tag);el.textContent=String(text);parent.appendChild(el);return el};
+ try{
+  const r=await syncFetch('/sync/admin/integrity',{method:'GET'});
+  if(!r.ok)throw Error(r.error||'تعذر الفحص');
+  const c=r.counts||{};
+  add(out,'p','إجمالي السجلات: '+c.total+' | النشطة: '+c.active+' | المحذوفة منطقيًا: '+c.deleted+' | آخر تسلسل: '+r.latestSeq);
+  const bursts=r.deleteBursts||[];
+  add(out,'h4','دفعات الحذف (5 عمليات أو أكثر في الدقيقة خلال آخر 30 يومًا)');
+  if(!bursts.length)add(out,'p','لا توجد دفعات تطابق الحد في الفترة المفحوصة.');
+  for(const b of bursts)add(out,'p',new Date(Number(b.minute_bucket)*60000).toLocaleString('ar')+' — '+b.deletes+' عمليات حذف (التسلسلات '+b.first_seq+' إلى '+b.last_seq+')');
+  add(out,'h4','آخر أحداث الحذف المسجلة');
+  for(const d of (r.recentDeletes||[]).slice(0,15))add(out,'p','#'+d.seq+' — '+d.record_id+' — '+new Date(Number(d.created_at)).toLocaleString('ar'));
+  add(out,'h4','جداول النسخ الاحتياطية المكتشفة');
+  add(out,'p',(r.backupTables||[]).join('، ')||'لم يتم العثور على جداول احتياطية بالتسمية المتوقعة.');
+  add(out,'p','تنبيه: هذه مراقبة فقط، ولا تنشئ نسخًا احتياطية تلقائية. أحداث الحذف القديمة لا تعني بالضرورة أن السجلات ما زالت محذوفة.');
+  status.textContent='اكتمل الفحص (للقراءة فقط).';
+ }catch(e){status.textContent='تعذر الفحص: '+(e.message||'خطأ غير معروف');}
+}
