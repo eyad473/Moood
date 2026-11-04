@@ -524,6 +524,12 @@ async function push(request, env) {
     const opId = cleanString(item.opId, 200);
     const recordId = cleanString(item.recordId, 200);
     const operation = item.operation === "delete" ? "delete" : "upsert";
+    // EMERGENCY DATA PROTECTION: temporarily reject ALL family record deletions.
+    // Do not remove until authenticated deletion audit and recovery are deployed.
+    if (operation === "delete" && recordId.startsWith("r-")) {
+      conflicts.push({opId: cleanString(item.opId,200), recordId, reason:"حذف الأسر معطل مؤقتاً لحماية البيانات", code:"FAMILY_DELETE_LOCKED"});
+      continue;
+    }
     const updatedAt = Number(item.updatedAt);
     const baseVersion = Number(item.baseVersion || 0);
     const data = operation === "delete" ? null : (item.data ?? {});
