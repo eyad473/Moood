@@ -4087,3 +4087,49 @@ importOfflineCampMap=function(event){const file=event.target.files?.[0];if(!file
  }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
+
+
+// Phase C2: read-only administrator recovery explorer. No mutation endpoints are called.
+let recoveryC2NextAfter=null;
+function recoveryC2Esc(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function recoveryC2El(id){return document.getElementById(id)}
+function recoveryC2Busy(b){for(const id of ['recoveryC2InspectBtn','recoveryC2DeletedBtn','recoveryC2MoreBtn']){const e=recoveryC2El(id);if(e)e.disabled=b;}}
+function recoveryC2Date(v){const n=Number(v);return Number.isFinite(n)&&n>0?new Date(n < 1e11 ? n*1000:n).toLocaleString('ar-PS'):'—'}
+function recoveryC2Summary(raw){
+  if(!raw)return 'لا توجد نسخة محفوظة';
+  try{const v=typeof raw==='string'?JSON.parse(raw):raw;if(!v||typeof v!=='object')return 'بيانات غير قابلة للعرض';
+    const names=['name','familyName','headName','اسم رب الأسرة','اسم الأسرة','الاسم','fullName'];
+    const found=names.map(k=>v[k]).find(x=>typeof x==='string'&&x.trim());
+    return found?recoveryC2Esc(found):'نسخة بيانات محفوظة (لم يُحدّد الاسم من الحقول المعروفة)';
+  }catch(e){return 'نسخة محفوظة بصيغة غير قابلة للقراءة';}
+}
+async function recoveryC2Inspect(){
+  const status=recoveryC2El('recoveryC2Status'),out=recoveryC2El('recoveryC2Results');if(!status||!out)return;
+  const recordId=(recoveryC2El('recoveryC2RecordId')?.value||'').trim();
+  if(!/^r-[a-zA-Z0-9-]{3,190}$/.test(recordId)){status.textContent='أدخل معرف سجل صحيحًا يبدأ بـ r-';return;}
+  recoveryC2Busy(true);status.textContent='جارٍ فحص السجل (قراءة فقط)…';out.replaceChildren();recoveryC2NextAfter=null;recoveryC2El('recoveryC2MoreBtn').hidden=true;
+  try{const b=await syncFetch('/sync/admin/recovery/inspect',{method:'POST',body:JSON.stringify({recordId})});
+    const current=b.current;
+    let html='<div style="padding:12px;border:1px solid #e2e8f0;border-radius:10px;margin:8px 0"><b>الحالة الحالية</b><p>'+(!current?'غير موجود في جدول السجلات الحالي':(Number(current.deleted)===1?'محذوف منطقيًا':'نشط')+' · الإصدار '+recoveryC2Esc(current.version)+' · '+recoveryC2Summary(current.data_json))+'</p></div>';
+    html+='<b>آخر العمليات ('+Number(b.history?.length||0)+')</b>';
+    html+=(b.history||[]).map(x=>'<div style="padding:9px;border-bottom:1px solid #e2e8f0">#'+recoveryC2Esc(x.seq)+' · '+recoveryC2Esc(x.operation)+' · إصدار '+recoveryC2Esc(x.version)+' · '+recoveryC2Date(x.created_at)+'<div class="muted">'+recoveryC2Summary(x.data_json)+'</div></div>').join('')||'<p class="muted">لا يوجد تاريخ عمليات لهذا المعرف.</p>';
+    html+='<b>النسخ الاحتياطية ('+Number(b.backups?.length||0)+')</b>';
+    html+=(b.backups||[]).map(x=>'<div style="padding:9px;border-bottom:1px solid #e2e8f0">'+recoveryC2Esc(x.source)+' · '+(Number(x.record?.deleted)===1?'محذوف':'نشط')+' · إصدار '+recoveryC2Esc(x.record?.version)+'<div class="muted">'+recoveryC2Summary(x.record?.data_json)+'</div></div>').join('')||'<p class="muted">لا توجد نسخة في جداول النسخ الاحتياطية التي فحصها الخادم.</p>';
+    out.innerHTML=html;status.textContent='اكتمل الفحص للمعرف '+recordId+' — دون أي تعديل.';
+  }catch(e){status.textContent='تعذر الفحص: '+(e.message||'خطأ غير معروف');}finally{recoveryC2Busy(false);}
+}
+async function recoveryC2ListDeleted(reset=true){
+  const status=recoveryC2El('recoveryC2Status'),out=recoveryC2El('recoveryC2Results'),more=recoveryC2El('recoveryC2MoreBtn');if(!status||!out||!more)return;
+  if(reset){recoveryC2NextAfter=null;out.replaceChildren();}
+  recoveryC2Busy(true);status.textContent='جارٍ جلب قائمة المحذوفة (قراءة فقط)…';
+  try{const q=new URLSearchParams({limit:'25'});if(recoveryC2NextAfter)q.set('after',recoveryC2NextAfter);
+    const b=await syncFetch('/sync/admin/recovery/deleted?'+q,{method:'GET'});
+    for(const x of (b.items||[])){
+      const div=document.createElement('div');div.style.cssText='padding:10px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap';
+      const span=document.createElement('span');span.textContent=x.record_id+' · إصدار '+x.version+' · '+recoveryC2Date(x.updated_at);
+      const btn=document.createElement('button');btn.type='button';btn.className='btn';btn.textContent='فحص';btn.onclick=()=>{recoveryC2El('recoveryC2RecordId').value=x.record_id;recoveryC2Inspect()};
+      div.append(span,btn);out.append(div);
+    }
+    recoveryC2NextAfter=b.nextAfter||null;more.hidden=!recoveryC2NextAfter;status.textContent='تم عرض '+(b.items||[]).length+' سجل في هذه الصفحة. القائمة تاريخية وقد تتضمن سجلات غير عائلية.';
+  }catch(e){status.textContent='تعذر جلب المحذوفة: '+(e.message||'خطأ غير معروف');}finally{recoveryC2Busy(false);}
+}

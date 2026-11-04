@@ -1114,6 +1114,17 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 <div><b>مزامنة آمنة</b><p class="muted">البيانات الحالية لا تُستبدل عشوائياً. التعديلات تُرسل للسحابة وتُجلب من الأجهزة الأخرى حسب نظام الإصدارات.</p></div>
 <div class="actions no-print"><button class="btn" onclick="syncCenterNow()">فحص السيرفر</button><button class="btn" onclick="syncPull().then(refreshSyncCenter).catch(e=&gt;toast('تعذر جلب التحديثات'))">جلب التحديثات</button><button class="btn" onclick="syncPush().then(refreshSyncCenter).catch(e=&gt;toast('تعذر رفع التعديلات'))">رفع التعديلات</button></div>
 </div>
+<div class="sync-panel no-print" id="recoveryC2Panel" style="margin-top:16px;border:1px solid #cbd5e1;border-radius:14px;padding:15px;background:var(--card,#fff)">
+  <div><b>مركز البحث عن السجلات المفقودة — المرحلة C2</b><p class="muted">بحث إداري للقراءة فقط في السحابة وسجل العمليات والنسخ الاحتياطية. لا يحذف أو يستعيد أو يغيّر أي سجل.</p></div>
+  <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <input id="recoveryC2RecordId" type="text" dir="ltr" maxlength="200" placeholder="معرف السجل r-..." aria-label="معرف السجل" style="flex:1;min-width:180px;padding:10px;border:1px solid #cbd5e1;border-radius:9px"/>
+    <button type="button" class="btn primary" id="recoveryC2InspectBtn" onclick="recoveryC2Inspect()">فحص السجل</button>
+    <button type="button" class="btn" id="recoveryC2DeletedBtn" onclick="recoveryC2ListDeleted(true)">عرض المحذوفة</button>
+  </div>
+  <p class="muted" id="recoveryC2Status" role="status" aria-live="polite">يتطلب تسجيل الدخول بالحساب الرئيسي.</p>
+  <div id="recoveryC2Results" style="max-height:420px;overflow:auto;overflow-wrap:anywhere"></div>
+  <div class="actions"><button type="button" class="btn" id="recoveryC2MoreBtn" onclick="recoveryC2ListDeleted(false)" hidden>عرض المزيد</button></div>
+</div>
 </section>
 <section class="view" id="settings">
 <div class="card">
