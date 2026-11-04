@@ -2141,14 +2141,15 @@ async function syncPrimaryReconcileOnce(){
 let __primaryPullSig="";
 async function syncPrimaryPullMissing(pulse){
   if(!syncRole.isPrimary)return {added:0};
-  if(syncBuildChanges().length>0)return {added:0,skipped:"pending"};
+  const pend=syncBuildChanges().length;
+  if(pend>0)return {added:0,skipped:"pending",pend};
   const serverGen=Number(pulse?.authoritativeGeneration||0);
   const serverCount=Number(pulse?.actualRecordCount??-1);
   const local=data.filter(r=>String(r.__syncId||"").startsWith("r-")).length;
   const seen=Number(localStorage.getItem(AUTH_GEN_KEY)||0);
   const sig=serverGen+":"+serverCount+":"+local;
-  if(serverGen===seen && !(serverCount>local))return {added:0};
-  if(sig===__primaryPullSig)return {added:0};
+  if(serverGen===seen && !(serverCount>local))return {added:0,skipped:"nochange",serverGen,seen,serverCount,local};
+  if(sig===__primaryPullSig)return {added:0,skipped:"samesig",serverCount,local};
   const snap=await syncFetchAuthoritativeSnapshot();
   const have=new Set(data.map(r=>r.__syncId).filter(Boolean));
   const pidOf=r=>[r["رقم هوية الأسرة"]||"",r["رقم هوية الفرد"]||"",r["اسم الفرد"]||""].join("|");
@@ -2170,7 +2171,7 @@ async function syncPrimaryPullMissing(pulse){
     rebuildFilters();renderAll();
   }
   localStorage.setItem(AUTH_GEN_KEY,String(snap.generation));
-  return {added,skippedDup,serverCount:snap.serverCount};
+  return {added,skippedDup,serverCount:snap.serverCount,local,serverGen};
 }
 async function syncOnlineReconcile(reason="auto"){
   if(syncBusy||!navigator.onLine)return;syncBusy=true;
@@ -2190,12 +2191,17 @@ async function syncOnlineReconcile(reason="auto"){
         const h=await syncFetch("/health",{method:"GET"});__syncHealthCache=h;__syncHealthAt=Date.now();
         syncSaveShadow(data);syncSavePending([]);localStorage.setItem(AUTH_GEN_KEY,String(Number(h.authoritativeGeneration||localStorage.getItem(AUTH_GEN_KEY)||0)));
       }
-      if(pulseP?.ok && pushed.remaining===0){
+      let diag="";
+      if(!pulseP?.ok)diag="pulse فشل";
+      else if(pushed.remaining!==0)diag="push غير مكتمل: متبقي "+pushed.remaining+" تعارضات "+(pushed.conflicts||[]).length;
+      else{
         try{
           const pr=await syncPrimaryPullMissing(pulseP);
           if(pr.added>0)toast(`تم سحب ${pr.added} سجل موجود في السحابة وغير موجود على هذا الجهاز`);
-        }catch(e){console.warn("V72 pull-missing:",e);}
+          diag=JSON.stringify(pr);
+        }catch(e){console.warn("V72 pull-missing:",e);diag="خطأ: "+(e?.message||e);}
       }
+      if(!window.__v72Shown){window.__v72Shown=true;toast("V72 تشخيص — "+diag+" | محلي "+data.length);}
       syncInitialized=true;
       return;
     }
