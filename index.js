@@ -840,6 +840,35 @@ async function recoveryDeletedList(request,env) {
   return json({ok:true,items:rows,nextAfter:rows.length===limit?rows[rows.length-1].record_id:null,readOnly:true});
 }
 
+
+// Phase C3: admin-only optimistic, versioned recovery. Never overwrite an active record.
+async function recoveryC3Restore(request, env) {
+ const auth=await requirePrimaryDevice(request,env);
+ if(!auth.ok)return json({ok:false,error:auth.error,code:auth.code||'AUTH'},403);
+ let b;try{b=await request.json()}catch{return json({ok:false,error:'طلب غير صالح'},400)}
+ const id=cleanString(b.recordId||'',200), seq=Number(b.sourceSeq), expected=Number(b.expectedVersion);
+ if(!/^r-[a-zA-Z0-9-]{3,190}$/.test(id)||!Number.isSafeInteger(seq)||seq<=0||!Number.isSafeInteger(expected)||expected<1||b.confirm!==true)return json({ok:false,error:'معرف السجل أو مصدر الاستعادة أو التأكيد غير صالح'},400);
+ await ensureSchema(env);
+ const current=await env.DB.prepare('SELECT record_id,version,deleted FROM sync_records WHERE record_id=?').bind(id).first();
+ if(!current)return json({ok:false,error:'السجل غير موجود في sync_records؛ لا يمكن استعادته بهذه الطريقة'},404);
+ if(Number(current.deleted)!==1)return json({ok:false,error:'السجل نشط بالفعل، لن تتم الكتابة فوقه',code:'ALREADY_ACTIVE'},409);
+ if(Number(current.version)!==expected)return json({ok:false,error:'تغير إصدار السجل، أعد الفحص قبل الاستعادة',code:'STALE_PREVIEW'},409);
+ const source=await env.DB.prepare("SELECT data_json FROM sync_changes WHERE seq=? AND record_id=? AND operation='upsert'").bind(seq,id).first();
+ if(!source?.data_json)return json({ok:false,error:'لا توجد نسخة upsert موثقة بهذا التسلسل'},404);
+ let data;try{data=JSON.parse(source.data_json)}catch{return json({ok:false,error:'النسخة التاريخية غير قابلة للقراءة'},422)}
+ if(!data||typeof data!=='object'||Array.isArray(data))return json({ok:false,error:'محتوى النسخة التاريخية غير صالح'},422);
+ const t=now(), next=expected+1, op='recovery-c3:'+id+':'+next;
+ // D1 batch executes as one transaction. Both statements require the same deleted version.
+ try{
+  const result=await env.DB.batch([
+   env.DB.prepare("INSERT INTO sync_changes(op_id,record_id,operation,data_json,updated_at,version,device_id,created_at) SELECT ?,record_id,'upsert',?, ?, ?, ?, ? FROM sync_records WHERE record_id=? AND deleted=1 AND version=?").bind(op,source.data_json,t,next,auth.deviceId||'recovery-c3',t,id,expected),
+   env.DB.prepare('UPDATE sync_records SET data_json=?,deleted=0,version=?,updated_at=?,updated_by=? WHERE record_id=? AND deleted=1 AND version=?').bind(source.data_json,next,t,auth.deviceId||'recovery-c3',id,expected)
+  ]);
+  if(Number(result[0]?.meta?.changes)!==1||Number(result[1]?.meta?.changes)!==1)return json({ok:false,error:'لم تتم الاستعادة بسبب تغيير متزامن؛ افحص السجل مجددًا',code:'CONFLICT'},409);
+  return json({ok:true,recordId:id,version:next,sourceSeq:seq,message:'تمت الاستعادة بنجاح؛ اجلب التحديثات بعد التأكد من السجل'});
+ }catch(e){return json({ok:false,error:'تعذر إتمام الاستعادة. أعد فحص السجل ولا تكرر الطلب عشوائيًا',code:'RECOVERY_FAILED'},409)}
+}
+
 async function authoritativeSnapshot(request, env) {
   const auth = await requireDisplayOrPrimary(request, env);
   if (!auth.ok) return json({ok:false,error:auth.error,code:auth.code},auth.code==="DISPLAY_DISABLED"?403:401);
@@ -1423,6 +1452,7 @@ export default {
       if (url.pathname === "/auth/display-permissions" && request.method === "POST") return await setDisplayPermissions(request, env);
       if (url.pathname === "/auth/display-emergency-lock" && request.method === "POST") return await setDisplayEmergencyLock(request, env);
       if (url.pathname === "/auth/display-activity" && request.method === "GET") return await listDisplayActivity(request, env);
+      if (url.pathname === "/sync/admin/recovery/restore" && request.method === "POST") return await recoveryC3Restore(request, env);
       if (url.pathname === "/sync/admin/recovery/inspect" && request.method === "POST") return await recoveryInspect(request, env);
       if (url.pathname === "/sync/admin/recovery/deleted" && request.method === "GET") return await recoveryDeletedList(request, env);
       if (url.pathname === "/sync/role" && request.method === "GET") return await role(request, env);
