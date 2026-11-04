@@ -504,6 +504,17 @@ async function push(request, env) {
     }
   }
 
+  /* V72: حارس الحذف الجماعي. دفعة واحدة تحذف أكثر من MASS_DELETE_LIMIT سجل أسرة تُرفض كاملة ولا يُكتب منها شيء.
+     السماح المؤقت يتم فقط بقرار صريح: sync_meta.allow_mass_delete_until = وقت (ms) في المستقبل. */
+  const MASS_DELETE_LIMIT = 30;
+  const familyDeletes = incoming.filter(x => x && x.operation === "delete" && String(x.recordId || "").startsWith("r-")).length;
+  if (familyDeletes > MASS_DELETE_LIMIT) {
+    const until = Number(await getMeta(env, "allow_mass_delete_until") || 0);
+    if (!(until > now())) {
+      return json({ ok:false, code:"MASS_DELETE_BLOCKED", error:`تم رفض دفعة تحذف ${familyDeletes} أسرة دفعة واحدة (الحد ${MASS_DELETE_LIMIT}). لم يُحذف شيء.`, deletes:familyDeletes, limit:MASS_DELETE_LIMIT, accepted:[], conflicts:[], skipped:[] }, 409);
+    }
+  }
+
   for (const item of incoming) {
     if (!validRecord(item)) {
       skipped.push({ opId: item?.opId || null, reason: "recordId/updatedAt غير صالح" });
@@ -554,7 +565,7 @@ async function push(request, env) {
     }
 
     const current = await env.DB.prepare(`
-      SELECT record_id, updated_at, version, deleted
+      SELECT record_id, updated_at, version, deleted, data_json
       FROM sync_records WHERE record_id = ?
     `).bind(recordId).first();
 
@@ -618,7 +629,8 @@ async function push(request, env) {
           updated_by = excluded.updated_by
       `).bind(
         recordId,
-        dataJson ?? "{}",
+        /* V72: الحذف المنطقي يحتفظ بآخر بيانات السجل (لا تُمسح إلى {}) ليسهل الاسترجاع. كل القراءات تستثني deleted=1. */
+        dataJson ?? (current?.data_json || "{}"),
         updatedAt,
         nextVersion,
         operation === "delete" ? 1 : 0,
