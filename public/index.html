@@ -1113,12 +1113,6 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 <div class="sync-panel">
 <div><b>مزامنة آمنة</b><p class="muted">البيانات الحالية لا تُستبدل عشوائياً. التعديلات تُرسل للسحابة وتُجلب من الأجهزة الأخرى حسب نظام الإصدارات.</p></div>
 <div class="actions no-print"><button class="btn" onclick="syncCenterNow()">فحص السيرفر</button><button class="btn" onclick="syncPull().then(refreshSyncCenter).catch(e=&gt;toast('تعذر جلب التحديثات'))">جلب التحديثات</button><button class="btn" onclick="syncPush().then(refreshSyncCenter).catch(e=&gt;toast('تعذر رفع التعديلات'))">رفع التعديلات</button></div>
-<div class="sync-panel no-print" id="recoveredRecordsPanel" style="border:1px solid #dbeafe;background:#f8fbff;border-radius:14px;padding:15px;margin-top:12px">
-<div><b>تثبيت السجلّين المستعادين — إجراء إداري لمرة واحدة</b><p class="muted" style="line-height:1.8">يُستخدم فقط بعد التحقق من وجود إبراهيم أبو عيادة وعلا أبو عريبان في قاعدة D1 بحالة نشطة. لا يحذف بيانات ولا يشغّل المزامنة العامة. يتطلب الحساب الرئيسي.</p></div>
-<div class="actions"><button type="button" class="btn primary" id="publishRecoveredBtn" onclick="abuPublishRecoveredRecords()">تثبيت استعادة إبراهيم وعلا</button></div>
-<p id="publishRecoveredResult" role="status" aria-live="polite" style="font-size:12px;line-height:1.9;white-space:pre-wrap;margin:9px 0 0"></p>
-</div>
-</div>
 </div>
 </section>
 <section class="view" id="settings">
@@ -1487,40 +1481,6 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 })();
 </script>
 <script src="./app.js?v=71.0-admin-login"></script>
-<script>
-/* V73: manual, one-time, administrator-only recovery publication. */
-window.abuPublishRecoveredRecords=async function(){
- const button=document.getElementById('publishRecoveredBtn');
- const result=document.getElementById('publishRecoveredResult');
- const ids=['r-26c96766-1048','r-71b132a9-1049'];
- if(!button||!result)return;
- if(typeof syncFetch!=='function'){result.textContent='تعذر تحميل وحدة الاتصال بالخادم. حدّث الصفحة أولاً.';return;}
- if(!navigator.onLine){result.textContent='يلزم الاتصال بالإنترنت لإتمام العملية.';return;}
- try{
-  if(typeof fetchSyncRole==='function')await fetchSyncRole(true);
-  if(typeof syncRole==='undefined'||!syncRole.isAdmin){result.textContent='هذه العملية متاحة للحساب الرئيسي (Admin) فقط.';return;}
- }catch(e){result.textContent='تعذر التحقق من صلاحية المدير: '+String(e.message||e);return;}
- if(!window.confirm('تأكيد إداري: هل تم أخذ نسخة احتياطية حديثة من قاعدة D1؟\n\nسيتم تسجيل حدثي استعادة للسجلين المحددين فقط. لا تضغط موافق إن سبق تنفيذ هذا الإجراء.'))return;
- button.disabled=true;
- result.textContent='جارٍ التحقق من حالة السجلين في الخادم...';
- try{
-  /* Preflight is read-only: avoid repeating a successful publication. */
-  const chk=await syncFetch('/sync/pull?since=11172&limit=500',{method:'GET'});
-  const changes=Array.isArray(chk.changes)?chk.changes:[];
-  const newest=ids.map(id=>changes.filter(x=>x.recordId===id).sort((a,b)=>Number(b.seq||0)-Number(a.seq||0))[0]);
-  if(newest.some(x=>x&&x.operation==='upsert'&&Number(x.version)>=4)){
-    result.textContent='يوجد حدث استعادة سابق لأحد السجلين أو كليهما. لن تُكرر العملية؛ افحص sync_changes أولاً.';
-    return;
-  }
-  result.textContent='جارٍ تثبيت الاستعادة...';
-  const r=await syncFetch('/sync/admin/publish-recovered',{method:'POST',body:JSON.stringify({recordIds:ids})});
-  const published=Array.isArray(r.published)?r.published:[];
-  if(published.length!==2||!ids.every(id=>published.some(x=>x.recordId===id)))throw Error('الخادم لم يؤكد نشر السجلين معًا. افحص سجل التغييرات قبل إعادة المحاولة.');
-  result.textContent='نجح تسجيل استعادة السجلين في سجل المزامنة. آخر تسلسل: '+String(r.latestSeq??'غير متاح')+'\nافحص sync_changes في D1 قبل تشغيل أي مزامنة.';
-  button.disabled=true;
- }catch(e){result.textContent='تعذر تأكيد العملية: '+String(e.message||e)+'\nلا تعاود الضغط قبل فحص sync_changes في D1.';}
- finally{button.disabled=true;}
-};
-</script></body>
+</body>
 </html>
 <style>.original-governorate-card .housing-chart-item{cursor:pointer}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-track{box-shadow:0 0 0 3px rgba(59,130,246,.18),0 4px 14px rgba(37,99,235,.13);transform:translateY(-1px)}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-fill{filter:brightness(1.16)}</style>
