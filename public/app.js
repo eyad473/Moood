@@ -4217,3 +4217,22 @@ async function integrityD1Load(){
   status.textContent='اكتمل الفحص (للقراءة فقط).';
  }catch(e){status.textContent='تعذر الفحص: '+(e.message||'خطأ غير معروف');}
 }
+
+// D2 private backup controls. Never expose backup content in the browser.
+async function backupD2Status(){
+ const status=document.getElementById('backupD2Status'),out=document.getElementById('backupD2Results');
+ if(!status||!out)return;status.textContent='جارٍ فحص النسخ...';out.replaceChildren();
+ try{const r=await syncFetch('/sync/admin/backup/status',{method:'GET'});if(!r.ok)throw Error(r.error||'تعذر الفحص');
+ status.textContent=r.configured?'تم الاتصال بمخزن النسخ الخاص.':'R2 غير مربوط؛ لا توجد نسخ تلقائية من D2.';
+ for(const b of r.backups||[]){const p=document.createElement('p');p.textContent=b.key+' — '+String(b.uploaded||'');out.appendChild(p)}
+ if(r.truncated){const p=document.createElement('p');p.textContent='النتائج جزئية؛ قائمة R2 تتجاوز صفحة واحدة.';out.appendChild(p)}
+ }catch(e){status.textContent='تعذر الفحص: '+(e.message||'خطأ')}
+}
+async function backupD2Create(){
+ if(!confirm('إنشاء نسخة احتياطية خاصة من السجلات الحالية وسجل التغييرات في R2؟ لا يتم تعديل D1.'))return;
+ const status=document.getElementById('backupD2Status');if(status)status.textContent='جارٍ إنشاء النسخة؛ لا تغلق الصفحة حتى ظهور النتيجة...';
+ try{const r=await syncFetch('/sync/admin/backup/create',{method:'POST'});if(!r.ok)throw Error(r.error||'فشل النسخ');
+ if(status)status.textContent='تم حفظ النسخة: '+r.backup.prefix+' — السجلات '+r.backup.tables.sync_records.rows+' — الأحداث '+r.backup.tables.sync_changes.rows;
+ await backupD2Status();
+ }catch(e){if(status)status.textContent='فشل إنشاء النسخة: '+(e.message||'خطأ')}
+}
