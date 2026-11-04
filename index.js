@@ -807,6 +807,34 @@ async function refreshAuthoritativeMeta(request, env) {
   return json({ok:true,applied:true,before,after:{generation,recordCount:actual}});
 }
 
+/* V73: explicit, authenticated recovery of already-active records into the change log.
+   Never changes deleted flags or record content; requires administrator session. */
+async function publishRecoveredRecords(request,env){
+  const auth=await requirePrimaryDevice(request,env);
+  if(!auth.ok||!auth.admin)return json({ok:false,error:"صلاحية المدير مطلوبة"},403);
+  await ensureSchema(env);
+  let body;try{body=await request.json()}catch{return json({ok:false,error:"طلب غير صالح"},400)}
+  const ids=Array.isArray(body.recordIds)?[...new Set(body.recordIds)]:[];
+  if(!ids.length||ids.length>10||ids.some(id=>typeof id!=="string"||!/^r-[a-zA-Z0-9-]{1,150}$/.test(id)))return json({ok:false,error:"حدد من 1 إلى 10 سجلات صحيحة"},400);
+  const statements=[],published=[];
+  const t=now();
+  for(const id of ids){
+    const r=await env.DB.prepare("SELECT record_id,data_json,version,deleted FROM sync_records WHERE record_id=?").bind(id).first();
+    if(!r||Number(r.deleted)!==0||!r.data_json||r.data_json==="{}")return json({ok:false,error:"السجل غير نشط أو بياناته غير متاحة: "+id},409);
+    const v=Number(r.version||0)+1;
+    statements.push(env.DB.prepare("UPDATE sync_records SET version=?,updated_at=?,updated_by=? WHERE record_id=? AND deleted=0 AND version=?").bind(v,t,auth.deviceId,id,Number(r.version)));
+    statements.push(env.DB.prepare("INSERT INTO sync_changes(op_id,record_id,operation,data_json,updated_at,version,device_id,created_at) VALUES(?,?,'upsert',?,?,?,?,?)").bind(crypto.randomUUID(),id,r.data_json,t,v,auth.deviceId,t));
+    published.push({recordId:id,version:v});
+  }
+  await env.DB.batch(statements);
+  const latest=await env.DB.prepare("SELECT COALESCE(MAX(seq),0) AS seq FROM sync_changes").first();
+  await setMeta(env,"latest_seq",Number(latest?.seq||0));
+  await setMeta(env,"authoritative_generation",Number(await getMeta(env,"authoritative_generation")||0)+1);
+  await setMeta(env,"authoritative_snapshot_at",t);
+  await setMeta(env,"authoritative_record_count",await activeAuthoritativeCount(env));
+  return json({ok:true,published,latestSeq:Number(latest?.seq||0)});
+}
+
 async function authoritativeSnapshot(request, env) {
   const auth = await requireDisplayOrPrimary(request, env);
   if (!auth.ok) return json({ok:false,error:auth.error,code:auth.code},auth.code==="DISPLAY_DISABLED"?403:401);
@@ -1397,6 +1425,7 @@ export default {
       if (url.pathname === "/sync/push" && request.method === "POST") return await push(request, env);
       if (url.pathname === "/sync/primary-reconcile" && request.method === "POST") return await primaryReconcile(request, env);
       if (url.pathname === "/sync/admin/refresh-authoritative-meta" && request.method === "POST") return await refreshAuthoritativeMeta(request, env);
+      if (url.pathname === "/sync/admin/publish-recovered" && request.method === "POST") return await publishRecoveredRecords(request, env);
       if (url.pathname === "/sync/authoritative" && request.method === "GET") return await authoritativeSnapshot(request, env);
       if (url.pathname === "/sync/bootstrap" && request.method === "POST") return await bootstrap(request, env);
       if (env.ASSETS) return await env.ASSETS.fetch(request);
