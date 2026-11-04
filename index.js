@@ -807,6 +807,39 @@ async function refreshAuthoritativeMeta(request, env) {
   return json({ok:true,applied:true,before,after:{generation,recordCount:actual}});
 }
 
+
+// Phase C1: administrator-only, read-only recovery discovery. No restoration or deletion here.
+async function recoveryInspect(request, env) {
+  const auth = await requirePrimaryDevice(request, env);
+  if (!auth.ok) return json({ok:false,error:auth.error,code:auth.code||"AUTH"},403);
+  let body;
+  try { body = await request.json(); } catch { return json({ok:false,error:"Invalid JSON"},400); }
+  const recordId = cleanString(body?.recordId || "",200);
+  if (!/^r-[a-zA-Z0-9-]{3,190}$/.test(recordId)) return json({ok:false,error:"معرف السجل غير صالح"},400);
+  await ensureSchema(env);
+  const current = await env.DB.prepare(`SELECT record_id,data_json,deleted,version,updated_at FROM sync_records WHERE record_id=?`).bind(recordId).first();
+  const history = await env.DB.prepare(`SELECT seq,operation,version,created_at,updated_at,data_json FROM sync_changes WHERE record_id=? ORDER BY seq DESC LIMIT 30`).bind(recordId).all();
+  const backups = [];
+  const tables = await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'sync_records_backup_%' ORDER BY name DESC LIMIT 12`).all();
+  for (const t of (tables.results||[])) {
+    if (!/^sync_records_backup_[0-9]{8}$/.test(t.name)) continue;
+    const row = await env.DB.prepare(`SELECT record_id,data_json,deleted,version,updated_at FROM "${t.name}" WHERE record_id=?`).bind(recordId).first();
+    if (row) backups.push({source:t.name,record:row});
+  }
+  return json({ok:true,recordId,current:current||null,history:history.results||[],backups,readOnly:true});
+}
+async function recoveryDeletedList(request,env) {
+  const auth = await requirePrimaryDevice(request,env);
+  if (!auth.ok) return json({ok:false,error:auth.error,code:auth.code||"AUTH"},403);
+  await ensureSchema(env);
+  const u = new URL(request.url);
+  const after = cleanString(u.searchParams.get('after')||'',200);
+  const limit = Math.max(1,Math.min(50,Number(u.searchParams.get('limit')||25)||25));
+  const r = await env.DB.prepare(`SELECT record_id,version,updated_at FROM sync_records WHERE deleted=1 AND record_id LIKE 'r-%' AND record_id>? ORDER BY record_id LIMIT ?`).bind(after,limit).all();
+  const rows = r.results||[];
+  return json({ok:true,items:rows,nextAfter:rows.length===limit?rows[rows.length-1].record_id:null,readOnly:true});
+}
+
 async function authoritativeSnapshot(request, env) {
   const auth = await requireDisplayOrPrimary(request, env);
   if (!auth.ok) return json({ok:false,error:auth.error,code:auth.code},auth.code==="DISPLAY_DISABLED"?403:401);
@@ -1390,6 +1423,8 @@ export default {
       if (url.pathname === "/auth/display-permissions" && request.method === "POST") return await setDisplayPermissions(request, env);
       if (url.pathname === "/auth/display-emergency-lock" && request.method === "POST") return await setDisplayEmergencyLock(request, env);
       if (url.pathname === "/auth/display-activity" && request.method === "GET") return await listDisplayActivity(request, env);
+      if (url.pathname === "/sync/admin/recovery/inspect" && request.method === "POST") return await recoveryInspect(request, env);
+      if (url.pathname === "/sync/admin/recovery/deleted" && request.method === "GET") return await recoveryDeletedList(request, env);
       if (url.pathname === "/sync/role" && request.method === "GET") return await role(request, env);
       if (url.pathname === "/sync/pulse" && request.method === "GET") return await syncPulse(request, env);
       if (url.pathname === "/sync/claim-primary" && request.method === "POST") return await claimPrimary(request, env);
