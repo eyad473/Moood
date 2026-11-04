@@ -1906,6 +1906,7 @@ function smartMergeRows(a,b){
   return out;
 }
 function smartDeduplicateData(reason="auto"){
+  if(reason === "auto" || reason === "startup") return {removed:0,groups:0,kept:data?.length||0};
   if(!Array.isArray(data)||data.length<2) return {removed:0,groups:0,kept:data?.length||0};
   const groups=new Map();
   data.forEach((r,i)=>{const key=smartPersonKey(r);if(!key)return;if(!groups.has(key))groups.set(key,[]);groups.get(key).push({r,i});});
@@ -3045,7 +3046,8 @@ function startProtectedApp(){
   if(protectedAppStarted)return;
   protectedAppStarted=true;
   load();
-  runSmartDedup("startup");
+  // EMERGENCY: automatic dedup disabled to protect newly added families.
+  // runSmartDedup("startup");
   initReportColumns();
   renderPersonPicker();
   initV5();
