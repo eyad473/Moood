@@ -1122,7 +1122,19 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
     <button type="button" class="btn" id="recoveryC2DeletedBtn" onclick="recoveryC2ListDeleted(true)">عرض المحذوفة</button>
   </div>
   <p class="muted" id="recoveryC2Status" role="status" aria-live="polite">يتطلب تسجيل الدخول بالحساب الرئيسي.</p>
-  <div id="recoveryC2Results" style="max-height:420px;overflow:auto;overflow-wrap:anywhere"></div>
+  <div class="sync-panel no-print" style="border:1px solid #cbd5e1;border-radius:12px;padding:12px;margin:12px 0">
+ <b>المرحلة C3 — استعادة سجل محذوف</b>
+ <p class="muted">اكتب معرف السجل أعلاه، ثم اعرض النسخة التاريخية وتحقق منها قبل تأكيد الاستعادة. لا يتم تعديل السجلات النشطة.</p>
+ <button type="button" class="btn" onclick="recoveryC3Prepare()">معاينة نسخة قابلة للاستعادة</button>
+ <div id="recoveryC3Preview" aria-live="polite"></div>
+</div>
+<div class="sync-panel no-print" style="border:1px solid #cbd5e1;border-radius:12px;padding:12px;margin:12px 0">
+ <b>مراجعة أبناء الأسر التي ترأسها أرملة</b>
+ <p class="muted">تعرض الحالات المحتملة للمراجعة فقط. لا يُثبت اليتم إلا بعد التحقق من وفاة الأب وعمر الفرد؛ لا تعدّل الأعلام تلقائيًا.</p>
+ <button type="button" class="btn" onclick="recoveryC3WidowReview()">عرض أبناء الأرامل غير المصنفين</button>
+ <div id="recoveryC3WidowResults" style="max-height:240px;overflow:auto"></div>
+</div>
+<div id="recoveryC2Results" style="max-height:420px;overflow:auto;overflow-wrap:anywhere"></div>
   <div class="actions"><button type="button" class="btn" id="recoveryC2MoreBtn" onclick="recoveryC2ListDeleted(false)" hidden>عرض المزيد</button></div>
 </div>
 </section>

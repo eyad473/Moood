@@ -112,7 +112,36 @@ function isWidowStatus(value){const x=smartStatusNorm(value);return x.includes("
 function isDivorceStatus(value){const x=smartStatusNorm(value);return x.includes("مطلق")||x.includes("مطلقه");}
 function isChildRelation(value){const x=smartStatusNorm(value);return x.includes("ابن")||x.includes("ابنه")||x.includes("بنت")||x.includes("ولد");}
 function getFamilyHeadRecord(r){const rows=familyMap().get(r?.["اسم رب الأسرة"]||"")||[];return rows.find(x=>norm(x["صلة القرابة"])==="رب الاسرة")||rows[0]||r||{};}
-function syncAutomaticOrphans(persist=true){let changed=0;familyMap().forEach(rows=>{const head=rows.find(x=>norm(x["صلة القرابة"])==="رب الاسرة")||rows[0];const widow=isWidowStatus(head?.["الحالة الاجتماعية"]);rows.forEach(r=>{if(!isChildRelation(r["صلة القرابة"]))return;if(widow){if(r["يتيم/منفصل عن ذويه?"]!=="نعم")r["يتيم/منفصل عن ذويه?"]="نعم";if(r["يتيم/منفصل عن ذويه؟"]!=="نعم")r["يتيم/منفصل عن ذويه؟"]="نعم";if(r.__autoOrphanByWidow!==true){r.__autoOrphanByWidow=true;changed++;}}else if(r.__autoOrphanByWidow===true){delete r.__autoOrphanByWidow;if(r["يتيم/منفصل عن ذويه?"]==="نعم")delete r["يتيم/منفصل عن ذويه?"];if(r["يتيم/منفصل عن ذويه؟"]==="نعم")delete r["يتيم/منفصل عن ذويه؟"];changed++;}})});if(changed&&persist)autoSave();return changed;}
+// Camp-specific administrative rule: children of a family head whose marital
+// status is widow are marked in the application's orphan category, regardless
+// of age. Existing orphan flags are never cleared by this routine.
+function syncAutomaticOrphans(persist=true){
+ let changed=0;
+ familyMap().forEach(rows=>{
+  // Require an explicit head record: never infer the head from an arbitrary member.
+  const head=rows.find(x=>norm(x['صلة القرابة'])==='رب الاسرة');
+  if(!head||!isWidowStatus(head['الحالة الاجتماعية']))return;
+  for(const r of rows){
+   if(r===head||!isChildRelation(r['صلة القرابة']))continue;
+   if(r['يتيم/منفصل عن ذويه؟']==='نعم'&&r['يتيم/منفصل عن ذويه?']==='نعم')continue;
+   r['يتيم/منفصل عن ذويه؟']='نعم';
+   r['يتيم/منفصل عن ذويه?']='نعم';
+   changed++;
+  }
+ });
+ if(changed&&persist)autoSave();return changed;
+}
+function widowOrphanReviewCandidates(){
+ const out=[];familyMap().forEach(rows=>{
+  const head=rows.find(x=>norm(x['صلة القرابة'])==='رب الاسرة');
+  if(!head||!isWidowStatus(head['الحالة الاجتماعية']))return;
+  for(const r of rows){
+   if(r===head||!isChildRelation(r['صلة القرابة']))continue;
+   if(r['يتيم/منفصل عن ذويه؟']==='نعم')continue;
+   out.push({family:r['اسم رب الأسرة']||'',name:r['اسم الفرد']||'',age:ageOf(r)});
+  }
+ });return out;
+}
 
 function ensureFamilyHeadRecords(persist=true){
  const fm=familyMap();
@@ -4132,4 +4161,35 @@ async function recoveryC2ListDeleted(reset=true){
     }
     recoveryC2NextAfter=b.nextAfter||null;more.hidden=!recoveryC2NextAfter;status.textContent='تم عرض '+(b.items||[]).length+' سجل في هذه الصفحة. القائمة تاريخية وقد تتضمن سجلات غير عائلية.';
   }catch(e){status.textContent='تعذر جلب المحذوفة: '+(e.message||'خطأ غير معروف');}finally{recoveryC2Busy(false);}
+}
+
+
+// C3: explicit admin confirmation. The server enforces deleted status and expected version.
+let recoveryC3Preview=null;
+function recoveryC3Reset(){recoveryC3Preview=null;const p=document.getElementById('recoveryC3Preview');if(p)p.replaceChildren();}
+async function recoveryC3Prepare(){
+ const id=(document.getElementById('recoveryC2RecordId')?.value||'').trim();const status=document.getElementById('recoveryC2Status');recoveryC3Reset();
+ if(!/^r-[a-zA-Z0-9-]{3,190}$/.test(id)){status.textContent='أدخل معرف سجل صحيح';return}
+ try{
+  const b=await syncFetch('/sync/admin/recovery/inspect',{method:'POST',body:JSON.stringify({recordId:id})});
+  if(!b.current||Number(b.current.deleted)!==1){status.textContent='الاستعادة متاحة للسجلات المحذوفة فقط. السجل الحالي نشط أو غير موجود.';return}
+  const source=(b.history||[]).find(x=>x.operation==='upsert'&&x.data_json&&Number.isSafeInteger(Number(x.seq)));
+  if(!source){status.textContent='لا توجد نسخة upsert في آخر 30 حدثًا. لا يمكن استعادة هذا السجل تلقائيًا.';return}
+  recoveryC3Preview={recordId:id,expectedVersion:Number(b.current.version),sourceSeq:Number(source.seq)};
+  const panel=document.getElementById('recoveryC3Preview');panel.replaceChildren();
+  const desc=document.createElement('p');desc.textContent='نسخة مقترحة: '+recoveryC2Summary(source.data_json)+' | الحدث #'+source.seq+' | الإصدار الحالي '+b.current.version+' | الاستعادة ستُنشئ إصدارًا جديدًا.';
+  const btn=document.createElement('button');btn.type='button';btn.className='btn primary';btn.textContent='تأكيد استعادة هذا السجل فقط';btn.onclick=recoveryC3Commit;panel.append(desc,btn);
+  status.textContent='راجع الاسم والمعرف قبل التأكيد. لن تُستبدل أي سجلات نشطة.';
+ }catch(e){status.textContent='تعذر إعداد الاستعادة: '+(e.message||'خطأ')}
+}
+async function recoveryC3Commit(){
+ const p=recoveryC3Preview,status=document.getElementById('recoveryC2Status');if(!p)return;
+ if(!confirm('هل تؤكد استعادة السجل '+p.recordId+' من النسخة التاريخية؟'))return;
+ recoveryC3Reset();
+ try{const r=await syncFetch('/sync/admin/recovery/restore',{method:'POST',body:JSON.stringify({...p,confirm:true})});status.textContent=r.message||'تمت الاستعادة. افحص السجل ثم اجلب التحديثات.';}
+ catch(e){status.textContent='تعذر الاستعادة: '+(e.message||'خطأ')}
+}
+function recoveryC3WidowReview(){const p=document.getElementById('recoveryC3WidowResults');if(!p)return;
+ const candidates=widowOrphanReviewCandidates();p.replaceChildren();const summary=document.createElement('p');summary.textContent='أبناء الأرامل غير المصنفين حاليًا: '+candidates.length+'. التصنيف التلقائي يشمل جميع الأعمار وفق قاعدة المخيم، ويُحفظ محليًا عند تطبيقه.';p.append(summary);
+ candidates.slice(0,100).forEach(x=>{const line=document.createElement('div');line.textContent=x.family+' — '+x.name+' — العمر: '+(x.age??'غير معروف');p.append(line)});
 }
