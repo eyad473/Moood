@@ -808,6 +808,21 @@ async function refreshAuthoritativeMeta(request, env) {
 }
 
 
+
+// Phase D1: authenticated, read-only integrity dashboard. No backup or deletion writes.
+async function syncIntegrityDashboard(request, env) {
+  const auth = await requirePrimaryDevice(request, env);
+  if (!auth.ok) return json({ok:false,error:auth.error,code:auth.code||'AUTH'},403);
+  await ensureSchema(env);
+  const counts = await env.DB.prepare(`SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN deleted=0 THEN 1 ELSE 0 END),0) AS active, COALESCE(SUM(CASE WHEN deleted=1 THEN 1 ELSE 0 END),0) AS deleted FROM sync_records`).first();
+  const latest = await env.DB.prepare(`SELECT COALESCE(MAX(seq),0) AS seq FROM sync_changes`).first();
+  const recent = await env.DB.prepare(`SELECT seq,record_id,operation,version,created_at FROM sync_changes WHERE operation='delete' ORDER BY seq DESC LIMIT 40`).all();
+  const bursts = await env.DB.prepare(`SELECT CAST(created_at/60000 AS INTEGER) AS minute_bucket, COUNT(*) AS deletes, MIN(seq) AS first_seq, MAX(seq) AS last_seq FROM sync_changes WHERE operation='delete' AND created_at >= ? GROUP BY CAST(created_at/60000 AS INTEGER) HAVING COUNT(*) >= 5 ORDER BY minute_bucket DESC LIMIT 15`).bind(Date.now()-30*86400000).all();
+  const tables = await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'sync_records_backup_%' ORDER BY name DESC LIMIT 20`).all();
+  const backupTables = (tables.results||[]).map(x=>x.name).filter(x=>/^sync_records_backup_[0-9]{8}$/.test(x));
+  return json({ok:true,readOnly:true,generatedAt:Date.now(),counts,latestSeq:latest?.seq||0,recentDeletes:recent.results||[],deleteBursts:bursts.results||[],backupTables,notes:['الدفعات التاريخية لا تعني بالضرورة أن السجلات ما زالت محذوفة','وجود جدول احتياطي لا يثبت صلاحية الاستعادة منه','لا توجد نسخ احتياطية تلقائية مفعّلة بواسطة هذه المرحلة']});
+}
+
 // Phase C1: administrator-only, read-only recovery discovery. No restoration or deletion here.
 async function recoveryInspect(request, env) {
   const auth = await requirePrimaryDevice(request, env);
@@ -1452,6 +1467,7 @@ export default {
       if (url.pathname === "/auth/display-permissions" && request.method === "POST") return await setDisplayPermissions(request, env);
       if (url.pathname === "/auth/display-emergency-lock" && request.method === "POST") return await setDisplayEmergencyLock(request, env);
       if (url.pathname === "/auth/display-activity" && request.method === "GET") return await listDisplayActivity(request, env);
+      if (url.pathname === "/sync/admin/integrity" && request.method === "GET") return await syncIntegrityDashboard(request, env);
       if (url.pathname === "/sync/admin/recovery/restore" && request.method === "POST") return await recoveryC3Restore(request, env);
       if (url.pathname === "/sync/admin/recovery/inspect" && request.method === "POST") return await recoveryInspect(request, env);
       if (url.pathname === "/sync/admin/recovery/deleted" && request.method === "GET") return await recoveryDeletedList(request, env);
