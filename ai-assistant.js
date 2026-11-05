@@ -1,5 +1,5 @@
-// Abu Oreiban AI — Gemini backend. Informational only.
-// Do not send family records, session tokens, or database data to Gemini.
+// Abu Oreiban AI — Gemini primary, Groq fallback, Workers AI final fallback. Informational only.
+// Never send resident records, session tokens or database data to an AI provider.
 const HEADERS = {
   'content-type': 'application/json; charset=utf-8',
   'cache-control': 'no-store',
@@ -9,14 +9,109 @@ const HEADERS = {
 };
 const reply = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: HEADERS });
 const fail = (status, code, error) => reply({ ok: false, code, error }, status);
-const SYSTEM = `أنت مساعد ذكاء اصطناعي لإدارة مخيم أبو عريبان. تحدث بالعربية الفلسطينية بأسلوب مهذب وواضح. لا تخترع إعلانات أو مواعيد أو توزيعات أو حالة دفع أو حالة طلب. لا تزعم الوصول إلى بيانات الأسرة أو الأنظمة. إذا احتاج السؤال معلومة داخلية غير متاحة لك، وضح أنك لا تستطيع التحقق منها الآن ووجّه المستخدم إلى الدعم الفني. لا تطلب أرقام هويات أو معلومات طبية. لا تعد بالمساعدات ولا تربط استحقاق الإغاثة بالمساهمة المالية. لا تنفذ أي إجراء إداري أو مالي.`;
+const SYSTEM = `أنت مساعد معلوماتي لخدمات بوابة أهالي مخيم أبو عريبان. أجب بالعربية الفلسطينية بوضوح واختصار. لا تختلق إعلانات أو مواعيد أو توزيعات أو حالات دفع أو طلبات. لا تزعم الوصول لبيانات الأسر أو الأنظمة. وجّه الأسئلة التي تتطلب معلومات داخلية إلى قسم الدعم الفني. لا تطلب هوية أو بيانات طبية أو كلمات مرور. لا تربط استحقاق المساعدات بالمساهمات المالية. لا تنفذ قرارات إدارية أو مالية.`;
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+const safeModel = value => typeof value === 'string' && /^[A-Za-z0-9._-]+$/.test(value);
+const geminiAnswer = data => (data?.candidates?.[0]?.content?.parts || [])
+  .filter(part => typeof part?.text === 'string' && !part.thought)
+  .map(part => part.text).join('\n').trim();
+
+async function timedFetch(url, options, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try { return await fetch(url, { ...options, signal: controller.signal }); }
+  finally { clearTimeout(timer); }
+}
+
+async function callGemini(env, message, model) {
+  const response = await timedFetch(`${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM }] },
+      contents: [{ role: 'user', parts: [{ text: message }] }],
+      generationConfig: { temperature: 0.3, maxOutputTokens: 350 }
+    })
+  }, 12000);
+  if (!response.ok) {
+    const error = new Error('Gemini HTTP status');
+    error.status = response.status;
+    throw error;
+  }
+  const data = await response.json();
+  const answer = geminiAnswer(data);
+  if (!answer) throw new Error('Gemini empty response');
+  return answer;
+}
+
+// Only invoked after a 404: verify which text-generation models the API key can access.
+async function discoverGeminiModel(env) {
+  const response = await timedFetch(`${GEMINI_BASE}/models?pageSize=100`, {
+    headers: { 'x-goog-api-key': env.GEMINI_API_KEY }
+  }, 5000);
+  if (!response.ok) throw new Error('Gemini model discovery failed');
+  const data = await response.json();
+  const models = (data?.models || []).filter(m =>
+    m?.name?.startsWith('models/') &&
+    m?.supportedGenerationMethods?.includes('generateContent') &&
+    /flash/i.test(m.name) && !/image|audio|tts|live|embedding/i.test(m.name)
+  );
+  const preferred = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
+  models.sort((a, b) => {
+    const x = preferred.indexOf(a.name.slice(7)), y = preferred.indexOf(b.name.slice(7));
+    return (x < 0 ? 99 : x) - (y < 0 ? 99 : y);
+  });
+  return models[0]?.name?.slice(7) || null;
+}
+
+async function callGroq(env, message) {
+  if (!env.GROQ_API_KEY) throw new Error('Groq key missing');
+  const model = safeModel(env.GROQ_MODEL) ? env.GROQ_MODEL : 'llama-3.3-70b-versatile';
+  const response = await timedFetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${env.GROQ_API_KEY}`
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: message }],
+      temperature: 0.3,
+      max_tokens: 350,
+      stream: false
+    })
+  }, 12000);
+  if (!response.ok) {
+    const error = new Error('Groq HTTP status');
+    error.status = response.status;
+    throw error;
+  }
+  const data = await response.json();
+  const answer = typeof data?.choices?.[0]?.message?.content === 'string'
+    ? data.choices[0].message.content.trim() : '';
+  if (!answer) throw new Error('Groq empty response');
+  return answer;
+}
+
+async function callWorkersAI(env, message) {
+  if (!env.AI || typeof env.AI.run !== 'function') throw new Error('Workers AI binding missing');
+  const model = typeof env.AI_MODEL === 'string' && /^@cf\/[A-Za-z0-9._\/-]+$/.test(env.AI_MODEL)
+    ? env.AI_MODEL : '@cf/meta/llama-3.1-8b-instruct';
+  // AI.run may not support AbortSignal; avoid unhandled rejections from racing promises.
+  const result = await env.AI.run(model, {
+    messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: message }],
+    max_tokens: 350, temperature: 0.3
+  });
+  const answer = typeof result?.response === 'string' ? result.response.trim() : '';
+  if (!answer) throw new Error('Workers AI empty response');
+  return answer;
+}
 
 export async function handleAiChat(request, env) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: HEADERS });
   if (request.method !== 'POST') return fail(405, 'METHOD_NOT_ALLOWED', 'الطريقة غير مدعومة');
   if (env.AI_ENABLED !== 'true') return fail(503, 'AI_DISABLED', 'المساعد الذكي غير مفعّل حالياً');
   if (!env.DB) return fail(503, 'DB_BINDING_MISSING', 'خدمة التحقق من الجلسات غير متوفرة حالياً');
-  if (!env.GEMINI_API_KEY) return fail(503, 'GEMINI_KEY_MISSING', 'مفتاح خدمة المساعد غير مُعدّ على الخادم');
 
   const token = (request.headers.get('X-Support-Session') || '').trim();
   if (!token || token.length > 200) return fail(401, 'SESSION_REQUIRED', 'يرجى تسجيل الدخول أولاً');
@@ -24,8 +119,8 @@ export async function handleAiChat(request, env) {
   try {
     session = await env.DB.prepare('SELECT family_id FROM support_sessions WHERE token=? AND expires_at>? LIMIT 1')
       .bind(token, Date.now()).first();
-  } catch (e) {
-    console.error('Gemini session validation failed', e?.name || 'DatabaseError');
+  } catch {
+    console.error('AI session DB validation failed');
     return fail(503, 'AI_SESSION_DB_ERROR', 'تعذّر التحقق من جلسة الدخول حالياً');
   }
   if (!session) return fail(401, 'SESSION_EXPIRED', 'انتهت جلسة الدخول');
@@ -36,46 +131,47 @@ export async function handleAiChat(request, env) {
   const message = typeof body?.message === 'string' ? body.message.trim() : '';
   if (!message || message.length > 1200) return fail(400, 'INVALID_MESSAGE', 'اكتب رسالة من 1 إلى 1200 حرف');
 
-  const model = env.GEMINI_MODEL || 'gemini-2.5-flash';
-  if (!/^[a-zA-Z0-9._-]+$/.test(model)) return fail(503, 'GEMINI_MODEL_INVALID', 'اسم نموذج المساعد غير صالح');
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45000);
-  let response;
-  try {
-    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM }] },
-        contents: [{ role: 'user', parts: [{ text: message }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 700 }
-      }),
-      signal: controller.signal
-    });
-  } catch (e) {
-    const timedOut = controller.signal.aborted;
-    console.error('Gemini transport error', timedOut ? 'TIMEOUT_45S' : (e?.name || 'NetworkError'));
-    return timedOut
-      ? fail(503, 'GEMINI_TIMEOUT', 'انتهت مهلة انتظار رد المساعد (45 ثانية)، يُرجى المحاولة لاحقاً')
-      : fail(503, 'GEMINI_NETWORK_ERROR', 'تعذّر الاتصال بخدمة المساعد حالياً');
-  } finally {
-    clearTimeout(timeout);
+  if (env.GEMINI_API_KEY) {
+    const model = safeModel(env.GEMINI_MODEL) ? env.GEMINI_MODEL : 'gemini-flash-latest';
+    try {
+      const answer = await callGemini(env, message, model);
+      return reply({ ok: true, reply: answer, mode: 'informational', provider: 'gemini', actions: [] });
+    } catch (e) {
+      console.error('AI Gemini failed', e?.status || e?.name || 'error', 'model', model);
+      if (e?.status === 404) {
+        try {
+          const discovered = await discoverGeminiModel(env);
+          if (discovered && discovered !== model) {
+            const answer = await callGemini(env, message, discovered);
+            return reply({ ok: true, reply: answer, mode: 'informational', provider: 'gemini', actions: [] });
+          }
+        } catch (discoveryError) {
+          console.error('AI Gemini discovery failed', discoveryError?.status || discoveryError?.name || 'error');
+        }
+      }
+    }
+  } else {
+    console.error('AI Gemini key missing');
   }
 
-  if (!response.ok) {
-    // Never log the API key, provider response body, or resident message.
-    console.error('Gemini HTTP error', response.status, 'model:', model);
-    if (response.status === 429) return fail(503, 'GEMINI_RATE_LIMIT', 'خدمة المساعد مشغولة حالياً، يُرجى المحاولة لاحقاً');
-    if (response.status === 401 || response.status === 403) return fail(503, 'GEMINI_AUTH_ERROR', 'تعذّر التحقق من إعدادات خدمة المساعد');
-    if (response.status === 404) return fail(503, 'GEMINI_MODEL_NOT_FOUND', 'نموذج المساعد غير متاح حالياً');
-    return fail(503, 'GEMINI_PROVIDER_ERROR', 'تعذّر تشغيل خدمة المساعد حالياً');
+  // Second provider: Groq. Never log API keys, prompts or provider response bodies.
+  if (env.GROQ_API_KEY) {
+    try {
+      const answer = await callGroq(env, message);
+      return reply({ ok: true, reply: answer, mode: 'informational', provider: 'groq', actions: [] });
+    } catch (e) {
+      console.error('AI Groq failed', e?.status || e?.name || 'error');
+    }
+  } else {
+    console.warn('AI Groq key missing; skipping Groq fallback');
   }
-  let data;
-  try { data = await response.json(); }
-  catch { return fail(503, 'GEMINI_INVALID_RESPONSE', 'وصل رد غير صالح من خدمة المساعد'); }
-  const answer = (data?.candidates?.[0]?.content?.parts || [])
-    .filter(part => typeof part?.text === 'string' && !part.thought)
-    .map(part => part.text).join('\n').trim();
-  if (!answer) return fail(503, 'GEMINI_EMPTY_RESPONSE', 'لم يُرجع المساعد إجابة، يُرجى المحاولة لاحقاً');
-  return reply({ ok: true, reply: answer, mode: 'informational', actions: [] });
+
+  // Final provider: use Cloudflare Workers AI if its binding exists.
+  try {
+    const answer = await callWorkersAI(env, message);
+    return reply({ ok: true, reply: answer, mode: 'informational', provider: 'workers-ai', actions: [] });
+  } catch (e) {
+    console.error('AI fallback failed', e?.name || 'error');
+    return fail(503, 'AI_PROVIDERS_UNAVAILABLE', 'خدمة المساعد غير متاحة حالياً. يُرجى استخدام الدعم الفني المعتاد');
+  }
 }
