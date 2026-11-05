@@ -64,14 +64,39 @@ async function discoverGeminiModel(env) {
   return models[0]?.name?.slice(7) || null;
 }
 
-async function callGroq(env, message) {
+// Discover accessible Groq chat models when a configured model returns 404.
+// Only model IDs are inspected; no resident messages are sent to this endpoint.
+async function discoverGroqModels(env) {
+  const response = await timedFetch('https://api.groq.com/openai/v1/models', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${env.GROQ_API_KEY}` }
+  }, 8000);
+  if (!response.ok) {
+    const error = new Error('Groq model list unavailable');
+    error.status = response.status;
+    throw error;
+  }
+  const data = await response.json();
+  const ids = (Array.isArray(data?.data) ? data.data : [])
+    .filter(m => m && typeof m.id === 'string' && m.active !== false)
+    .map(m => m.id)
+    .filter(id => /^[A-Za-z0-9._\/-]+$/.test(id))
+    .filter(id => !/whisper|speech|tts|audio|guard|moderation|embedding|vision/i.test(id));
+  const preferred = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'openai/gpt-oss-20b', 'openai/gpt-oss-120b'];
+  ids.sort((a, b) => {
+    const rank = x => { const i = preferred.indexOf(x); return i < 0 ? 100 : i; };
+    return rank(a) - rank(b);
+  });
+  return ids;
+}
+
+async function callGroq(env, message, model) {
   if (!env.GROQ_API_KEY) throw new Error('Groq key missing');
-  const model = safeModel(env.GROQ_MODEL) ? env.GROQ_MODEL : 'llama-3.3-70b-versatile';
   const response = await timedFetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${env.GROQ_API_KEY}`
+      Authorization: `Bearer ${env.GROQ_API_KEY}`
     },
     body: JSON.stringify({
       model,
@@ -84,6 +109,11 @@ async function callGroq(env, message) {
   if (!response.ok) {
     const error = new Error('Groq HTTP status');
     error.status = response.status;
+    // Read only a provider-defined error code, never log or return raw response bodies.
+    try {
+      const data = await response.json();
+      if (typeof data?.error?.code === 'string') error.providerCode = data.error.code.slice(0, 60);
+    } catch { /* response may not be JSON */ }
     throw error;
   }
   const data = await response.json();
@@ -145,10 +175,25 @@ export async function handleAiChat(request, env) {
     console.warn('AI provider failed', provider, reason);
   };
   if (env.GROQ_API_KEY) {
+    const configured = safeModel(env.GROQ_MODEL) ? env.GROQ_MODEL : 'llama-3.3-70b-versatile';
     try {
-      const answer = await callGroq(env, message);
+      const answer = await callGroq(env, message, configured);
       return reply({ ok: true, reply: answer, mode: 'informational', provider: 'groq', actions: [] });
-    } catch (e) { recordFailure('groq', e); }
+    } catch (e) {
+      recordFailure('groq', e);
+      if (e?.status === 404) {
+        try {
+          const models = await discoverGroqModels(env);
+          const alternative = models.find(id => id !== configured);
+          if (alternative) {
+            try {
+              const answer = await callGroq(env, message, alternative);
+              return reply({ ok: true, reply: answer, mode: 'informational', provider: 'groq', actions: [] });
+            } catch (retryError) { recordFailure('groq-alternative', retryError); }
+          } else failures.push({ provider: 'groq-discovery', reason: 'NO_ALTERNATIVE_MODEL' });
+        } catch (discoveryError) { recordFailure('groq-discovery', discoveryError); }
+      }
+    }
   } else failures.push({ provider: 'groq', reason: 'KEY_MISSING' });
 
   if (env.GEMINI_API_KEY) {
