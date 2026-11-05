@@ -1331,6 +1331,68 @@ async function supportLookup(request, env) {
   const wa=await env.DB.prepare(`SELECT whatsapp_number FROM family_whatsapp WHERE family_id=? LIMIT 1`).bind(String(session.family_id)).first().catch(()=>null);
   return json({ok:true,family:{name:familyName,fields:supportPublicRecord(first),members:rows.map(supportPublicRecord),count:rows.length,whatsappNumber:wa?.whatsapp_number||''}});
 }
+/* AI-assisted automatic intake: clear routine requests only; no family data sent to model. */
+function classifyRoutineIntake(raw) {
+ const s=String(raw||'').trim().slice(0,1200);
+ if(s.length<14)return null;
+ const normalized=s.replace(/[إأآ]/g,'ا').replace(/ى/g,'ي').replace(/[ًٌٍَُِّْـ]/g,'');
+ const questionOnly=/^(شو|كيف|هل|متى|وين|ليش|لماذا|ايش|ما هي|هل في|بدي اعرف|استفسار|السلام|مرحبا|اهلا)/.test(normalized);
+ const explicit=/(بدي اقدم شكوى|عندي شكوى|بدي اشتكي|بنشتكي|نشتكي|ارجو اصلاح|يرجى اصلاح|نرجو اصلاح|نطالب ب|بدي ابلغ|حابب ابلغ|بدي اقدم طلب|ارجو توفير|نرجو توفير|محتاجين|نعاني من|منقطع[هة]? عنا|خربان[هة]?|تسريب|طفح|مكسور[هة]?|مش شغال[هة]?|لا تعمل|ما بشتغل|مقطوع[هة]?|مفيش مي|ما في مي)/.test(normalized);
+ if(!explicit||questionOnly)return null;
+ // Never automatically submit sensitive, eligibility, financial or family-record changes.
+ if(/(تعديل بيانات|تحديث بيانات|رقم هويه|هوية|رقم وطني|تحويل|محفظة|دفع|دفعت|تبرع|مساهم|مستحق|استحقاق|كوبون|كابون|ترشيح|حذف|اضافة فرد|طلاق|وفاة|مرض|دواء|حالة صحية|مساعدة نقدية|فلوس|مصاري)/.test(normalized))return null;
+ const categories=[
+  ['المياه',/مياه|ميه|المي|الماي|حنفية|ماسورة|خزان|نقطة مياه|تسريب/],
+  ['الصرف الصحي',/صرف|مجاري|مجارير|بيارة|امتصاص|طفح|شفط/],
+  ['الكهرباء والإنارة',/كهربا|انارة|لمبة|ضو|اسلاك|عمود/],
+  ['النظافة والنفايات',/قمامة|نفايات|زبالة|حاوية|نظافة/],
+  ['الإيواء والخيام',/خيمة|خيام|شادر|شوادر|مطر|غرق|تسريب سقف/],
+  ['المرافق والخدمات',/شارع|طريق|ممر|مدرسة|مرفق|حمام|دورة مياه/]
+ ];
+ const found=categories.find(([,re])=>re.test(normalized));
+ if(!found)return null;
+ const category=found[0];
+ const isComplaint=/(شكوى|اشتكي|بنشتكي|نشتكي|نعاني|خربان|مكسور|تسريب|طفح|مقطوع|ما بشتغل|مش شغال|لا تعمل)/.test(normalized);
+ return {requestType:isComplaint?'شكوى':'طلب آخر',subject:('بلاغ تلقائي - '+category).slice(0,160),message:s,category};
+}
+async function aiChatWithRoutineIntake(request,env){
+ const bodyText=await request.text();
+ let payload;try{payload=JSON.parse(bodyText)}catch{return json({ok:false,error:'طلب غير صالح'},400)}
+ const message=typeof payload?.message==='string'?payload.message.trim():'';
+ const item=classifyRoutineIntake(message);
+ if(item){
+  const token=cleanString(request.headers.get('X-Support-Session')||'',200);
+  if(!token)return json({ok:false,error:'يجب تسجيل الدخول أولاً'},401);
+  // Verify family session through the existing support submission flow.
+  // Idempotency: block identical recent tickets; also block concurrent requests with D1 UNIQUE gate.
+  const session=await supportSession(env,token);
+  if(!session)return json({ok:false,error:'انتهت جلسة الأسرة، أعد تسجيل الدخول'},401);
+  await ensureSupportSchema(env);
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS ai_intake_dedupe (dedupe_key TEXT PRIMARY KEY, family_id TEXT NOT NULL, ticket_no TEXT, created_at INTEGER NOT NULL)`).run();
+  const norm=message.normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase();
+  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(session.family_id+'|'+norm));
+  const key=Array.from(new Uint8Array(digest)).map(x=>x.toString(16).padStart(2,'0')).join('');
+  const t=Date.now();
+  const prior=await env.DB.prepare('SELECT ticket_no,created_at FROM ai_intake_dedupe WHERE dedupe_key=?').bind(key).first();
+  if(prior&&t-Number(prior.created_at)<86400000){
+   if(prior.ticket_no)return json({ok:true,reply:'تم تسجيل هذا البلاغ مسبقاً لدى الإدارة. رقم المتابعة: '+prior.ticket_no,provider:'camp-intake',ticketNo:prior.ticket_no,autoSubmitted:true,duplicate:true});
+   return json({ok:true,reply:'بلاغك قيد التسجيل حالياً. انتظر لحظة ثم راجع قسم طلباتي.',provider:'camp-intake',autoSubmitted:false});
+  }
+  await env.DB.prepare('DELETE FROM ai_intake_dedupe WHERE dedupe_key=? AND created_at<?').bind(key,t-86400000).run();
+  const claimed=await env.DB.prepare('INSERT OR IGNORE INTO ai_intake_dedupe(dedupe_key,family_id,ticket_no,created_at) VALUES(?,?,NULL,?)').bind(key,session.family_id,t).run();
+  if(!claimed.meta?.changes)return json({ok:true,reply:'بلاغك قيد التسجيل. راجع قسم طلباتي بعد لحظات.',provider:'camp-intake',autoSubmitted:false});
+  try{
+   const submitReq=new Request(new URL('/support/submit',request.url),{method:'POST',headers:{'Content-Type':'application/json','X-Support-Session':token},body:JSON.stringify({requestType:item.requestType,subject:item.subject,message:item.message,requestedChanges:'',attachments:[]})});
+   const result=await supportSubmit(submitReq,env);
+   const data=await result.json();
+   if(!data.ok){await env.DB.prepare('DELETE FROM ai_intake_dedupe WHERE dedupe_key=?').bind(key).run();return json({ok:false,error:'تعذر تسجيل البلاغ تلقائياً: '+String(data.error||'حاول من قسم إرسال طلب'),code:'AUTO_INTAKE_FAILED'},result.status)}
+   await env.DB.prepare('UPDATE ai_intake_dedupe SET ticket_no=? WHERE dedupe_key=?').bind(data.ticketNo,key).run();
+   return json({ok:true,reply:'وصلني بلاغك عن '+item.category+'، وتم تسجيله تلقائياً لدى إدارة مخيم أبو عريبان. رقم المتابعة: '+data.ticketNo+'\nتقدر تتابع حالته من قسم طلباتي. تسجيل البلاغ لا يعني اعتماد حلّه.',provider:'camp-intake',autoSubmitted:true,ticketNo:data.ticketNo,category:item.category});
+  }catch(e){await env.DB.prepare('DELETE FROM ai_intake_dedupe WHERE dedupe_key=? AND ticket_no IS NULL').bind(key).run();console.error('Automatic intake failed',e?.name||'error');return json({ok:false,error:'تعذّر تسجيل البلاغ. استخدم قسم إرسال طلب.',code:'AUTO_INTAKE_ERROR'},503)}
+ }
+ return handleAiChat(new Request(request.url,{method:request.method,headers:request.headers,body:bodyText}),env);
+}
+
 async function supportSubmit(request, env) {
   await ensureSupportSchema(env);
   let b; try { b=await request.json(); } catch { return json({ok:false,error:'البيانات المرسلة غير صالحة'},400); }
@@ -1500,7 +1562,7 @@ export default {
 
     const url = new URL(request.url);
     try {
-      if (url.pathname === "/api/ai/chat" && request.method === "POST") return await handleAiChat(request, env);
+      if (url.pathname === "/api/ai/chat" && request.method === "POST") return await aiChatWithRoutineIntake(request, env);
       if (url.pathname === "/fund/resident/status" && request.method === "GET") return await fundResidentStatus(request,env);
       if (url.pathname === "/fund/admin/list" && request.method === "GET") return await fundList(request,env);
       if (url.pathname === "/fund/admin/payment" && request.method === "POST") return await fundSave(request,env);
