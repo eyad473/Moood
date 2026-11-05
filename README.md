@@ -1,13 +1,29 @@
-# moood — V16 app + D1 cloud sync on the same Worker URL
+# المرحلة الأولى — المساعد الذكي لمخيم أبو عريبان
 
-This package serves the V16 `index.html` UI from the same Worker URL while preserving the D1 sync API.
+تم إعداد مكوّن Workers AI حقيقي للربط بالمشروع الرسمي Moood. **لم يتم النشر** أو تشغيله على قاعدة البيانات الحية.
 
-- `/` → V16 application UI
-- `/health` → Worker/D1 health JSON
-- `/sync/pull` → sync pull API
-- `/sync/push` → sync push API
-- `/sync/bootstrap` → first bootstrap API
+## دمج الكود في Moood
+1. أضف `ai-assistant.js` بجانب `index.js`.
+2. في بداية `index.js` أضف:
+   `import { handleAiChat } from './ai-assistant.js';`
+3. داخل `fetch`، بعد تعريف `url` وقبل المسارات الحالية أضف:
+   `if (url.pathname === '/api/ai/chat' && request.method === 'POST') return await handleAiChat(request, env);`
+4. أضف إلى `wrangler.toml`:
+   ```toml
+   [ai]
+   binding = "AI"
 
-Deploy the whole folder with Wrangler or use the GitHub-connected Worker with this structure.
+   [vars]
+   AI_ENABLED = "false"
+   AI_MODEL = "@cf/meta/llama-3.1-8b-instruct"
+   ```
+   إذا كان لديك `[vars]` بالفعل، ادمج المفاتيح دون تكرار القسم.
+5. بعد أخذ نسخة احتياطية من D1، نفذ `ai-schema.sql` على قاعدة `mood` عند الاستعداد.
+6. لا تغير `AI_ENABLED` إلى `true` قبل إضافة حد الاستخدام ومراجعة الخصوصية واختبار الأمان. لا يوجد واجهة محادثة للأهالي في هذه المرحلة.
 
-D1 binding must remain `DB` and database `mood`.
+## الحدود الحالية
+- يعمل فقط لجلسة أهالي صالحة عبر `X-Support-Session`.
+- يرسل نص السؤال فقط إلى النموذج؛ لا يرسل ملف الأسرة.
+- لا ينشئ تذاكر ولا يعدل بيانات أو دفعات.
+- لا يجيب عن الحالات الفعلية للطلبات لعدم وجود أدوات ربط بعد.
+- يلزم حد معدل طلبات من جهة الخادم قبل التفعيل العام لضمان الحصة المجانية.
