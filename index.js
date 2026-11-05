@@ -1468,6 +1468,21 @@ async function fundSave(request,env) {
   return json({ok:true,id:result.meta?.last_row_id||null});
 }
 
+// Read-only resident fund status. Family identity is taken only from the verified support session.
+async function fundResidentStatus(request,env) {
+  await ensureSupportSchema(env);
+  const token=cleanString(request.headers.get('X-Support-Session')||'',200);
+  const session=await supportSession(env,token);
+  if(!session)return json({ok:false,error:'انتهت جلسة الأسرة. يرجى تسجيل الدخول مجدداً.'},401);
+  const month=new URL(request.url).searchParams.get('month');
+  if(!fundMonth(month))return json({ok:false,error:'شهر غير صالح'},400);
+  await fundSchema(env);
+  const familyId=String(session.family_id);
+  const row=await env.DB.prepare(`SELECT COALESCE(SUM(amount_agorot),0) AS paid FROM camp_fund_payments WHERE family_id=? AND month=? AND voided_at IS NULL`).bind(familyId,month).first();
+  const paid=Math.max(0,Number(row?.paid||0)),required=300;
+  return json({ok:true,month,requiredAgorot:required,paidAgorot:paid,remainingAgorot:Math.max(0,required-paid),status:paid>=required?'paid':paid>0?'partial':'unpaid'});
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
@@ -1483,6 +1498,7 @@ export default {
 
     const url = new URL(request.url);
     try {
+      if (url.pathname === "/fund/resident/status" && request.method === "GET") return await fundResidentStatus(request,env);
       if (url.pathname === "/fund/admin/list" && request.method === "GET") return await fundList(request,env);
       if (url.pathname === "/fund/admin/payment" && request.method === "POST") return await fundSave(request,env);
       if (url.pathname === "/announcements" && request.method === "GET") return await listPublicAnnouncements(request, env);
