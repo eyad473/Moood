@@ -2231,20 +2231,22 @@ async function syncPrimaryReconcileOnce(){
 let __primaryPullSig="";
 async function syncPrimaryPullMissing(pulse){
   if(!syncRole.isPrimary)return {added:0};
+  // D3: incoming cloud-only records may be merged while local edits remain queued.
+  // Never overwrite existing rows or discard pending edits.
   const pend=syncBuildChanges().length;
-  if(pend>0)return {added:0,skipped:"pending",pend};
   const serverGen=Number(pulse?.authoritativeGeneration||0);
   const serverCount=Number(pulse?.actualRecordCount??-1);
   const local=data.filter(r=>String(r.__syncId||"").startsWith("r-")).length;
   const seen=Number(localStorage.getItem(AUTH_GEN_KEY)||0);
   const sig=serverGen+":"+serverCount+":"+local;
-  if(serverGen===seen && !(serverCount>local))return {added:0,skipped:"nochange",serverGen,seen,serverCount,local};
+  if(serverGen===seen && !(serverCount>local))return {added:0,skipped:"nochange",pend,serverGen,seen,serverCount,local};
   if(sig===__primaryPullSig)return {added:0,skipped:"samesig",serverCount,local};
   const snap=await syncFetchAuthoritativeSnapshot();
   const have=new Set(data.map(r=>r.__syncId).filter(Boolean));
   const pidOf=r=>[r["رقم هوية الأسرة"]||"",r["رقم هوية الفرد"]||"",r["اسم الفرد"]||""].join("|");
   const havePid=new Set(data.filter(r=>r["رقم هوية الفرد"]).map(pidOf));
   let added=0,skippedDup=0;
+  const acceptedCloudRows=[];
   const dedupRm=syncReadIdSet(SYNC_DEDUP_REMOVED_KEY);
   for(const x of snap.records){
     if(!x.recordId||have.has(x.recordId)||dedupRm.has(x.recordId))continue;
@@ -2252,17 +2254,25 @@ async function syncPrimaryPullMissing(pulse){
     if(!r||typeof r!=="object"||!Object.keys(r).length)continue;
     if(r["رقم هوية الفرد"]&&havePid.has(pidOf(r))){skippedDup++;continue;}
     r.__syncId=x.recordId;r.__syncVersion=Number(x.version||0);
-    data.push(r);have.add(x.recordId);added++;
+    data.push(r);have.add(x.recordId);acceptedCloudRows.push(structuredClone(r));added++;
   }
   __primaryPullSig=sig;
   if(added>0){
     renumber();
     localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
-    if(!syncLoadPending().length)syncSaveShadow(data);
+    // Add only these server-confirmed rows to the shadow baseline. Never reset
+    // the shadow of locally edited records, and never clear pending operations.
+    const shadowIds=new Set(syncShadow.map(r=>r.__syncId));
+    for(const cloudRow of acceptedCloudRows){
+      if(!shadowIds.has(cloudRow.__syncId)){
+        syncShadow.push(structuredClone(cloudRow));shadowIds.add(cloudRow.__syncId);
+      }
+    }
+    localStorage.setItem(SYNC_SHADOW_KEY,JSON.stringify(syncShadow));
     rebuildFilters();renderAll();
   }
   localStorage.setItem(AUTH_GEN_KEY,String(snap.generation));
-  return {added,skippedDup,serverCount:snap.serverCount,local,serverGen};
+  return {added,skippedDup,pend,serverCount:snap.serverCount,local,serverGen};
 }
 async function syncOnlineReconcile(reason="auto"){
   if(syncBusy||!navigator.onLine)return;syncBusy=true;
@@ -2277,22 +2287,36 @@ async function syncOnlineReconcile(reason="auto"){
       /* لا يُرسل أي تقرير مقارنة إلا لعامل آمن (safeReconcile) — حماية من تشغيل تطبيق جديد مع Worker قديم */
       if(pulseP?.safeReconcile===true)await syncPrimaryReconcileOnce();
       syncLoadShadow();syncRebuildPending();
-      const pushed=await syncPush();
-      if(pushed.total>0 && pushed.remaining===0){
-        const h=await syncFetch("/health",{method:"GET"});__syncHealthCache=h;__syncHealthAt=Date.now();
-        syncSaveShadow(data);syncSavePending([]);localStorage.setItem(AUTH_GEN_KEY,String(Number(h.authoritativeGeneration||localStorage.getItem(AUTH_GEN_KEY)||0)));
-      }
-      let diag="";
-      if(!pulseP?.ok)diag="pulse فشل";
-      else if(pushed.remaining!==0)diag="push غير مكتمل: متبقي "+pushed.remaining+" تعارضات "+(pushed.conflicts||[]).length;
-      else{
+      // D3: A failed/conflicted upload must not block receiving NEW cloud records.
+      // Existing local records remain untouched; pending operations remain durable.
+      let pushed=null, pushError=null;
+      try{pushed=await syncPush();}
+      catch(e){pushError=e;console.warn("D3 push failed; safe add-only pull still attempted",e);}
+      if(pushed && pushed.total>0 && pushed.remaining===0){
         try{
-          const pr=await syncPrimaryPullMissing(pulseP);
-          if(pr.added>0)toast(`تم سحب ${pr.added} سجل موجود في السحابة وغير موجود على هذا الجهاز`);
-          diag=JSON.stringify(pr);
-        }catch(e){console.warn("V72 pull-missing:",e);diag="خطأ: "+(e?.message||e);}
+          const h=await syncFetch("/health",{method:"GET"});__syncHealthCache=h;__syncHealthAt=Date.now();
+          syncSaveShadow(data);syncSavePending([]);
+          localStorage.setItem(AUTH_GEN_KEY,String(Number(h.authoritativeGeneration||localStorage.getItem(AUTH_GEN_KEY)||0)));
+        }catch(e){console.warn("D3 health refresh failed",e);}
       }
-      if(diag&&/خطأ|فشل|غير مكتمل/.test(diag)&&!window.__v72Shown){window.__v72Shown=true;toast("تعذر سحب السجلات الناقصة — "+diag);}
+      let pullResult=null,pullError=null;
+      if(pulseP?.ok){
+        try{
+          pullResult=await syncPrimaryPullMissing(pulseP);
+          if(pullResult.added>0)toast(`تم جلب ${pullResult.added} سجل جديد من السحابة`);
+        }catch(e){pullError=e;console.warn("D3 safe pull-missing failed",e);}
+      }
+      const diagnostics=[];
+      if(!pulseP?.ok)diagnostics.push("تعذر فحص السحابة");
+      if(pushError)diagnostics.push("رفع التعديلات: "+(pushError.message||pushError));
+      else if(pushed?.remaining)diagnostics.push("تعديلات معلقة: "+pushed.remaining+"، تعارضات: "+(pushed.conflicts||[]).length);
+      if(pullError)diagnostics.push("جلب السجلات: "+(pullError.message||pullError));
+      if(pullResult?.skippedDup)diagnostics.push("سجلات متشابهة تحتاج مراجعة: "+pullResult.skippedDup);
+      window.__syncLastDetailedError=diagnostics.join(" | ");
+      if(diagnostics.length){
+        console.warn("D3 sync diagnostics:",window.__syncLastDetailedError);
+        if(!window.__d3Warned){window.__d3Warned=true;toast("المزامنة تحتاج مراجعة — التفاصيل في سجل المتصفح");}
+      }
       syncInitialized=true;
       return;
     }
