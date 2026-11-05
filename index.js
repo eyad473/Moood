@@ -1427,6 +1427,47 @@ async function supportUpdate(request, env) {
 // Phase D2 (no R2): backups are downloaded locally via the existing client export.
 // No server-side backup creation, public download endpoint, or scheduled storage job.
 
+
+// Camp fund v1: admin-only, additive schema. All amounts are integer agorot (1 ILS = 100).
+async function fundAdmin(request, env) {
+  await ensureAuthSchema(env);
+  const session = await displaySession(request, env);
+  if (!session.ok || session.role !== "admin") return {error: json({ok:false,error:"يلزم تسجيل الدخول بحساب المدير لإدارة الصندوق"},403)};
+  return {session};
+}
+async function fundSchema(env) {
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS camp_fund_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, family_id TEXT NOT NULL, family_name TEXT NOT NULL, month TEXT NOT NULL, amount_agorot INTEGER NOT NULL CHECK(amount_agorot > 0), note TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, created_by TEXT NOT NULL, voided_at INTEGER, voided_by TEXT, void_reason TEXT)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_camp_fund_family_month ON camp_fund_payments(family_id,month,voided_at)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_camp_fund_month ON camp_fund_payments(month,voided_at)`)
+  ]);
+}
+function fundMonth(v) { return /^20\d{2}-(0[1-9]|1[0-2])$/.test(String(v||"")) && String(v)>="2026-11"; }
+async function fundList(request,env) {
+  const auth=await fundAdmin(request,env);if(auth.error)return auth.error;
+  const month=new URL(request.url).searchParams.get('month');
+  if(!fundMonth(month))return json({ok:false,error:"شهر غير صالح"},400);
+  await fundSchema(env);
+  const rows=await env.DB.prepare(`SELECT id,family_id,family_name,month,amount_agorot,note,created_at,created_by FROM camp_fund_payments WHERE month=? AND voided_at IS NULL ORDER BY created_at DESC,id DESC`).bind(month).all();
+  return json({ok:true,month,requiredAgorot:300,payments:rows.results||[]});
+}
+async function fundSave(request,env) {
+  const auth=await fundAdmin(request,env);if(auth.error)return auth.error;
+  let b;try{b=await request.json()}catch{return json({ok:false,error:"طلب غير صالح"},400)}
+  const familyId=String(b.familyId||'').trim(), familyName=String(b.familyName||'').trim(),month=String(b.month||'');
+  const amount=Number(b.amountAgorot),note=String(b.note||'').trim();
+  if(!/^\d{9}$/.test(familyId)||familyName.length<3||familyName.length>200||!fundMonth(month)||!Number.isSafeInteger(amount)||amount<1||amount>1000000||note.length>500)return json({ok:false,error:"تحقق من رقم هوية الأسرة والاسم والشهر والمبلغ"},400);
+  await fundSchema(env);
+  // Require a matching active family record from authoritative sync data, not just browser input.
+  const match=await env.DB.prepare(`SELECT record_id FROM sync_records WHERE deleted=0 AND json_valid(data_json) AND CAST(json_extract(data_json, '$."رقم هوية الأسرة"') AS TEXT)=? AND json_extract(data_json, '$."اسم رب الأسرة"')=? LIMIT 1`).bind(familyId,familyName).first();
+  const matched=!!match;
+  if(!matched)return json({ok:false,error:"الأسرة غير موجودة في السجلات السحابية المطابقة. يرجى مزامنة بيانات الأسر أولاً."},409);
+  const existing=await env.DB.prepare(`SELECT COALESCE(SUM(amount_agorot),0) total FROM camp_fund_payments WHERE family_id=? AND month=? AND voided_at IS NULL`).bind(familyId,month).first();
+  if(Number(existing?.total||0)+amount>300)return json({ok:false,error:"المبلغ يتجاوز المساهمة المطلوبة لهذا الشهر. راجع الدفعات السابقة."},409);
+  const result=await env.DB.prepare(`INSERT INTO camp_fund_payments(family_id,family_name,month,amount_agorot,note,created_at,created_by) VALUES(?,?,?,?,?,?,?)`).bind(familyId,familyName,month,amount,note,Date.now(),auth.session.username||'admin').run();
+  return json({ok:true,id:result.meta?.last_row_id||null});
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
@@ -1442,6 +1483,8 @@ export default {
 
     const url = new URL(request.url);
     try {
+      if (url.pathname === "/fund/admin/list" && request.method === "GET") return await fundList(request,env);
+      if (url.pathname === "/fund/admin/payment" && request.method === "POST") return await fundSave(request,env);
       if (url.pathname === "/announcements" && request.method === "GET") return await listPublicAnnouncements(request, env);
       if (url.pathname === "/announcements/admin" && request.method === "GET") return await listAdminAnnouncements(request, env);
       if (url.pathname === "/announcements/admin" && request.method === "POST") return await saveAnnouncement(request, env);
