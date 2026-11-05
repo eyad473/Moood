@@ -83,7 +83,33 @@ function saveNow(){
   toast("تم حفظ البيانات على الهاتف/المتصفح");
 }
 function autoSave(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data))}catch(e){toast("تعذر الحفظ المحلي: مساحة التخزين ممتلئة")}}
-function toast(msg){const t=document.getElementById("toast");let m=String(msg||"");const compact={"تم حفظ البيانات محلياً — جاري المزامنة":"تم الحفظ والمزامنة جاريًا","تم حفظ البيانات محلياً — بانتظار عودة الإنترنت":"تم الحفظ محلياً","السحابة متصلة والبيانات متاحة":"تمت المزامنة","تعذر الاتصال بالسحابة حالياً":"تعذر الاتصال بالسحابة","تمت المزامنة بنجاح":"تمت المزامنة","تم الحفظ بنجاح":"تم الحفظ"};m=compact[m]||m;if(m.length>34)m=m.slice(0,34)+"…";t.textContent=m;t.classList.add("show");clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>t.classList.remove("show"),1900)}
+function toast(msg){
+ const t=document.getElementById("toast");
+ if(!t)return;
+ const message=String(msg??"").trim();
+ if(!message)return;
+ // Show the original complete message: never abbreviate, slice, or replace it.
+ t.textContent=message;
+ t.setAttribute("role","status");
+ t.setAttribute("aria-live","polite");
+ t.setAttribute("aria-atomic","true");
+ Object.assign(t.style,{
+  position:"fixed",top:"calc(env(safe-area-inset-top, 0px) + 16px)",
+  bottom:"auto",left:"50%",right:"auto",transform:"translateX(-50%)",
+  width:"max-content",maxWidth:"calc(100vw - 28px)",minWidth:"0",
+  boxSizing:"border-box",padding:"13px 18px",borderRadius:"14px",
+  whiteSpace:"pre-wrap",overflowWrap:"anywhere",wordBreak:"normal",
+  textOverflow:"clip",overflow:"visible",height:"auto",maxHeight:"min(65vh, 480px)",
+  overflowY:"auto",lineHeight:"1.8",fontSize:"15px",textAlign:"center",
+  zIndex:"2147483647",pointerEvents:"auto"
+ });
+ t.classList.add("show");
+ clearTimeout(window.__toastTimer);
+ // At least 5 seconds, with extra reading time for longer messages (max 14 s).
+ const duration=Math.min(14000,Math.max(5000,2200+message.length*75));
+ window.__toastTimer=setTimeout(()=>t.classList.remove("show"),duration);
+}
+
 function showView(id){
  const current=document.querySelector(".view.active"); if(current?.id===id)return;
  requestAnimationFrame(()=>{document.querySelectorAll(".view").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x.dataset.view===id));const target=document.getElementById(id);if(target)target.classList.add("active");
