@@ -39,7 +39,7 @@ export async function handleAiChat(request, env) {
   const model = env.GEMINI_MODEL || 'gemini-2.5-flash';
   if (!/^[a-zA-Z0-9._-]+$/.test(model)) return fail(503, 'GEMINI_MODEL_INVALID', 'اسم نموذج المساعد غير صالح');
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
+  const timeout = setTimeout(() => controller.abort(), 45000);
   let response;
   try {
     response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
@@ -53,15 +53,18 @@ export async function handleAiChat(request, env) {
       signal: controller.signal
     });
   } catch (e) {
-    console.error('Gemini transport error', e?.name || 'NetworkError');
-    return fail(503, e?.name === 'AbortError' ? 'GEMINI_TIMEOUT' : 'GEMINI_NETWORK_ERROR', 'تعذّر الاتصال بخدمة المساعد حالياً');
+    const timedOut = controller.signal.aborted;
+    console.error('Gemini transport error', timedOut ? 'TIMEOUT_45S' : (e?.name || 'NetworkError'));
+    return timedOut
+      ? fail(503, 'GEMINI_TIMEOUT', 'انتهت مهلة انتظار رد المساعد (45 ثانية)، يُرجى المحاولة لاحقاً')
+      : fail(503, 'GEMINI_NETWORK_ERROR', 'تعذّر الاتصال بخدمة المساعد حالياً');
   } finally {
     clearTimeout(timeout);
   }
 
   if (!response.ok) {
     // Never log the API key, provider response body, or resident message.
-    console.error('Gemini HTTP error', response.status);
+    console.error('Gemini HTTP error', response.status, 'model:', model);
     if (response.status === 429) return fail(503, 'GEMINI_RATE_LIMIT', 'خدمة المساعد مشغولة حالياً، يُرجى المحاولة لاحقاً');
     if (response.status === 401 || response.status === 403) return fail(503, 'GEMINI_AUTH_ERROR', 'تعذّر التحقق من إعدادات خدمة المساعد');
     if (response.status === 404) return fail(503, 'GEMINI_MODEL_NOT_FOUND', 'نموذج المساعد غير متاح حالياً');
