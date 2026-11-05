@@ -131,13 +131,33 @@ export async function handleAiChat(request, env) {
   const message = typeof body?.message === 'string' ? body.message.trim() : '';
   if (!message || message.length > 1200) return fail(400, 'INVALID_MESSAGE', 'اكتب رسالة من 1 إلى 1200 حرف');
 
+  // Prefer Groq to avoid delaying every request behind a failing Gemini connection.
+  // Expose only safe provider diagnostics, never secrets or raw provider responses.
+  const failures = [];
+  const recordFailure = (provider, e) => {
+    const status = Number(e?.status);
+    const reason = e?.name === 'AbortError' ? 'TIMEOUT'
+      : Number.isInteger(status) && status >= 400 && status <= 599 ? `HTTP_${status}`
+      : e?.message === 'Workers AI binding missing' ? 'BINDING_MISSING'
+      : e?.message === 'Groq key missing' ? 'KEY_MISSING'
+      : 'REQUEST_FAILED';
+    failures.push({ provider, reason });
+    console.warn('AI provider failed', provider, reason);
+  };
+  if (env.GROQ_API_KEY) {
+    try {
+      const answer = await callGroq(env, message);
+      return reply({ ok: true, reply: answer, mode: 'informational', provider: 'groq', actions: [] });
+    } catch (e) { recordFailure('groq', e); }
+  } else failures.push({ provider: 'groq', reason: 'KEY_MISSING' });
+
   if (env.GEMINI_API_KEY) {
     const model = safeModel(env.GEMINI_MODEL) ? env.GEMINI_MODEL : 'gemini-flash-latest';
     try {
       const answer = await callGemini(env, message, model);
       return reply({ ok: true, reply: answer, mode: 'informational', provider: 'gemini', actions: [] });
     } catch (e) {
-      console.error('AI Gemini failed', e?.status || e?.name || 'error', 'model', model);
+      recordFailure('gemini', e);
       if (e?.status === 404) {
         try {
           const discovered = await discoverGeminiModel(env);
@@ -145,33 +165,20 @@ export async function handleAiChat(request, env) {
             const answer = await callGemini(env, message, discovered);
             return reply({ ok: true, reply: answer, mode: 'informational', provider: 'gemini', actions: [] });
           }
-        } catch (discoveryError) {
-          console.error('AI Gemini discovery failed', discoveryError?.status || discoveryError?.name || 'error');
-        }
+        } catch (discoveryError) { recordFailure('gemini-discovery', discoveryError); }
       }
     }
-  } else {
-    console.error('AI Gemini key missing');
-  }
+  } else failures.push({ provider: 'gemini', reason: 'KEY_MISSING' });
 
-  // Second provider: Groq. Never log API keys, prompts or provider response bodies.
-  if (env.GROQ_API_KEY) {
+  if (env.AI && typeof env.AI.run === 'function') {
     try {
-      const answer = await callGroq(env, message);
-      return reply({ ok: true, reply: answer, mode: 'informational', provider: 'groq', actions: [] });
-    } catch (e) {
-      console.error('AI Groq failed', e?.status || e?.name || 'error');
-    }
-  } else {
-    console.warn('AI Groq key missing; skipping Groq fallback');
-  }
-
-  // Final provider: use Cloudflare Workers AI if its binding exists.
-  try {
-    const answer = await callWorkersAI(env, message);
-    return reply({ ok: true, reply: answer, mode: 'informational', provider: 'workers-ai', actions: [] });
-  } catch (e) {
-    console.error('AI fallback failed', e?.name || 'error');
-    return fail(503, 'AI_PROVIDERS_UNAVAILABLE', 'خدمة المساعد غير متاحة حالياً. يُرجى استخدام الدعم الفني المعتاد');
-  }
+      const answer = await callWorkersAI(env, message);
+      return reply({ ok: true, reply: answer, mode: 'informational', provider: 'workers-ai', actions: [] });
+    } catch (e) { recordFailure('workers-ai', e); }
+  } else failures.push({ provider: 'workers-ai', reason: 'BINDING_MISSING' });
+  return reply({
+    ok: false, code: 'AI_PROVIDERS_UNAVAILABLE',
+    error: 'تعذّر تشغيل مزوّدي الذكاء الاصطناعي. يُرجى استخدام الدعم الفني مؤقتاً.',
+    diagnostics: failures
+  }, 503);
 }
