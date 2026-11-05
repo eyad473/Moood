@@ -185,6 +185,11 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
 @keyframes chartDonutIn{from{opacity:.4;transform:scale(.86) rotate(-18deg)}to{opacity:1;transform:scale(1) rotate(0)}}
 @media(prefers-reduced-motion:reduce){.chart-svgbox,.chart-svgbox svg .chart-segment,.chart-svgbox svg .chart-bar,.health-item,.housing-chart-item,.health-fill,.housing-chart-fill,.donut,.legend-row{animation:none!important;transition:none!important}}
 
+
+/* صندوق المخيم: تصميم متجاوب للموبايل دون التأثير على التبويبات الأخرى */
+#campFund{min-width:0;max-width:100%;overflow-x:clip}#campFund .fund-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 16px}#campFund .fund-head h2{font-size:clamp(19px,3vw,25px);line-height:1.55;margin:0;color:#172033}#campFund .fund-head p{margin:4px 0 0;color:#64748b;font-size:13px;line-height:1.8}#campFund .fund-rate{background:#eaf2ff;color:#1d4ed8;padding:8px 12px;border-radius:12px;font-weight:800;font-size:13px}#campFund .fund-panel{padding:clamp(13px,3vw,22px);margin-top:0;min-width:0}#campFund .fund-toolbar{display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin-bottom:18px}#campFund .fund-field{display:flex;flex-direction:column;gap:6px;min-width:0}#campFund .fund-field label{font-size:13px;font-weight:800;color:#334155;line-height:1.6}#campFund .fund-field input{display:block;width:100%;max-width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:11px;background:white;color:#172033;font-size:14px}#campFund .fund-field input:focus{outline:2px solid #93c5fd;outline-offset:1px}#campFund .fund-toolbar>.fund-field{min-width:185px}#campFund .fund-toolbar .btn{min-height:44px;white-space:normal;line-height:1.5}#campFund .fund-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 22px}#campFund .fund-stat{padding:14px 12px;border:1px solid #e2e8f0;border-radius:14px;background:#f8fafc;min-width:0}#campFund .fund-stat span{display:block;font-size:12px;color:#64748b;font-weight:700;margin-bottom:5px}#campFund .fund-stat strong{display:block;font-size:clamp(18px,2.7vw,25px);font-weight:800;overflow-wrap:anywhere;line-height:1.5;font-variant-numeric:tabular-nums}#campFund .fund-subtitle{font-size:17px;margin:10px 0 13px}#campFund .fund-form{display:grid;grid-template-columns:minmax(0,2fr) minmax(120px,1fr) minmax(0,1.5fr);gap:12px;align-items:end}#campFund .fund-hint{font-size:13px;color:#64748b;line-height:1.9;margin:14px 0}#campFund .fund-message{line-height:1.8;font-size:13px;font-weight:700;overflow-wrap:anywhere}#campFund .fund-table-scroll{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid #e2e8f0;border-radius:12px}#campFund .fund-table{width:100%;min-width:650px;border-collapse:collapse}#campFund .fund-table th,#campFund .fund-table td{padding:11px 9px;text-align:right;border-bottom:1px solid #e2e8f0;font-size:12px}#campFund .fund-table th{background:#f1f5f9;color:#334155;font-weight:800}#campFund .fund-table .btn{white-space:nowrap}
+@media(max-width:720px){#campFund .fund-head{align-items:flex-start}#campFund .fund-head h2{font-size:19px}#campFund .fund-toolbar{display:grid;grid-template-columns:1fr 1fr;gap:9px}#campFund .fund-toolbar>.fund-field{grid-column:1/-1;min-width:0}#campFund .fund-toolbar .btn{width:100%;padding:10px 7px;font-size:12px}#campFund .fund-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}#campFund .fund-stat{padding:12px 10px}#campFund .fund-stat strong{font-size:21px}#campFund .fund-form{grid-template-columns:1fr}#campFund .fund-field input{font-size:16px}#campFund .fund-panel{padding:13px}#campFund .fund-hint{font-size:12px}}
+@media(max-width:350px){#campFund .fund-toolbar{grid-template-columns:1fr}#campFund .fund-toolbar>.fund-field{grid-column:auto}#campFund .fund-stats{grid-template-columns:1fr 1fr}#campFund .fund-stat strong{font-size:18px}}
 </style>
 <style>
 .family-search-card{margin-bottom:18px}
@@ -904,20 +909,17 @@ html[data-theme="dark"] .abu-badge-float{border-color:#141e2b}
  </div>
 </section>
 <section class="view" id="campFund" dir="rtl">
- <div class="section-head"><div><h2>💰 صندوق مخيم أبو عريبان</h2><p class="muted">مساهمات الأسر الشهرية — ابتداءً من نوفمبر 2026. المبلغ المطلوب 3 شواكل لكل أسرة.</p></div></div>
- <div class="card" style="padding:18px;margin-bottom:15px">
- <label>الشهر <input id="fundMonth" type="month" min="2026-11" value="2026-11" onchange="fundLoad()"></label>
- <button class="btn" onclick="fundLoad()">تحديث الكشف</button> <button class="btn" onclick="fundExport()">تصدير كشف Excel (XLSX)</button>
- <div id="fundSummary" style="margin:15px 0;font-weight:bold">لم يتم تحميل البيانات بعد</div>
- <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
- <label>بحث عن رب الأسرة أو الهوية <input id="fundSearch" type="search" oninput="fundRender()" placeholder="ابحث عن الأسرة"></label>
- <label>المبلغ (شيكل) <input id="fundAmount" type="number" value="3" min="0.01" max="3" step="0.01" style="width:100px"></label>
- <label>ملاحظة (اختياري) <input id="fundNote" maxlength="500" placeholder="ملاحظة داخلية"></label>
- </div><p class="muted">اختر الأسرة من الكشف ثم أكد الدفع بعد التحقق من التحويل. لا يتم الحفظ من خلال بوابة الأهالي.</p>
- <div id="fundMessage" role="status" style="margin:8px 0"></div>
- <div style="overflow-x:auto"><table style="width:100%"><thead><tr><th>رب الأسرة</th><th>الهوية</th><th>المدفوع ₪</th><th>المتبقي ₪</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody id="fundRows"></tbody></table></div>
+ <div class="fund-head"><div><h2>💰 صندوق مخيم أبو عريبان</h2><p>إدارة المساهمات الشهرية للأسر — ابتداءً من نوفمبر 2026</p></div><span class="fund-rate">3 ₪ لكل أسرة</span></div>
+ <div class="card fund-panel">
+  <div class="fund-toolbar"><div class="fund-field"><label for="fundMonth">الشهر المستحق</label><input id="fundMonth" type="month" min="2026-11" value="2026-11" onchange="fundLoad()"></div><button class="btn" type="button" onclick="fundLoad()">↻ تحديث الكشف</button><button class="btn primary" type="button" onclick="fundExport()">▦ تصدير Excel (XLSX)</button></div>
+  <div id="fundSummary" class="fund-stats" aria-live="polite">لم يتم تحميل البيانات بعد</div>
+  <h3 class="fund-subtitle">تسجيل مساهمة أسرة</h3>
+  <div class="fund-form"><div class="fund-field fund-search"><label for="fundSearch">بحث عن رب الأسرة أو رقم الهوية</label><input id="fundSearch" type="search" oninput="fundRender()" placeholder="اكتب اسم رب الأسرة أو رقم الهوية"></div><div class="fund-field"><label for="fundAmount">المبلغ المدفوع (شيكل)</label><input id="fundAmount" type="number" inputmode="decimal" value="3" min="0.01" max="3" step="0.01"></div><div class="fund-field"><label for="fundNote">ملاحظة داخلية (اختياري)</label><input id="fundNote" maxlength="500" placeholder="أدخل ملاحظة عند الحاجة"></div></div>
+  <p class="fund-hint">ابحث عن الأسرة في الكشف أدناه، ثم اضغط «تسجيل دفعة» بعد التحقق من وصول التحويل. لا يمكن للأهالي تأكيد الدفعات بأنفسهم.</p>
+  <div id="fundMessage" role="status" class="fund-message" aria-live="polite"></div>
+  <div class="fund-table-scroll"><table class="fund-table"><thead><tr><th>رب الأسرة</th><th>الهوية</th><th>المدفوع ₪</th><th>المتبقي ₪</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody id="fundRows"></tbody></table></div>
  </div>
- </section>
+</section>
 <section class="view" id="distributions">
 <div class="card">
 <div class="cardhead"><div><h2>إدارة التوزيعات</h2><div class="muted" style="font-size:11px;margin-top:3px">حملة التوزيع الحالية: تسجيل واعتماد وتسليم مباشر، مع منع تكرار نوع المساعدة للعائلة ومزامنة سحابية</div></div><div class="actions no-print"><button class="btn primary" onclick="openDistributionModal()">＋ تسجيل توزيع</button><button class="btn" onclick="openDistBulkRegisterModal()">＋ تسجيل جماعي</button><button class="btn" onclick="exportDistributionsExcel()">تصدير Excel</button></div></div>
