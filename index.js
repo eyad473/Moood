@@ -1,3 +1,5 @@
+import { handleAiChat } from "./ai-assistant.js";
+
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store"
@@ -1498,6 +1500,7 @@ export default {
 
     const url = new URL(request.url);
     try {
+      if (url.pathname === "/api/ai/chat" && request.method === "POST") return await handleAiChat(request, env);
       if (url.pathname === "/fund/resident/status" && request.method === "GET") return await fundResidentStatus(request,env);
       if (url.pathname === "/fund/admin/list" && request.method === "GET") return await fundList(request,env);
       if (url.pathname === "/fund/admin/payment" && request.method === "POST") return await fundSave(request,env);
