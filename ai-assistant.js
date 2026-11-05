@@ -178,7 +178,7 @@ export async function handleAiChat(request, env) {
   } else failures.push({ provider: 'workers-ai', reason: 'BINDING_MISSING' });
   return reply({
     ok: false, code: 'AI_PROVIDERS_UNAVAILABLE',
-    error: 'تعذّر تشغيل مزوّدي الذكاء الاصطناعي. يُرجى استخدام الدعم الفني مؤقتاً.',
+    error: 'تعذّر تشغيل المساعد. تشخيص: ' + failures.map(f => f.provider + '=' + f.reason).join(' | '),
     diagnostics: failures
   }, 503);
 }
