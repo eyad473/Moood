@@ -4310,7 +4310,9 @@ function fundFamilies(){const m=new Map();for(const r of data){const id=String(r
 function fundMonthValue(){return document.getElementById('fundMonth')?.value||'2026-11'}
 async function fundLoad(){if(fundLoading)return;fundLoading=true;const msg=document.getElementById('fundMessage');try{const month=fundMonthValue();const result=await authFetch('/fund/admin/list?month='+encodeURIComponent(month));fundPayments=result.payments||[];fundLoadedMonth=month;if(msg)msg.textContent='';fundRender()}catch(e){fundLoadedMonth='';if(msg)msg.textContent='تعذر تحميل كشف الصندوق: '+e.message}finally{fundLoading=false}}
 function fundState(f){const total=fundPayments.filter(p=>p.family_id===f.id).reduce((n,p)=>n+Number(p.amount_agorot||0),0);return {total,remaining:Math.max(0,300-total),label:total>=300?'مسدد':total>0?'جزئي':'غير مسدد'};}
-function fundMatchesFilter(f,filter){const x=fundState(f);return filter==='paid'?x.remaining===0:filter==='unpaid'?x.total===0:filter==='partial'?x.total>0&&x.remaining>0:filter==='outstanding'?x.remaining>0:true;}
+function fundMatchesFilter(f,filter){const x=fundState(f);return filter==='paid'?x.remaining===0:filter==='unpaid'?x.total===0:filter==='partial'?x.total>0&&x.remaining>0:filter==='outstanding'?x.remaining>0:filter==='all';}
+function fundSetExportScope(scope){const sel=document.getElementById('fundExportScope');if(!sel)return;sel.value=scope;fundExport();}
+function fundSyncExportFilter(){const display=document.getElementById('fundFilter'),exportSel=document.getElementById('fundExportScope');if(display&&exportSel)exportSel.value=display.value;fundRender();}
 function fundRender(){
  const body=document.getElementById('fundRows'),summary=document.getElementById('fundSummary');if(!body)return;
  const all=fundFamilies(),q=String(document.getElementById('fundSearch')?.value||'').trim(),filter=document.getElementById('fundFilter')?.value||'all';
@@ -4326,12 +4328,21 @@ function fundRender(){
 async function fundPay(id){const f=fundFamilies().find(x=>x.id===id);if(!f||fundLoadedMonth!==fundMonthValue())return;const amount=Number(document.getElementById('fundAmount')?.value),agorot=Math.round(amount*100),note=String(document.getElementById('fundNote')?.value||'');if(!Number.isFinite(amount)||agorot<1||Math.abs(agorot/100-amount)>0.00001){alert('أدخل مبلغاً صحيحاً');return}if(agorot>fundState(f).remaining){alert('المبلغ أكبر من المتبقي لهذه الأسرة');return}if(!confirm(`هل تؤكد استلام ${amount.toFixed(2)} شيكل من ${f.name} عن شهر ${fundMonthValue()}؟`))return;const msg=document.getElementById('fundMessage');try{await authFetch('/fund/admin/payment',{method:'POST',body:JSON.stringify({familyId:id,familyName:f.name,month:fundMonthValue(),amountAgorot:agorot,note})});if(msg)msg.textContent='تم تسجيل الدفعة بنجاح';await fundLoad()}catch(e){if(msg)msg.textContent='لم يتم تأكيد الحفظ: '+e.message;await fundLoad()}}
 function fundExport(){
  if(fundLoadedMonth!==fundMonthValue()){alert('حمّل كشف الشهر أولاً');return;}
- const month=fundLoadedMonth,scope=document.getElementById('fundExportScope')?.value||'all';
+ const month=fundLoadedMonth,selector=document.getElementById('fundExportScope');
+ if(!selector){alert('تعذر العثور على اختيار نوع الكشف. حدّث الصفحة.');return;}
+ const scope=selector.value;
+ if(!['all','paid','unpaid','partial','outstanding','visible'].includes(scope)){alert('نوع الكشف غير صالح');return;}
  const titles={all:'جميع الأسر',paid:'الأسر المسددة',unpaid:'الأسر غير المسددة',partial:'الدفعات الجزئية',outstanding:'الأسر التي لم تستكمل السداد',visible:'نتائج البحث والفلترة'};
  const all=fundFamilies(),q=String(document.getElementById('fundSearch')?.value||'').trim();
  const filter=scope==='visible'?(document.getElementById('fundFilter')?.value||'all'):scope;
  const families=all.filter(f=>fundMatchesFilter(f,filter)&&(scope!=='visible'||f.name.includes(q)||f.id.includes(q)));
  if(!families.length){alert('لا توجد أسر في الفئة المحددة لتصديرها');return;}
+ if(scope==='paid'&&!families.every(f=>fundState(f).remaining===0)){alert('خطأ في تصفية المسددين: تم إيقاف التصدير');return;}
+ if(scope==='unpaid'&&!families.every(f=>fundState(f).total===0)){alert('خطأ في تصفية غير المسددين: تم إيقاف التصدير');return;}
+ if(scope!=='all'&&scope!=='visible'&&families.length===all.length&&all.length>1){
+  if(!confirm('التصفية المختارة تشمل جميع الأسر فعلياً ('+families.length+'). هل تريد المتابعة؟'))return;
+ }
+ if(!confirm('سيتم تنزيل كشف: '+titles[scope]+'\nالشهر: '+month+'\nعدد الأسر: '+families.length+'\nهل تريد المتابعة؟'))return;
  const paid=families.filter(f=>fundState(f).remaining===0).length;
  const partial=families.filter(f=>{const x=fundState(f);return x.total>0&&x.remaining>0}).length;
  const collected=families.reduce((sum,f)=>sum+fundState(f).total,0)/100;
