@@ -699,6 +699,7 @@ html[data-theme="dark"] .abu-badge-float{border-color:#141e2b}
 <button class="tab" data-view="families">إدارة العائلات</button>
 <button class="tab" data-view="sectors">🧭 قواطع المخيم</button>
 <button class="tab" data-view="campMap">🗺️ خريطة المخيم</button>
+<button class="tab" data-view="campFund">💰 صندوق المخيم</button>
 <button class="tab" data-view="distributions">إدارة التوزيعات</button>
 <button class="tabx" type="button" data-menu-action="supportInbox">🛠️ طلبات الدعم الفني<i class="abu-badge abu-support-badge abu-badge-tab" hidden>0</i></button>
 <button class="tabx" type="button" data-menu-action="campAnnouncements">📢 إعلانات المخيم</button>
@@ -902,6 +903,21 @@ html[data-theme="dark"] .abu-badge-float{border-color:#141e2b}
   </aside>
  </div>
 </section>
+<section class="view" id="campFund" dir="rtl">
+ <div class="section-head"><div><h2>💰 صندوق مخيم أبو عريبان</h2><p class="muted">مساهمات الأسر الشهرية — ابتداءً من نوفمبر 2026. المبلغ المطلوب 3 شواكل لكل أسرة.</p></div></div>
+ <div class="card" style="padding:18px;margin-bottom:15px">
+ <label>الشهر <input id="fundMonth" type="month" min="2026-11" value="2026-11" onchange="fundLoad()"></label>
+ <button class="btn" onclick="fundLoad()">تحديث الكشف</button> <button class="btn" onclick="fundExport()">تصدير كشف Excel (XLSX)</button>
+ <div id="fundSummary" style="margin:15px 0;font-weight:bold">لم يتم تحميل البيانات بعد</div>
+ <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+ <label>بحث عن رب الأسرة أو الهوية <input id="fundSearch" type="search" oninput="fundRender()" placeholder="ابحث عن الأسرة"></label>
+ <label>المبلغ (شيكل) <input id="fundAmount" type="number" value="3" min="0.01" max="3" step="0.01" style="width:100px"></label>
+ <label>ملاحظة (اختياري) <input id="fundNote" maxlength="500" placeholder="ملاحظة داخلية"></label>
+ </div><p class="muted">اختر الأسرة من الكشف ثم أكد الدفع بعد التحقق من التحويل. لا يتم الحفظ من خلال بوابة الأهالي.</p>
+ <div id="fundMessage" role="status" style="margin:8px 0"></div>
+ <div style="overflow-x:auto"><table style="width:100%"><thead><tr><th>رب الأسرة</th><th>الهوية</th><th>المدفوع ₪</th><th>المتبقي ₪</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody id="fundRows"></tbody></table></div>
+ </div>
+ </section>
 <section class="view" id="distributions">
 <div class="card">
 <div class="cardhead"><div><h2>إدارة التوزيعات</h2><div class="muted" style="font-size:11px;margin-top:3px">حملة التوزيع الحالية: تسجيل واعتماد وتسليم مباشر، مع منع تكرار نوع المساعدة للعائلة ومزامنة سحابية</div></div><div class="actions no-print"><button class="btn primary" onclick="openDistributionModal()">＋ تسجيل توزيع</button><button class="btn" onclick="openDistBulkRegisterModal()">＋ تسجيل جماعي</button><button class="btn" onclick="exportDistributionsExcel()">تصدير Excel</button></div></div>
@@ -1363,6 +1379,7 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
    <button data-drawer-view="campMap"><span>🗺</span>خريطة المخيم</button>
    <button data-drawer-view="records"><span>▤</span>السجلات</button>
    <button data-drawer-view="classified"><span>▥</span>الكشوفات</button>
+   <button type="button" data-drawer-view="campFund" aria-label="فتح تبويب صندوق المخيم"><span>💰</span>صندوق المخيم</button>
    <button data-drawer-view="distributions"><span>◫</span>التوزيعات</button>
    <button type="button" data-menu-action="supportInbox"><span>🛠</span>طلبات الدعم الفني<i class="abu-badge abu-support-badge abu-badge-inline" hidden>0</i></button>
    <button type="button" data-menu-action="campAnnouncements"><span>📢</span>إعلانات المخيم</button>
