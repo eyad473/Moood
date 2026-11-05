@@ -1355,11 +1355,41 @@ function classifyRoutineIntake(raw) {
  const isComplaint=/(شكوى|اشتكي|بنشتكي|نشتكي|نعاني|خربان|مكسور|تسريب|طفح|مقطوع|ما بشتغل|مش شغال|لا تعمل)/.test(normalized);
  return {requestType:isComplaint?'شكوى':'طلب آخر',subject:('بلاغ تلقائي - '+category).slice(0,160),message:s,category};
 }
+// A small, explicit intake state machine. The browser only holds an untrusted draft;
+// the server validates its type and content before creating a real ticket.
+function intakeNormalize(v){return String(v||'').normalize('NFKC').replace(/[إأآ]/g,'ا').replace(/ى/g,'ي').replace(/[ًٌٍَُِّْـ]/g,'').trim();}
+function intakeTopic(v){
+ const s=intakeNormalize(v);
+ const topics=[['المساعدات',/مساعدات|طرود|توزيع|اغاث|إغاث|سلة غذائية|مواد غذائية/],['المياه',/مياه|المي|ميه|ماي|ماسورة|حنفية|خزان/],['الصرف الصحي',/صرف|مجاري|بيارة|طفح|امتصاص/],['الإنارة',/انارة|كهربا|اضاءة|ضو|عمود/],['النظافة',/نظافة|زبالة|قمامة|نفايات/],['الإيواء',/خيمة|شادر|شوادر|ايواء|غرق|مطر/],['الخدمات العامة',/شارع|طريق|ممر|مدرسة|حمام/]];
+ return topics.find(([,re])=>re.test(s))?.[0]||'خدمات المخيم';
+}
+function intakeSensitive(v){return /(رقم هويه|رقم هوية|كلمة مرور|رمز تحقق|تعديل بيانات|حذف فرد|اضافة فرد|دفع|دفعت|محفظة|تحويل مالي|مساهمات مالية)/.test(intakeNormalize(v));}
+function intakeIntent(v){
+ const s=intakeNormalize(v);
+ if(/^(السلام|مرحبا|اهلا|صباح الخير|مساء الخير)/.test(s))return false;
+ return /(بدي اقدم شكوى|عندي شكوى|بدي اشتكي|شكوى|بدي اقدم طلب|عندي طلب|بدي ابلغ|نرجو اصلاح|ارجو اصلاح|نرجو توفير|نعاني من|لم تصل.*مساعدات|ما وصل.*مساعدات|ما اجانا.*مساعدات|انقطاع.*مياه|المي مقطوع|تسريب|طفح المجاري)/.test(s);
+}
+function intakeDetail(v){
+ const s=intakeNormalize(v);
+ if(s.length<16)return false;
+ if(/^(بدي اقدم شكوى|عندي شكوى|شكوى|بدي اقدم طلب|عندي طلب|بدي اشتكي)[.!؟\s]*$/.test(s))return false;
+ return true;
+}
 async function aiChatWithRoutineIntake(request,env){
  const bodyText=await request.text();
  let payload;try{payload=JSON.parse(bodyText)}catch{return json({ok:false,error:'طلب غير صالح'},400)}
  const message=typeof payload?.message==='string'?payload.message.trim():'';
- const item=classifyRoutineIntake(message);
+ if(!message||message.length>1200)return json({ok:false,error:'اكتب رسالة من 1 إلى 1200 حرف'},400);
+ const draft=payload?.intakeDraft;
+ const hasDraft=draft&&typeof draft==='object'&&draft.kind==='routine'&&typeof draft.startedAt==='number'&&Date.now()-draft.startedAt>=0&&Date.now()-draft.startedAt<15*60*1000;
+ const activeDraft=hasDraft&&!intakeSensitive(message);
+ if(hasDraft&&/^(الغاء|إلغاء|انس|تراجع|لا بديش|خلص)$/.test(intakeNormalize(message)))return json({ok:true,reply:'تمام، ألغيت تجهيز الشكوى. كيف بقدر أساعدك؟',intakeDraft:null,provider:'camp-intake'});
+ if((activeDraft||intakeIntent(message))&&!intakeSensitive(message)){
+   if(!intakeDetail(message))return json({ok:true,reply:'أكيد، احكيلي شو المشكلة بالتفصيل، وإذا بتتعلق بمكان أو نقطة خدمات اذكر موقعها داخل المخيم. رح أسجّل الشكوى للإدارة مباشرة بعد ما توضح المشكلة.',intakeDraft:{kind:'routine',startedAt:Date.now()},provider:'camp-intake'});
+ }
+ const item=(activeDraft||intakeIntent(message))&&!intakeSensitive(message)&&intakeDetail(message)
+   ? {requestType:'شكوى',subject:('بلاغ تلقائي - '+intakeTopic(message)).slice(0,160),message,category:intakeTopic(message)}
+   : classifyRoutineIntake(message);
  if(item){
   const token=cleanString(request.headers.get('X-Support-Session')||'',200);
   if(!token)return json({ok:false,error:'يجب تسجيل الدخول أولاً'},401);
@@ -1375,7 +1405,7 @@ async function aiChatWithRoutineIntake(request,env){
   const t=Date.now();
   const prior=await env.DB.prepare('SELECT ticket_no,created_at FROM ai_intake_dedupe WHERE dedupe_key=?').bind(key).first();
   if(prior&&t-Number(prior.created_at)<86400000){
-   if(prior.ticket_no)return json({ok:true,reply:'تم تسجيل هذا البلاغ مسبقاً لدى الإدارة. رقم المتابعة: '+prior.ticket_no,provider:'camp-intake',ticketNo:prior.ticket_no,autoSubmitted:true,duplicate:true});
+   if(prior.ticket_no)return json({ok:true,reply:'تم تسجيل هذا البلاغ مسبقاً لدى الإدارة. رقم المتابعة: '+prior.ticket_no,provider:'camp-intake',ticketNo:prior.ticket_no,autoSubmitted:true,duplicate:true,intakeDraft:null});
    return json({ok:true,reply:'بلاغك قيد التسجيل حالياً. انتظر لحظة ثم راجع قسم طلباتي.',provider:'camp-intake',autoSubmitted:false});
   }
   await env.DB.prepare('DELETE FROM ai_intake_dedupe WHERE dedupe_key=? AND created_at<?').bind(key,t-86400000).run();
@@ -1387,7 +1417,7 @@ async function aiChatWithRoutineIntake(request,env){
    const data=await result.json();
    if(!data.ok){await env.DB.prepare('DELETE FROM ai_intake_dedupe WHERE dedupe_key=?').bind(key).run();return json({ok:false,error:'تعذر تسجيل البلاغ تلقائياً: '+String(data.error||'حاول من قسم إرسال طلب'),code:'AUTO_INTAKE_FAILED'},result.status)}
    await env.DB.prepare('UPDATE ai_intake_dedupe SET ticket_no=? WHERE dedupe_key=?').bind(data.ticketNo,key).run();
-   return json({ok:true,reply:'وصلني بلاغك عن '+item.category+'، وتم تسجيله تلقائياً لدى إدارة مخيم أبو عريبان. رقم المتابعة: '+data.ticketNo+'\nتقدر تتابع حالته من قسم طلباتي. تسجيل البلاغ لا يعني اعتماد حلّه.',provider:'camp-intake',autoSubmitted:true,ticketNo:data.ticketNo,category:item.category});
+   return json({ok:true,reply:'وصلني بلاغك عن '+item.category+'، وتم تسجيله تلقائياً لدى إدارة مخيم أبو عريبان. رقم المتابعة: '+data.ticketNo+'\nتقدر تتابع حالته من قسم طلباتي. تسجيل البلاغ لا يعني اعتماد حلّه.',provider:'camp-intake',autoSubmitted:true,ticketNo:data.ticketNo,category:item.category,intakeDraft:null});
   }catch(e){await env.DB.prepare('DELETE FROM ai_intake_dedupe WHERE dedupe_key=? AND ticket_no IS NULL').bind(key).run();console.error('Automatic intake failed',e?.name||'error');return json({ok:false,error:'تعذّر تسجيل البلاغ. استخدم قسم إرسال طلب.',code:'AUTO_INTAKE_ERROR'},503)}
  }
  return handleAiChat(new Request(request.url,{method:request.method,headers:request.headers,body:bodyText}),env);
