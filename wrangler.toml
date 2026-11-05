@@ -10,3 +10,10 @@ database_id = "6231567a-ca81-400e-916d-f9a11806b343"
 [assets]
 directory = "./public"
 binding = "ASSETS"
+
+[ai]
+binding = "AI"
+
+[vars]
+AI_ENABLED = "false"
+AI_MODEL = "@cf/meta/llama-3.1-8b-instruct"
