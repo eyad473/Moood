@@ -15,5 +15,5 @@ binding = "ASSETS"
 binding = "AI"
 
 [vars]
-AI_ENABLED = "false"
+AI_ENABLED = "true"
 AI_MODEL = "@cf/meta/llama-3.1-8b-instruct"
