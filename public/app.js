@@ -4304,6 +4304,36 @@ function backupD2Download(){
 }
 
 
+// PalPay: admin-only, read-only review. A notification never creates a fund payment.
+let palpayInboxItems=[];
+function palpayTextNode(parent,tag,text){const el=document.createElement(tag);el.textContent=String(text);parent.appendChild(el);return el;}
+function palpayReviewButton(parent,label,callback){const b=document.createElement('button');b.type='button';b.className='btn';b.textContent=label;b.addEventListener('click',callback);parent.appendChild(b);return b;}
+async function palpayLoadInbox(){
+ const status=document.getElementById('palpayStatus'),box=document.getElementById('palpayInboxRows'),candidates=document.getElementById('palpayCandidatesBox');if(!box)return;
+ if(status)status.textContent='جارٍ تحميل إشعارات PalPay...';box.replaceChildren();if(candidates)candidates.replaceChildren();
+ try{const r=await authFetch('/palpay/admin/inbox');palpayInboxItems=r.notifications||[];
+  if(status)status.textContent='عدد الإشعارات: '+palpayInboxItems.length+' — البيانات إشعارات غير مؤكدة، راجع سجل PalPay الأصلي قبل تسجيل أي دفعة.';
+  for(const item of palpayInboxItems){const card=document.createElement('div');card.style.cssText='padding:12px;border:1px solid #dce4ef;border-radius:12px;background:#fff;overflow-wrap:anywhere';
+   palpayTextNode(card,'strong',item.sender_name||'مرسل غير معروف');palpayTextNode(card,'p',((Number(item.amount_agorot)||0)/100).toFixed(2)+' ₪ | '+(item.status==='pending_review'?'بانتظار المراجعة':item.status)+' | '+(item.direction==='unknown'?'اتجاه غير مؤكد':item.direction));
+   palpayTextNode(card,'small','رقم الإشعار: '+item.id+' | '+new Date(Number(item.notification_time)).toLocaleString('ar-PS'));
+   palpayReviewButton(card,'🔎 اقتراح الأسر',()=>palpayShowCandidates(item.id));box.appendChild(card);
+  }
+  if(!palpayInboxItems.length)palpayTextNode(box,'p','لا توجد إشعارات محفوظة حتى الآن.');
+ }catch(e){if(status)status.textContent='تعذر تحميل إشعارات PalPay: '+(e.message||e);}
+}
+async function palpayShowCandidates(id){
+ const box=document.getElementById('palpayCandidatesBox');if(!box)return;box.replaceChildren();palpayTextNode(box,'p','جارٍ البحث عن الأسر المرشحة...');
+ try{const r=await authFetch('/palpay/admin/candidates?id='+encodeURIComponent(id));box.replaceChildren();palpayTextNode(box,'strong','اقتراحات للإشعار رقم '+id+' — ليست إثبات دفع');
+  const list=r.candidates||[];if(!list.length)palpayTextNode(box,'p','لا توجد مطابقة موثوقة. ابحث يدويًا في كشف الأسر أدناه، ولا تفترض أن الاسم الإنجليزي مطابق تلقائيًا.');
+  for(const f of list){const line=document.createElement('div');line.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid #e2e8f0';
+   palpayTextNode(line,'span',f.familyName+' — تطابق تقريبي '+f.score+'%');palpayReviewButton(line,'بحث عن الأسرة في الكشف',()=>{
+    const input=document.getElementById('fundSearch');if(input){input.value=f.familyId;fundRender();input.scrollIntoView({behavior:'smooth',block:'center'});}
+   });box.appendChild(line);
+  }
+  palpayTextNode(box,'p','بعد مراجعة سجل PalPay الأصلي والتأكد من الأسرة والشهر، استخدم زر «تسجيل دفعة» الموجود في الصندوق. لا يتم اعتماد شيء من هذا القسم.');
+ }catch(e){box.replaceChildren();palpayTextNode(box,'p','تعذر جلب المطابقات: '+(e.message||e));}
+}
+
 // Camp fund v1 — admin interface; never stores payments in localStorage.
 let fundPayments=[],fundLoadedMonth='',fundLoading=false;
 function fundFamilies(){const m=new Map();for(const r of data){const id=String(r['رقم هوية الأسرة']||'').trim(),name=String(r['اسم رب الأسرة']||'').trim();if(/^\d{9}$/.test(id)&&name&&!m.has(id))m.set(id,{id,name});}return [...m.values()].sort((a,b)=>a.name.localeCompare(b.name,'ar'));}

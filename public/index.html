@@ -949,6 +949,13 @@ html[data-theme="dark"] .abu-badge-float{border-color:#141e2b}
   <div class="fund-toolbar"><div class="fund-field"><label for="fundMonth">الشهر المستحق</label><input id="fundMonth" type="month" min="2026-11" value="2026-11" onchange="fundLoad()"></div><button class="btn" type="button" onclick="fundLoad()">↻ تحديث الكشف</button></div>
   <div id="fundSummary" class="fund-stats" aria-live="polite">لم يتم تحميل البيانات بعد</div>
   <div class="fund-progress"><div class="fund-progress-head"><strong>نسبة السداد للشهر</strong><span id="fundProgressLabel">—</span></div><div class="fund-progress-track"><div id="fundProgressBar"></div></div></div>
+  <div class="fund-export-panel" id="palpayPanel" style="margin-top:16px">
+   <div class="fund-section-title"><span>📲 تحويلات PalPay الواردة</span><small>مراجعة المدير فقط — لا تسجيل تلقائي للدفع</small></div>
+   <button class="btn" type="button" onclick="palpayLoadInbox()">↻ تحديث التحويلات الواردة</button>
+   <p id="palpayStatus" class="fund-hint" role="status" aria-live="polite">اضغط تحديث لعرض الإشعارات المسجلة.</p>
+   <div id="palpayInboxRows" style="display:grid;gap:10px"></div>
+   <div id="palpayCandidatesBox" class="fund-hint" aria-live="polite"></div>
+  </div>
   <div class="fund-section-title"><span>تسجيل مساهمة أسرة</span><small>يُعتمد السداد من الإدارة فقط</small></div>
   <div class="fund-form"><div class="fund-field fund-search"><label for="fundSearch">بحث عن رب الأسرة أو رقم الهوية</label><input id="fundSearch" type="search" oninput="fundRender()" placeholder="اكتب اسم رب الأسرة أو رقم الهوية"></div><div class="fund-field"><label for="fundAmount">المبلغ المدفوع (شيكل)</label><input id="fundAmount" type="number" inputmode="decimal" value="3" min="0.01" max="3" step="0.01"></div><div class="fund-field"><label for="fundNote">ملاحظة داخلية (اختياري)</label><input id="fundNote" maxlength="500" placeholder="أدخل ملاحظة عند الحاجة"></div></div>
   <p class="fund-hint">ابحث عن الأسرة في الكشف أدناه، ثم اضغط «تسجيل دفعة» بعد التحقق من وصول التحويل. لا يمكن للأهالي تأكيد الدفعات بأنفسهم.</p>
