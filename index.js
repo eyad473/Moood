@@ -1,4 +1,4 @@
-import { palpayIngest, palpayInbox } from "./palpay-intake.js";
+import { palpayIngest, palpayInbox, palpayCandidates } from "./palpay-intake.js";
 import { handleAiChat } from "./ai-assistant.js";
 
 const JSON_HEADERS = {
@@ -1596,6 +1596,7 @@ export default {
       if (url.pathname === "/api/ai/chat" && request.method === "POST") return await aiChatWithRoutineIntake(request, env);
       if (url.pathname === "/palpay/ingest" && request.method === "POST") return await palpayIngest(request,env);
       if (url.pathname === "/palpay/admin/inbox" && request.method === "GET") return await palpayInbox(request,env,fundAdmin);
+      if (url.pathname === "/palpay/admin/candidates" && request.method === "GET") return await palpayCandidates(request,env,fundAdmin);
       if (url.pathname === "/fund/resident/status" && request.method === "GET") return await fundResidentStatus(request,env);
       if (url.pathname === "/fund/admin/list" && request.method === "GET") return await fundList(request,env);
       if (url.pathname === "/fund/admin/payment" && request.method === "POST") return await fundSave(request,env);
