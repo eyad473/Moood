@@ -1536,6 +1536,14 @@ async function fundSchema(env) {
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_camp_fund_family_month ON camp_fund_payments(family_id,month,voided_at)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_camp_fund_month ON camp_fund_payments(month,voided_at)`)
   ]);
+  const cols=await env.DB.prepare(`PRAGMA table_info(camp_fund_payments)`).all();
+  if(!(cols.results||[]).some(x=>x.name==='source_event_id')){
+    try{await env.DB.prepare(`ALTER TABLE camp_fund_payments ADD COLUMN source_event_id TEXT`).run()}catch(e){
+      const retry=await env.DB.prepare(`PRAGMA table_info(camp_fund_payments)`).all();
+      if(!(retry.results||[]).some(x=>x.name==='source_event_id'))throw e;
+    }
+  }
+  await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_fund_source_event ON camp_fund_payments(source_event_id) WHERE source_event_id IS NOT NULL`).run();
 }
 function fundMonth(v) { return /^20\d{2}-(0[1-9]|1[0-2])$/.test(String(v||"")) && String(v)>="2026-11"; }
 async function fundList(request,env) {
@@ -1563,6 +1571,34 @@ async function fundSave(request,env) {
   return json({ok:true,id:result.meta?.last_row_id||null});
 }
 
+
+// Conservative automatic posting: exact unique Arabic head-name match only.
+// English names and multiple-family transfers require a separately verified mapping.
+async function fundAutoApply(env,eventId){
+  await fundSchema(env);
+  const event=await env.DB.prepare(`SELECT event_id,sender_name,amount_agorot,currency,direction,notification_time,status FROM palpay_notification_inbox WHERE event_id=?`).bind(eventId).first();
+  if(!event||event.status!=='pending_review'||event.direction!=='incoming'||event.currency!=='ILS'||Number(event.amount_agorot)!==300)return;
+  const norm=s=>String(s||'').normalize('NFKC').replace(/[\u064B-\u065F\u0670\u0640]/g,'').replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/\s+/g,' ').trim();
+  const sender=norm(event.sender_name);
+  if(!sender||/[^\u0600-\u06FF ]/.test(sender))return;
+  const rows=await env.DB.prepare(`SELECT json_extract(data_json,'$."رقم هوية الأسرة"') AS family_id,json_extract(data_json,'$."اسم رب الأسرة"') AS family_name FROM sync_records WHERE deleted=0 AND record_id LIKE 'r-%' AND json_valid(data_json) AND json_extract(data_json,'$."اسم رب الأسرة"') IS NOT NULL LIMIT 5000`).all();
+  const matches=new Map();
+  for(const r of rows.results||[]){const id=String(r.family_id||'').trim(),name=String(r.family_name||'').trim();if(/^\d{9}$/.test(id)&&norm(name)===sender)matches.set(id,name)}
+  if(matches.size!==1)return;
+  const [familyId,familyName]=[...matches.entries()][0];
+  const month=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Gaza',year:'numeric',month:'2-digit'}).format(new Date(Number(event.notification_time)));
+  if(!fundMonth(month))return;
+  const t=Date.now();
+  // A single D1 batch is transactional. The conditional INSERT enforces the monthly cap.
+  const result=await env.DB.batch([
+    env.DB.prepare(`INSERT INTO camp_fund_payments(family_id,family_name,month,amount_agorot,note,created_at,created_by,source_event_id)
+      SELECT ?,?,?,300,'PalPay: automatic exact match',?,'palpay_auto',?
+      WHERE NOT EXISTS(SELECT 1 FROM camp_fund_payments WHERE source_event_id=?)
+      AND (SELECT COALESCE(SUM(amount_agorot),0) FROM camp_fund_payments WHERE family_id=? AND month=? AND voided_at IS NULL)=0`).bind(familyId,familyName,month,t,eventId,eventId,familyId,month),
+    env.DB.prepare(`UPDATE palpay_notification_inbox SET status=CASE WHEN EXISTS(SELECT 1 FROM camp_fund_payments WHERE source_event_id=?) THEN 'auto_paid' ELSE status END WHERE event_id=?`).bind(eventId,eventId)
+  ]);
+  return result;
+}
 
 // Phase 2: verified-resident, read-only beneficiary name search.
 // Never expose national ID numbers or any other family profile fields.
@@ -1646,7 +1682,20 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.pathname === "/api/ai/chat" && request.method === "POST") return await aiChatWithRoutineIntake(request, env);
-      if (url.pathname === "/palpay/ingest" && request.method === "POST") return await palpayIngest(request,env);
+      if (url.pathname === "/palpay/ingest" && request.method === "POST") {
+        const intakeCopy=request.clone();
+        const response=await palpayIngest(request,env);
+        if(response.ok){
+          try{
+            const payload=await response.clone().json();
+            if(payload.accepted){
+              const raw=await intakeCopy.json();
+              await fundAutoApply(env,String(raw.eventId||'').trim());
+            }
+          }catch(e){console.error('fund_auto_match_failed',String(e?.message||e))}
+        }
+        return response;
+      }
       if (url.pathname === "/palpay/admin/inbox" && request.method === "GET") return await palpayInbox(request,env,fundAdmin);
       if (url.pathname === "/palpay/admin/candidates" && request.method === "GET") return await palpayCandidates(request,env,fundAdmin);
       if (url.pathname === "/fund/resident/search" && request.method === "GET") return await fundResidentSearch(request,env);
