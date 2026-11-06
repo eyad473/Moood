@@ -1563,6 +1563,58 @@ async function fundSave(request,env) {
   return json({ok:true,id:result.meta?.last_row_id||null});
 }
 
+
+// Phase 2: verified-resident, read-only beneficiary name search.
+// Never expose national ID numbers or any other family profile fields.
+function fundSearchNorm(value) {
+  return String(value || '').normalize('NFKC')
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+    .replace(/[إأآٱ]/g, 'ا').replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+async function fundResidentSearch(request, env) {
+  await ensureSupportSchema(env);
+  const token=cleanString(request.headers.get('X-Support-Session')||'',200);
+  const session=await supportSession(env,token);
+  if(!session)return json({ok:false,error:'انتهت جلسة الأسرة. يرجى تسجيل الدخول مجدداً.'},401);
+  const url=new URL(request.url);
+  const query=cleanString(url.searchParams.get('q')||'',80);
+  const normalized=fundSearchNorm(query);
+  if(normalized.length<3)return json({ok:true,results:[],message:'اكتب ثلاثة أحرف على الأقل'});
+  if(normalized.length>60)return json({ok:false,error:'عبارة البحث طويلة'},400);
+  const month=url.searchParams.get('month');
+  if(!fundMonth(month))return json({ok:false,error:'شهر غير صالح'},400);
+  await fundSchema(env);
+  // Only active authoritative family records; distinct by family ID internally.
+  const records=await env.DB.prepare(`SELECT record_id,
+      json_extract(data_json, '$."رقم هوية الأسرة"') AS family_id,
+      json_extract(data_json, '$."اسم رب الأسرة"') AS family_name
+    FROM sync_records
+    WHERE deleted=0 AND record_id LIKE 'r-%' AND json_valid(data_json)
+      AND json_extract(data_json, '$."اسم رب الأسرة"') IS NOT NULL
+    LIMIT 5000`).all();
+  const found=new Map();
+  for(const r of records.results||[]){
+    const id=String(r.family_id||'').trim(), name=String(r.family_name||'').trim();
+    if(!/^\d{9}$/.test(id)||!name||found.has(id))continue;
+    const norm=fundSearchNorm(name);
+    if(!norm.includes(normalized))continue;
+    found.set(id,{familyRef:String(r.record_id),familyName:name,
+      score:norm.startsWith(normalized)?0:norm.split(' ').some(w=>w.startsWith(normalized))?1:2});
+  }
+  const choices=[...found.entries()].sort((a,b)=>a[1].score-b[1].score
+    ||a[1].familyName.localeCompare(b[1].familyName,'ar')).slice(0,8);
+  const results=[];
+  for(const [id,entry] of choices){
+    const paid=await env.DB.prepare(`SELECT COALESCE(SUM(amount_agorot),0) AS paid
+      FROM camp_fund_payments WHERE family_id=? AND month=? AND voided_at IS NULL`).bind(id,month).first();
+    const remaining=Math.max(0,300-Number(paid?.paid||0));
+    results.push({familyRef:entry.familyRef,familyName:entry.familyName,
+      status:remaining===0?'paid':'unpaid',remainingAgorot:remaining});
+  }
+  return json({ok:true,month,results});
+}
+
 // Read-only resident fund status. Family identity is taken only from the verified support session.
 async function fundResidentStatus(request,env) {
   await ensureSupportSchema(env);
@@ -1597,6 +1649,7 @@ export default {
       if (url.pathname === "/palpay/ingest" && request.method === "POST") return await palpayIngest(request,env);
       if (url.pathname === "/palpay/admin/inbox" && request.method === "GET") return await palpayInbox(request,env,fundAdmin);
       if (url.pathname === "/palpay/admin/candidates" && request.method === "GET") return await palpayCandidates(request,env,fundAdmin);
+      if (url.pathname === "/fund/resident/search" && request.method === "GET") return await fundResidentSearch(request,env);
       if (url.pathname === "/fund/resident/status" && request.method === "GET") return await fundResidentStatus(request,env);
       if (url.pathname === "/fund/admin/list" && request.method === "GET") return await fundList(request,env);
       if (url.pathname === "/fund/admin/payment" && request.method === "POST") return await fundSave(request,env);
