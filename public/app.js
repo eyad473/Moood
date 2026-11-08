@@ -271,9 +271,21 @@ function renderFamilies(){
  });
  document.getElementById("familyList").innerHTML=arr.map(([h,rows])=>{
   const r=rows[0]||{}, key=encodeURIComponent(h);
-  return `<div class="familybox"><div class="familyrow"><div><div class="familytitle">${esc(h)}</div><div class="muted">هوية الأسرة: ${esc(r["رقم هوية الأسرة"]||"—")} · الجوال: ${esc(r["رقم الجوال"]||"—")} · عدد الأفراد: <b>${familyDisplayCount(rows)}</b></div></div><div class="actions no-print"><button class="btn" onclick="editFamily(decodeURIComponent('${key}'))">تعديل الأسرة</button><button class="btn primary" onclick="addMemberToFamily(decodeURIComponent('${key}'))">＋ فرد</button><button class="btn danger" onclick="deleteFamily(decodeURIComponent('${key}'))">حذف العائلة</button></div></div><div class="memberlist">${rows.map(x=>`<div class="member"><span>${esc(x["اسم الفرد"]||"")} — ${esc(x["صلة القرابة"]||"")} — ${esc(x["رقم هوية الفرد"]||"")}</span><span class="no-print"><button class="pagebtn" onclick="editPerson(${data.indexOf(x)})">تعديل</button></span></div>`).join("")}</div></div>`
+  return `<div class="familybox"><div class="familyrow"><div><div class="familytitle">${esc(h)}</div><div class="muted">هوية الأسرة: ${esc(r["رقم هوية الأسرة"]||"—")} · الجوال: ${esc(r["رقم الجوال"]||"—")} · عدد الأفراد: <b>${familyDisplayCount(rows)}</b></div></div><div class="actions no-print"><button class="btn" onclick="familyShowDetails('${key}')">عرض التفاصيل</button><button class="btn" onclick="editFamily(decodeURIComponent('${key}'))">تعديل الأسرة</button><button class="btn primary" onclick="addMemberToFamily(decodeURIComponent('${key}'))">＋ فرد</button><button class="btn danger" onclick="deleteFamily(decodeURIComponent('${key}'))">حذف العائلة</button></div></div><div class="memberlist">${rows.map(x=>`<div class="member"><span>${esc(x["اسم الفرد"]||"")} — ${esc(x["صلة القرابة"]||"")} — ${esc(x["رقم هوية الفرد"]||"")}</span><span class="no-print"><button class="pagebtn" onclick="editPerson(${data.indexOf(x)})">تعديل</button></span></div>`).join("")}</div></div>`
  }).join("") || `<div class="empty">لا توجد عائلات مطابقة</div>`;
 }
+/* Families phase 3: form safety and quick record access; no persistence schema changes. */
+const familyFormBaseline={};
+function familyFormSnapshot(id){const f=document.getElementById(id);return f?Array.from(f.elements).filter(x=>x.id&&x.type!=="hidden").map(x=>x.id+"="+x.value).join("\u001e"):""}
+function familyFormRemember(id){familyFormBaseline[id]=familyFormSnapshot(id)}
+function familyFormCancel(modalId,formId){if(familyFormBaseline[formId]!==undefined&&familyFormSnapshot(formId)!==familyFormBaseline[formId]&&!confirm("هناك تعديلات غير محفوظة. هل تريد إغلاق النموذج دون حفظ؟"))return;closeModal(modalId)}
+function familyFormError(formId,message,fieldId){const box=document.getElementById(formId+"Error");if(box){box.textContent=message;box.hidden=false}const field=document.getElementById(fieldId);if(field){field.focus();field.setAttribute("aria-invalid","true")}}
+function familyFormClearError(formId){const box=document.getElementById(formId+"Error");if(box){box.hidden=true;box.textContent=""}document.querySelectorAll("#"+formId+" [aria-invalid]").forEach(x=>x.removeAttribute("aria-invalid"))}
+function familyNormalizedId(value){return String(value||"").replace(/[٠-٩۰-۹]/g,c=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(c)>=0?'٠١٢٣٤٥٦٧٨٩'.indexOf(c):'۰۱۲۳۴۵۶۷۸۹'.indexOf(c))).replace(/[^0-9]/g,"")}
+function familyValidateId(value){return !value||/^\d{9}$/.test(familyNormalizedId(value))}
+function familyValidatePhone(value){return !value||/^0\d{8,9}$/.test(familyNormalizedId(value))}
+async function familyCopyValue(value){try{await navigator.clipboard.writeText(String(value||""));toast("تم نسخ البيانات")}catch(e){toast("تعذر النسخ على هذا المتصفح")}}
+function familyShowDetails(encodedName){let name;try{name=decodeURIComponent(encodedName)}catch(e){return}const rows=familyMap().get(name);if(!rows?.length){toast("تعذر العثور على سجل الأسرة");return}const r=rows[0],fields=[["اسم رب الأسرة",name],["هوية الأسرة",r["رقم هوية الأسرة"]],["الجوال",r["رقم الجوال"]],["الجوال البديل",r["رقم جوال بديل"]],["الإقامة",r["داخل/خارج المخيم"]],["نوع السكن",r["نوع السكن الحالي"]],["العنوان",r["العنوان"]],["ملاحظات الأسرة",r["ملاحظات الأسرة"]]];const body=document.getElementById("familyDetailBody");if(!body)return;body.replaceChildren();const grid=document.createElement("div");grid.className="family-detail-grid";fields.forEach(([label,value])=>{const item=document.createElement("div");item.className="family-detail-field";const caption=document.createElement("small");caption.textContent=label;const text=document.createElement("strong");text.textContent=String(value||"—");item.append(caption,text);if(value&&(label==="هوية الأسرة"||label.includes("جوال"))){const copy=document.createElement("button");copy.type="button";copy.className="btn";copy.textContent="نسخ";copy.onclick=()=>familyCopyValue(value);item.append(copy)}grid.append(item)});body.append(grid);const heading=document.createElement("h3");heading.textContent="أفراد الأسرة ("+rows.length+")";body.append(heading);const list=document.createElement("div");list.className="family-detail-members";rows.forEach(row=>{const item=document.createElement("div");item.className="family-detail-member";item.textContent=[row["اسم الفرد"],row["صلة القرابة"],row["رقم هوية الفرد"]].filter(Boolean).join(" · ");list.append(item)});body.append(list);document.getElementById("familyDetailModal").classList.add("show")}
 function openFamilyModal(name=null){
  document.getElementById("familyForm").reset();document.getElementById("f_original").value=name||"";
  document.getElementById("familyModalTitle").textContent=name?"تعديل عائلة":"إضافة عائلة";
@@ -282,11 +294,17 @@ function openFamilyModal(name=null){
    setv("f_head",r["اسم رب الأسرة"]);setv("f_id",r["رقم هوية الأسرة"]);setv("f_phone",r["رقم الجوال"]);setv("f_alt",r["رقم جوال بديل"]);setv("f_inside",r["داخل/خارج المخيم"]);setv("f_complete",r["حالة اكتمال بيانات الأسرة"]);setv("f_gov",canonicalGovernorate(r["المحافظة الأصلية"]));setv("f_home",r["حالة المسكن الأصلي"]);setv("f_current",r["نوع السكن الحالي"]);setv("f_address",r["العنوان"]);setv("f_notes",r["ملاحظات الأسرة"]);
   }
  }
- document.getElementById("familyModal").classList.add("show");
+ familyFormClearError("familyForm");document.getElementById("familyModal").classList.add("show");familyFormRemember("familyForm");
 }
 function saveFamily(e){
  e.preventDefault();const old=document.getElementById("f_original").value, h=document.getElementById("f_head").value.trim();
- if(!h)return;
+ familyFormClearError("familyForm");
+ if(!h){familyFormError("familyForm","اسم رب الأسرة مطلوب","f_head");return}
+ const newId=v("f_id").trim(),phone=v("f_phone").trim(),alt=v("f_alt").trim();
+ if(!familyValidateId(newId)){familyFormError("familyForm","رقم الهوية يجب أن يتكون من 9 أرقام","f_id");return}
+ if(!familyValidatePhone(phone)||!familyValidatePhone(alt)){familyFormError("familyForm","يرجى إدخال رقم جوال صحيح يبدأ بصفر ويتكون من 9 أو 10 أرقام","f_phone");return}
+ const duplicate=[...familyMap().entries()].find(([other,rows])=>other!==old&&(other.trim()===h||newId&&familyNormalizedId(rows[0]?.["رقم هوية الأسرة"])===familyNormalizedId(newId)));
+ if(duplicate){familyFormError("familyForm","توجد عائلة مسجلة بالاسم أو رقم الهوية نفسه. راجع السجل قبل الحفظ.","f_head");return}
  const vals={"اسم رب الأسرة":h,"رقم هوية الأسرة":v("f_id"),"رقم الجوال":v("f_phone"),"رقم جوال بديل":v("f_alt"),"داخل/خارج المخيم":v("f_inside"),"حالة اكتمال بيانات الأسرة":v("f_complete"),"المحافظة الأصلية":canonicalGovernorate(v("f_gov")),"حالة المسكن الأصلي":v("f_home"),"نوع السكن الحالي":v("f_current"),"العنوان":v("f_address"),"ملاحظات الأسرة":v("f_notes")};
  if(old){
   data.forEach(r=>{if(r["اسم رب الأسرة"]===old)Object.assign(r,vals)});
@@ -309,7 +327,7 @@ function openPersonModal(idx=null){
  document.getElementById("personForm").reset();document.getElementById("p_index").value=idx==null?"":idx;
  document.getElementById("personModalTitle").textContent=idx==null?"إضافة فرد":"تعديل فرد";
  if(idx!=null){fillPerson(data[idx])}
- document.getElementById("personModal").classList.add("show");
+ familyFormClearError("personForm");document.getElementById("personModal").classList.add("show");familyFormRemember("personForm");
 }
 function addMemberToFamily(name){openPersonModal();setv("p_head",name)}
 function editPerson(idx){openPersonModal(idx)}
@@ -318,7 +336,7 @@ function fillPerson(r){
 }
 function savePerson(e){
  e.preventDefault();const idx=document.getElementById("p_index").value, r=idx===""?emptyRecord():data[+idx];
- const head=v("p_head").trim(), name=v("p_name").trim();if(!name||!head){alert("اسم الفرد واسم رب الأسرة مطلوبان");return}
+ const head=v("p_head").trim(), name=v("p_name").trim();if(!name||!head){familyFormError("personForm","اسم الفرد واسم رب الأسرة مطلوبان",!name?"p_name":"p_head");return}familyFormClearError("personForm");if(!familyMap().has(head)&&idx===""){familyFormError("personForm","اختر عائلة موجودة من قائمة الأسر قبل إضافة الفرد","p_head");return}if(!familyValidateId(v("p_id"))){familyFormError("personForm","هوية الفرد يجب أن تتكون من 9 أرقام","p_id");return}
  r["اسم الفرد"]=name;r["اسم رب الأسرة"]=head;r["رقم هوية الفرد"]=v("p_id");r["صلة القرابة"]=v("p_rel");r["الجنس"]=v("p_gender");r["الحالة الاجتماعية"]=v("p_marital");r["تاريخ الميلاد"]=v("p_birth");r["العمر التقريبي"]=v("p_age");r["مرض مزمن?"]=r["مرض مزمن؟"]=v("p_chronic");r["نوع المرض"]=v("p_disease");r["إصابة؟"]=v("p_injury");r["سبب الإصابة"]=v("p_injuryreason");r["تفاصيل الإصابة"]=v("p_injurydetails");r["إعاقة؟"]=v("p_disability");r["نوع الإعاقة"]=v("p_disabilitytype");r["يتيم/منفصل عن ذويه?"]=r["يتيم/منفصل عن ذويه؟"]=v("p_orphan");r["حامل؟"]=v("p_preg");r["مرضعة؟"]=v("p_lact");r["ملاحظات الفرد"]=v("p_notes");
  const fm=familyMap().get(head)?.[0];if(fm){["رقم هوية الأسرة","رقم الجوال","رقم جوال بديل","العنوان","داخل/خارج المخيم","حالة اكتمال بيانات الأسرة","المحافظة الأصلية","حالة المسكن الأصلي","نوع السكن الحالي","ملاحظات الأسرة"].forEach(k=>{if(filled(fm[k]))r[k]=fm[k]})}
  if(idx===""){r["#"]=String(data.length+1);data.push(r)}

@@ -1378,9 +1378,9 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 <div class="modal" id="displayAccountsModal"><div class="modalbox" style="max-width:760px"><div class="modalhead"><div><b>إدارة أجهزة العرض</b><div class="muted" style="font-size:10px;margin-top:2px">الحسابات تُدار من الجهاز الرئيسي فقط.</div></div><button class="btn" onclick="closeDisplayAccountsManager()">إغلاق</button></div><div class="modalbody"><div class="familybox"><b>إضافة جهاز عرض</b><div class="formgrid"><div class="field span3"><label>اسم الشخص رباعي</label><input id="daFullName" placeholder="مثال: محمد أحمد عبد الله علي"></div><div class="field"><label>اسم المستخدم</label><input id="daUsername" autocomplete="off" placeholder="mohammad01"></div><div class="field"><label>كلمة المرور</label><input id="daPassword" type="password" autocomplete="new-password" placeholder="6 أحرف على الأقل"></div><div class="field"><label>تأكيد كلمة المرور</label><input id="daPassword2" type="password" autocomplete="new-password"></div></div><div class="actions"><button class="btn primary" onclick="createDisplayAccount()">إنشاء الحساب</button></div><div id="daCreateResult" class="notice" hidden></div></div><div class="familybox"><b>الأجهزة والحسابات الحالية</b><div id="displayAccountsList" class="display-accounts-list"><div class="empty">جاري التحميل...</div></div></div></div></div></div>
 <div class="modal" id="familyModal">
 <div class="modalbox">
-<div class="modalhead"><b id="familyModalTitle">إضافة عائلة</b><button class="btn" onclick="closeModal('familyModal')">✕</button></div>
+<div class="modalhead"><b id="familyModalTitle">إضافة عائلة</b><button class="btn" onclick="familyFormCancel('familyModal','familyForm')">✕</button></div>
 <div class="modalbody">
-<form id="familyForm" onsubmit="saveFamily(event)">
+<form id="familyForm" onsubmit="saveFamily(event)"><div class="family-form-error" id="familyFormError" role="alert" hidden></div>
 <div class="formgrid">
 <div class="field span2"><label>اسم رب الأسرة *</label><input id="f_head" required=""/></div>
 <div class="field"><label>رقم هوية الأسرة</label><input id="f_id"/></div>
@@ -1395,16 +1395,16 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 <div class="field span3"><label>ملاحظات الأسرة</label><textarea id="f_notes" rows="3"></textarea></div>
 </div>
 <input id="f_original" type="hidden"/>
-<div class="modalfoot"><button class="btn primary">حفظ العائلة</button><button class="btn" onclick="closeModal('familyModal')" type="button">إلغاء</button></div>
+<div class="modalfoot"><button class="btn primary">حفظ العائلة</button><button class="btn" onclick="familyFormCancel('familyModal','familyForm')" type="button">إلغاء</button></div>
 </form>
 </div>
 </div>
 </div>
 <div class="modal" id="personModal">
 <div class="modalbox">
-<div class="modalhead"><b id="personModalTitle">إضافة فرد</b><button class="btn" onclick="closeModal('personModal')">✕</button></div>
+<div class="modalhead"><b id="personModalTitle">إضافة فرد</b><button class="btn" onclick="familyFormCancel('personModal','personForm')">✕</button></div>
 <div class="modalbody">
-<form id="personForm" onsubmit="savePerson(event)">
+<form id="personForm" onsubmit="savePerson(event)"><div class="family-form-error" id="personFormError" role="alert" hidden></div>
 <div class="formgrid">
 <div class="field span2"><label>اسم الفرد *</label><input id="p_name" required=""/></div>
 <div class="field"><label>اسم رب الأسرة *</label><input id="p_head" list="headsList" required=""/><datalist id="headsList"></datalist></div>
@@ -1427,11 +1427,17 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 <div class="field span3"><label>ملاحظات الفرد</label><textarea id="p_notes" rows="3"></textarea></div>
 </div>
 <input id="p_index" type="hidden"/>
-<div class="modalfoot"><button class="btn primary">حفظ الفرد</button><button class="btn" onclick="closeModal('personModal')" type="button">إلغاء</button></div>
+<div class="modalfoot"><button class="btn primary">حفظ الفرد</button><button class="btn" onclick="familyFormCancel('personModal','personForm')" type="button">إلغاء</button></div>
 </form>
 </div>
 </div>
 </div>
+<div class="modal" id="familyDetailModal"><div class="modalbox family-detail-modal"><div class="modalhead"><b>تفاصيل العائلة</b><button class="btn" type="button" onclick="closeModal('familyDetailModal')">إغلاق</button></div><div class="modalbody" id="familyDetailBody"></div></div></div>
+<style>
+.family-form-error:not([hidden]){padding:12px;border:1px solid #efb4b4;background:#fff3f3;color:#8d2323;border-radius:12px;margin-bottom:14px;font-weight:650}
+#familyForm [aria-invalid=true],#personForm [aria-invalid=true]{border-color:#dc2626!important;outline:2px solid #fecaca}
+.family-detail-modal{max-width:800px!important}.family-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.family-detail-field{min-width:0;padding:12px;background:#f6f8fc;border:1px solid #e3e9f2;border-radius:12px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;overflow-wrap:anywhere}.family-detail-field small{color:#617084}.family-detail-field strong{color:#1b3048}.family-detail-members{display:grid;gap:7px}.family-detail-member{padding:10px;border:1px solid #e4eaf1;border-radius:10px;overflow-wrap:anywhere}@media(max-width:480px){.family-detail-grid{grid-template-columns:1fr}}
+</style>
 <div class="modal" id="familyPrintModal">
 <div class="modalbox" style="max-width:1050px">
 <div class="modalhead">
