@@ -241,6 +241,51 @@ th,.table th{font-weight:700}
 .stat .label{font-size:13px;font-weight:600}
 .badge{font-family:var(--font-body);font-weight:700;line-height:1.45}
 @media(max-width:600px){body{font-size:14px;line-height:1.7}.brand h1{font-size:17px}.num{line-height:1.4}}
+
+/* Family management · phase 1: isolated visual layout; existing controls and handlers preserved */
+#families .card{min-width:0;overflow:visible}
+#families .family-admin-hero{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:7px 2px 18px;flex-wrap:wrap}
+#families .family-admin-heading{min-width:0;flex:1 1 230px}
+#families .family-admin-kicker{display:block;font-size:11px;color:#2563eb;font-weight:800;margin-bottom:5px}
+#families .family-admin-heading h2{font-size:clamp(20px,3vw,26px);line-height:1.4;margin:0;color:#172033}
+#families .family-admin-heading p{margin:5px 0 0;font-size:12px;color:#64748b;line-height:1.8}
+#families .family-admin-tools{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+#families .family-add-btn{min-height:43px;padding-inline:18px}
+#families .family-action-menu{position:relative}
+#families .family-action-menu summary{list-style:none;display:flex;align-items:center;min-height:43px;cursor:pointer;white-space:nowrap}
+#families .family-action-menu summary::-webkit-details-marker{display:none}
+#families .family-action-panel{position:absolute;left:0;top:calc(100% + 7px);z-index:12;display:grid;gap:7px;min-width:225px;padding:10px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;box-shadow:0 15px 35px #0f172a20}
+#families .family-action-panel .btn{text-align:right;white-space:nowrap}
+#families .family-overview{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:0 0 19px}
+#families .family-overview-card{min-width:0;border:1px solid #e5eaf2;background:#f8fafc;border-radius:15px;padding:13px 12px;display:flex;flex-direction:column;gap:5px}
+#families .family-overview-card span{font-size:11px;color:#64748b;font-weight:700}
+#families .family-overview-card strong{font-size:clamp(19px,2.5vw,26px);font-weight:800;color:#172033;font-variant-numeric:tabular-nums}
+#families .filters{grid-template-columns:minmax(0,2fr) repeat(2,minmax(0,1fr))!important}
+#families .filters .field{min-width:0}
+#families .filters input,#families .filters select{width:100%;min-width:0}
+@media(max-width:850px){#families .family-overview{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:600px){#families .card{padding:12px}#families .family-admin-hero{align-items:stretch;gap:12px}#families .family-admin-tools{width:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}#families .family-admin-tools>.btn,#families .family-action-menu,#families .family-action-menu summary{width:100%;justify-content:center}#families .family-action-panel{left:0;right:auto;max-width:calc(100vw - 38px)}#families .family-overview{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#families .family-overview-card{padding:11px}#families .filters{grid-template-columns:repeat(2,minmax(0,1fr))!important}#families .filters .field:first-child{grid-column:1/-1}#families .family-admin-heading p{font-size:11px}}
+@media(max-width:350px){#families .family-admin-tools{grid-template-columns:1fr}}
+@media print{#families .family-admin-hero,#families .family-overview{display:none!important}}
+
+
+/* Families phase 2 — compact mobile-first layout */
+.family-filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0 10px}.family-filter-bar #familyResultsCount{margin-inline-end:auto;font-weight:750;color:var(--text)}
+.family-main-filters{display:grid!important;grid-template-columns:minmax(180px,2fr) minmax(120px,1fr) minmax(120px,1fr)!important;gap:10px!important}
+.family-advanced-filters:not([hidden]){display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0;padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--card)}
+.familybox.family-v2{padding:15px;margin:10px 0;border-radius:17px}.family-v2 .familyrow{align-items:flex-start;gap:12px}.family-v2 .familytitle{font-size:clamp(15px,3.8vw,19px);line-height:1.7;overflow-wrap:anywhere}.family-v2 .family-v2-meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:9px;font-size:12px}.family-v2 .family-v2-meta span{unicode-bidi:plaintext}.family-v2 .family-v2-progress{height:5px;background:var(--border);border-radius:10px;overflow:hidden;margin-top:11px}.family-v2 .family-v2-progress i{display:block;height:100%;background:#16a34a;border-radius:10px}.family-v2 .family-v2-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.family-v2 .family-v2-actions .btn{font-size:12px;padding:9px 12px}.family-v2 details.family-v2-details{margin-top:12px;border-top:1px solid var(--border);padding-top:9px}.family-v2 details.family-v2-details summary{cursor:pointer;font-weight:700}.family-v2 .memberlist{margin-top:9px}.family-v2 .family-v2-missing{font-size:12px;margin-top:9px;color:#a16207;overflow-wrap:anywhere}
+@media(max-width:680px){.family-main-filters{grid-template-columns:repeat(2,minmax(0,1fr))!important}.family-main-filters .field:first-child{grid-column:1/-1}.family-advanced-filters:not([hidden]){grid-template-columns:1fr}.family-v2 .familyrow{display:block}.family-v2 .family-v2-actions{width:100%}.family-v2 .family-v2-actions .btn{flex:1 1 auto}.family-filter-bar .btn{padding:8px 10px;font-size:12px}}
+
+/* Family management: phase four — readable grayscale print and mobile controls. */
+@media print {
+ #families .familybox.family-v2{break-inside:avoid;page-break-inside:avoid;border:1px solid #888!important;box-shadow:none!important;background:#fff!important;color:#111!important;margin:7px 0;padding:9px}
+ #families .family-v2-progress{border:1px solid #888!important;background:#fff!important}
+ #families .family-v2-progress i{background:#777!important}
+ #families .family-v2-missing,#families .family-v2-meta,#families .familytitle{color:#111!important}
+ #families .family-v2-details{display:none!important}
+}
+@media(max-width:430px){#families .family-action-panel{max-width:calc(100vw - 30px)}#families .family-action-panel button{white-space:normal;text-align:right;line-height:1.6}}
+#toast.show{cursor:pointer;white-space:pre-wrap!important;overflow-wrap:anywhere!important;text-overflow:clip!important}
 </style>
 <style>
 .family-search-card{margin-bottom:18px}
@@ -969,11 +1014,27 @@ h3,h4,h5,h6{font-size:var(--type-md);font-weight:600;line-height:1.55;}
 </section>
 <section class="view" id="families">
 <div class="card">
-<div class="cardhead"><h2>إدارة العائلات</h2><div class="actions no-print"><button class="btn primary" onclick="openFamilyModal()">＋ إضافة عائلة</button><button class="btn" onclick="openFamilyPrintModal()">🖨 طباعة كشف العائلات</button><button class="btn" onclick="exportExcel()">تصدير الكشف Excel</button></div></div>
-<div class="filters no-print" style="grid-template-columns:2fr 1fr 1fr">
-<div class="field"><label>بحث عن عائلة</label><input id="fq" oninput="renderFamilies()" placeholder="اسم رب الأسرة أو رقم الهوية أو الجوال"/></div>
+<div class="family-admin-hero no-print">
+ <div class="family-admin-heading"><span class="family-admin-kicker">سجلات المخيم · إدارة الأسر</span><h2>إدارة العائلات</h2><p>متابعة بيانات الأسر والأفراد واكتمال سجلاتهم من مكان واحد.</p></div>
+ <div class="family-admin-tools"><button class="btn primary family-add-btn" type="button" onclick="openFamilyModal()">＋ إضافة عائلة</button><details class="family-action-menu"><summary class="btn">الإجراءات الأخرى ▾</summary><div class="family-action-panel"><button class="btn" type="button" onclick="openFamilyPrintModal()">🖨 طباعة كشف العائلات</button><button class="btn" type="button" onclick="exportFamilyScope('all')">تصدير جميع العائلات Excel</button><button class="btn" type="button" onclick="exportFamilyScope('filtered')">تصدير نتائج البحث والفلاتر Excel</button></div></details></div>
+</div>
+<div class="family-overview no-print" aria-label="إحصائيات العائلات">
+ <div class="family-overview-card"><span>إجمالي العائلات</span><strong id="familyStatTotal">—</strong></div>
+ <div class="family-overview-card"><span>إجمالي الأفراد</span><strong id="familyStatPeople">—</strong></div>
+ <div class="family-overview-card"><span>مكتملة</span><strong id="familyStatComplete">—</strong></div>
+ <div class="family-overview-card"><span>جزئية</span><strong id="familyStatPartial">—</strong></div>
+ <div class="family-overview-card"><span>ناقصة</span><strong id="familyStatMissing">—</strong></div>
+</div>
+<div class="family-filter-bar no-print"><span id="familyResultsCount" aria-live="polite">نتائج العائلات</span><button class="btn" type="button" onclick="resetFamilyFilters()">مسح الفلاتر</button><button class="btn" type="button" onclick="toggleFamilyAdvanced()" aria-controls="familyAdvancedFilters" aria-expanded="false" id="familyAdvancedToggle">فلاتر متقدمة ▾</button></div>
+<div class="filters family-main-filters no-print">
+<div class="field"><label>بحث عن عائلة</label><input id="fq" oninput="scheduleFamilyRender()" placeholder="الاسم أو الهوية أو الجوال الأساسي أو البديل"/></div>
 <div class="field"><label>عدد أفراد الأسرة</label><select id="fsize" onchange="renderFamilies()"><option value="">الكل</option><option value="1">فرد واحد</option><option value="2-4">2 - 4</option><option value="5-7">5 - 7</option><option value="8">8 فأكثر</option></select></div>
 <div class="field"><label>حالة البيانات</label><select id="fstatus" onchange="renderFamilies()"><option value="">كل الحالات</option><option value="مكتملة">مكتملة</option><option value="جزئية">جزئية</option><option value="غير مكتملة">ناقصة</option></select></div>
+</div>
+<div id="familyAdvancedFilters" class="family-advanced-filters no-print" hidden>
+<div class="field"><label>مكان الإقامة</label><select id="finside" onchange="renderFamiliesFast()"><option value="">الكل</option><option value="داخل المخيم">داخل المخيم</option><option value="خارج المخيم">خارج المخيم</option></select></div>
+<div class="field"><label>نوع السكن الحالي</label><select id="fhousing" onchange="renderFamiliesFast()"><option value="">جميع الأنواع</option></select></div>
+<div class="field"><label>ترتيب النتائج</label><select id="fsort" onchange="renderFamiliesFast()"><option value="original">الترتيب الأصلي</option><option value="name">الاسم أبجدياً</option><option value="members-desc">الأفراد: الأكثر أولاً</option><option value="members-asc">الأفراد: الأقل أولاً</option><option value="completion">الأقل اكتمالاً أولاً</option></select></div>
 </div>
 <div class="notice no-print" style="margin-top:10px">الأخضر = مكتملة، الأصفر = جزئية، الأحمر = ناقصة. الحالة تُحسب تلقائياً من البيانات الفعلية ويمكن أن تتغير فور التعديل.</div>
 <div id="familyList"></div>
@@ -1328,9 +1389,9 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 <div class="modal" id="displayAccountsModal"><div class="modalbox" style="max-width:760px"><div class="modalhead"><div><b>إدارة أجهزة العرض</b><div class="muted" style="font-size:10px;margin-top:2px">الحسابات تُدار من الجهاز الرئيسي فقط.</div></div><button class="btn" onclick="closeDisplayAccountsManager()">إغلاق</button></div><div class="modalbody"><div class="familybox"><b>إضافة جهاز عرض</b><div class="formgrid"><div class="field span3"><label>اسم الشخص رباعي</label><input id="daFullName" placeholder="مثال: محمد أحمد عبد الله علي"></div><div class="field"><label>اسم المستخدم</label><input id="daUsername" autocomplete="off" placeholder="mohammad01"></div><div class="field"><label>كلمة المرور</label><input id="daPassword" type="password" autocomplete="new-password" placeholder="6 أحرف على الأقل"></div><div class="field"><label>تأكيد كلمة المرور</label><input id="daPassword2" type="password" autocomplete="new-password"></div></div><div class="actions"><button class="btn primary" onclick="createDisplayAccount()">إنشاء الحساب</button></div><div id="daCreateResult" class="notice" hidden></div></div><div class="familybox"><b>الأجهزة والحسابات الحالية</b><div id="displayAccountsList" class="display-accounts-list"><div class="empty">جاري التحميل...</div></div></div></div></div></div>
 <div class="modal" id="familyModal">
 <div class="modalbox">
-<div class="modalhead"><b id="familyModalTitle">إضافة عائلة</b><button class="btn" onclick="closeModal('familyModal')">✕</button></div>
+<div class="modalhead"><b id="familyModalTitle">إضافة عائلة</b><button class="btn" onclick="familyFormCancel('familyModal','familyForm')">✕</button></div>
 <div class="modalbody">
-<form id="familyForm" onsubmit="saveFamily(event)">
+<form id="familyForm" onsubmit="saveFamily(event)"><div class="family-form-error" id="familyFormError" role="alert" hidden></div>
 <div class="formgrid">
 <div class="field span2"><label>اسم رب الأسرة *</label><input id="f_head" required=""/></div>
 <div class="field"><label>رقم هوية الأسرة</label><input id="f_id"/></div>
@@ -1345,16 +1406,16 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 <div class="field span3"><label>ملاحظات الأسرة</label><textarea id="f_notes" rows="3"></textarea></div>
 </div>
 <input id="f_original" type="hidden"/>
-<div class="modalfoot"><button class="btn primary">حفظ العائلة</button><button class="btn" onclick="closeModal('familyModal')" type="button">إلغاء</button></div>
+<div class="modalfoot"><button class="btn primary">حفظ العائلة</button><button class="btn" onclick="familyFormCancel('familyModal','familyForm')" type="button">إلغاء</button></div>
 </form>
 </div>
 </div>
 </div>
 <div class="modal" id="personModal">
 <div class="modalbox">
-<div class="modalhead"><b id="personModalTitle">إضافة فرد</b><button class="btn" onclick="closeModal('personModal')">✕</button></div>
+<div class="modalhead"><b id="personModalTitle">إضافة فرد</b><button class="btn" onclick="familyFormCancel('personModal','personForm')">✕</button></div>
 <div class="modalbody">
-<form id="personForm" onsubmit="savePerson(event)">
+<form id="personForm" onsubmit="savePerson(event)"><div class="family-form-error" id="personFormError" role="alert" hidden></div>
 <div class="formgrid">
 <div class="field span2"><label>اسم الفرد *</label><input id="p_name" required=""/></div>
 <div class="field"><label>اسم رب الأسرة *</label><input id="p_head" list="headsList" required=""/><datalist id="headsList"></datalist></div>
@@ -1377,11 +1438,17 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 <div class="field span3"><label>ملاحظات الفرد</label><textarea id="p_notes" rows="3"></textarea></div>
 </div>
 <input id="p_index" type="hidden"/>
-<div class="modalfoot"><button class="btn primary">حفظ الفرد</button><button class="btn" onclick="closeModal('personModal')" type="button">إلغاء</button></div>
+<div class="modalfoot"><button class="btn primary">حفظ الفرد</button><button class="btn" onclick="familyFormCancel('personModal','personForm')" type="button">إلغاء</button></div>
 </form>
 </div>
 </div>
 </div>
+<div class="modal" id="familyDetailModal"><div class="modalbox family-detail-modal"><div class="modalhead"><b>تفاصيل العائلة</b><button class="btn" type="button" onclick="closeModal('familyDetailModal')">إغلاق</button></div><div class="modalbody" id="familyDetailBody"></div></div></div>
+<style>
+.family-form-error:not([hidden]){padding:12px;border:1px solid #efb4b4;background:#fff3f3;color:#8d2323;border-radius:12px;margin-bottom:14px;font-weight:650}
+#familyForm [aria-invalid=true],#personForm [aria-invalid=true]{border-color:#dc2626!important;outline:2px solid #fecaca}
+.family-detail-modal{max-width:800px!important}.family-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.family-detail-field{min-width:0;padding:12px;background:#f6f8fc;border:1px solid #e3e9f2;border-radius:12px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;overflow-wrap:anywhere}.family-detail-field small{color:#617084}.family-detail-field strong{color:#1b3048}.family-detail-members{display:grid;gap:7px}.family-detail-member{padding:10px;border:1px solid #e4eaf1;border-radius:10px;overflow-wrap:anywhere}@media(max-width:480px){.family-detail-grid{grid-template-columns:1fr}}
+</style>
 <div class="modal" id="familyPrintModal">
 <div class="modalbox" style="max-width:1050px">
 <div class="modalhead">
