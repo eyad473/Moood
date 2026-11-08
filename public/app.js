@@ -104,6 +104,8 @@ function toast(msg){
   zIndex:"2147483647",pointerEvents:"auto"
  });
  t.classList.add("show");
+ t.title="اضغط على الإشعار لإغلاقه";
+ if(!t.dataset.dismissBound){t.addEventListener("click",()=>{clearTimeout(window.__toastTimer);t.classList.remove("show")});t.dataset.dismissBound="1";}
  clearTimeout(window.__toastTimer);
  // At least 5 seconds, with extra reading time for longer messages (max 14 s).
  const duration=Math.min(14000,Math.max(5000,2200+message.length*75));
@@ -920,27 +922,8 @@ function toggleFamilyPrintColumns(){
   if(box) box.style.display=mode==="head"?"none":"block";
 }
 function familyPrintEntries(){
-  const m=familyMap();
-  let arr=[...m.entries()];
-  const scope=document.getElementById("familyPrintScope")?.value||"all";
-  if(scope==="filtered"){
-    const q=(document.getElementById("fq")?.value||"").toLowerCase().trim();
-    const fs=document.getElementById("fsize")?.value||"";
-    const st=document.getElementById("fstatus")?.value||"";
-    arr=arr.filter(([h,rows])=>{
-      const r=rows[0]||{};
-      const blob=[h,r["رقم هوية الأسرة"],r["رقم الجوال"],r["العنوان"]].join(" ").toLowerCase();
-      if(q&&!blob.includes(q))return false;
-      const n=rows.length;
-      if(fs==="1"&&n!==1)return false;
-      if(fs==="2-4"&&(n<2||n>4))return false;
-      if(fs==="5-7"&&(n<5||n>7))return false;
-      if(fs==="8"&&n<8)return false;
-      if(st&&familyStatus(rows).status!==st)return false;
-      return true;
-    });
-  }
-  return arr;
+ const scope=document.getElementById("familyPrintScope")?.value||"all";
+ return scope==="filtered"?familyVisibleEntries():[...familyMap().entries()];
 }
 function personRole(rows, roles){
   return rows.find(r=>roles.includes(norm(r["صلة القرابة"]))) || null;
@@ -1301,13 +1284,11 @@ function updateFamilyOverview(){
   Object.entries(values).forEach(([id,n])=>{const el=document.getElementById(id);if(el)el.textContent=n.toLocaleString("ar-EG")});
  }catch(err){console.warn("Family overview unavailable",err)}
 }
-function renderFamiliesCore(){
- updateFamilyOverview();
+// Family-only filtered selection. Never mutates the underlying records or server state.
+function familyVisibleEntries(){
  const val=id=>document.getElementById(id)?.value||"";
  const q=familySearchNormalize(val("fq")),fs=val("fsize"),st=val("fstatus"),inside=val("finside"),housing=val("fhousing"),sort=val("fsort");
  let arr=[...familyMap().entries()];
- const housingSelect=document.getElementById("fhousing");
- if(housingSelect){const values=[...new Set(arr.map(([,rows])=>String((rows[0]||{})["نوع السكن الحالي"]||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ar"));const current=housingSelect.value;const signature=values.join("\u0001");if(housingSelect.dataset.signature!==signature){housingSelect.innerHTML='<option value="">جميع الأنواع</option>'+values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");housingSelect.dataset.signature=signature;housingSelect.value=values.includes(current)?current:""}}
  arr=arr.filter(([h,rows])=>{
   const r=rows[0]||{};
   const searchable=[h,...rows.map(x=>x["اسم رب الأسرة"]),r["رقم هوية الأسرة"],r["رقم الجوال"],r["رقم جوال بديل"],r["العنوان"]].map(familySearchNormalize).join(" ");
@@ -1323,6 +1304,23 @@ function renderFamiliesCore(){
  else if(sort==="members-desc")arr.sort((a,b)=>familyDisplayCount(b[1])-familyDisplayCount(a[1]));
  else if(sort==="members-asc")arr.sort((a,b)=>familyDisplayCount(a[1])-familyDisplayCount(b[1]));
  else if(sort==="completion")arr.sort((a,b)=>familyStatus(a[1]).score-familyStatus(b[1]).score);
+ return arr;
+}
+function exportFamilyScope(scope){
+ try{
+  const entries=scope==="filtered"?familyVisibleEntries():[...familyMap().entries()];
+  if(!entries.length){toast("لا توجد عائلات مطابقة لتصديرها");return;}
+  const rows=entries.flatMap(([,members])=>members);
+  const matrix=[["إدارة مخيم أبو عريبان"],[scope==="filtered"?"كشف العائلات حسب البحث والفلاتر":"كشف جميع العائلات"],[`العائلات: ${entries.length} | الأفراد: ${rows.length} | التاريخ: ${new Date().toLocaleString("ar-EG")}`],[],COLUMNS,...rows.map(r=>COLUMNS.map(c=>r[c]??""))];
+  downloadXLSX(matrix,`كشف_العائلات_${scope==="filtered"?"المفلترة":"كاملة"}_${dateStamp()}.xlsx`,{headerRow:5,title:"كشف العائلات"});
+  toast(`تم تصدير ${entries.length} عائلة و${rows.length} سجل فرد بصيغة Excel`);
+ }catch(error){console.error("Family export failed",error);toast("تعذر تصدير كشف العائلات. لم تتغير أي بيانات.");}
+}
+function renderFamiliesCore(){
+ updateFamilyOverview();
+ const housingSelect=document.getElementById("fhousing");
+ if(housingSelect){const values=[...new Set(arr.map(([,rows])=>String((rows[0]||{})["نوع السكن الحالي"]||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ar"));const current=housingSelect.value;const signature=values.join("\u0001");if(housingSelect.dataset.signature!==signature){housingSelect.innerHTML='<option value="">جميع الأنواع</option>'+values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");housingSelect.dataset.signature=signature;housingSelect.value=values.includes(current)?current:""}}
+ const arr=familyVisibleEntries();
  const countEl=document.getElementById("familyResultsCount");if(countEl)countEl.textContent=`عرض ${arr.length.toLocaleString("ar-EG")} من ${familyMap().size.toLocaleString("ar-EG")} عائلة`;
  document.getElementById("familyList").innerHTML=arr.map(([h,rows],i)=>{
   const r=rows[0]||{},key=encodeURIComponent(h),a=familyStatus(rows),cls=familyClass(a.status),missing=a.missing.slice(0,3).map(esc).join("، ");

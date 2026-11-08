@@ -275,6 +275,17 @@ th,.table th{font-weight:700}
 .family-advanced-filters:not([hidden]){display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0;padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--card)}
 .familybox.family-v2{padding:15px;margin:10px 0;border-radius:17px}.family-v2 .familyrow{align-items:flex-start;gap:12px}.family-v2 .familytitle{font-size:clamp(15px,3.8vw,19px);line-height:1.7;overflow-wrap:anywhere}.family-v2 .family-v2-meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:9px;font-size:12px}.family-v2 .family-v2-meta span{unicode-bidi:plaintext}.family-v2 .family-v2-progress{height:5px;background:var(--border);border-radius:10px;overflow:hidden;margin-top:11px}.family-v2 .family-v2-progress i{display:block;height:100%;background:#16a34a;border-radius:10px}.family-v2 .family-v2-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.family-v2 .family-v2-actions .btn{font-size:12px;padding:9px 12px}.family-v2 details.family-v2-details{margin-top:12px;border-top:1px solid var(--border);padding-top:9px}.family-v2 details.family-v2-details summary{cursor:pointer;font-weight:700}.family-v2 .memberlist{margin-top:9px}.family-v2 .family-v2-missing{font-size:12px;margin-top:9px;color:#a16207;overflow-wrap:anywhere}
 @media(max-width:680px){.family-main-filters{grid-template-columns:repeat(2,minmax(0,1fr))!important}.family-main-filters .field:first-child{grid-column:1/-1}.family-advanced-filters:not([hidden]){grid-template-columns:1fr}.family-v2 .familyrow{display:block}.family-v2 .family-v2-actions{width:100%}.family-v2 .family-v2-actions .btn{flex:1 1 auto}.family-filter-bar .btn{padding:8px 10px;font-size:12px}}
+
+/* Family management: phase four — readable grayscale print and mobile controls. */
+@media print {
+ #families .familybox.family-v2{break-inside:avoid;page-break-inside:avoid;border:1px solid #888!important;box-shadow:none!important;background:#fff!important;color:#111!important;margin:7px 0;padding:9px}
+ #families .family-v2-progress{border:1px solid #888!important;background:#fff!important}
+ #families .family-v2-progress i{background:#777!important}
+ #families .family-v2-missing,#families .family-v2-meta,#families .familytitle{color:#111!important}
+ #families .family-v2-details{display:none!important}
+}
+@media(max-width:430px){#families .family-action-panel{max-width:calc(100vw - 30px)}#families .family-action-panel button{white-space:normal;text-align:right;line-height:1.6}}
+#toast.show{cursor:pointer;white-space:pre-wrap!important;overflow-wrap:anywhere!important;text-overflow:clip!important}
 </style>
 <style>
 .family-search-card{margin-bottom:18px}
@@ -1005,7 +1016,7 @@ h3,h4,h5,h6{font-size:var(--type-md);font-weight:600;line-height:1.55;}
 <div class="card">
 <div class="family-admin-hero no-print">
  <div class="family-admin-heading"><span class="family-admin-kicker">سجلات المخيم · إدارة الأسر</span><h2>إدارة العائلات</h2><p>متابعة بيانات الأسر والأفراد واكتمال سجلاتهم من مكان واحد.</p></div>
- <div class="family-admin-tools"><button class="btn primary family-add-btn" type="button" onclick="openFamilyModal()">＋ إضافة عائلة</button><details class="family-action-menu"><summary class="btn">الإجراءات الأخرى ▾</summary><div class="family-action-panel"><button class="btn" type="button" onclick="openFamilyPrintModal()">🖨 طباعة كشف العائلات</button><button class="btn" type="button" onclick="exportExcel()">تصدير الكشف Excel</button></div></details></div>
+ <div class="family-admin-tools"><button class="btn primary family-add-btn" type="button" onclick="openFamilyModal()">＋ إضافة عائلة</button><details class="family-action-menu"><summary class="btn">الإجراءات الأخرى ▾</summary><div class="family-action-panel"><button class="btn" type="button" onclick="openFamilyPrintModal()">🖨 طباعة كشف العائلات</button><button class="btn" type="button" onclick="exportFamilyScope('all')">تصدير جميع العائلات Excel</button><button class="btn" type="button" onclick="exportFamilyScope('filtered')">تصدير نتائج البحث والفلاتر Excel</button></div></details></div>
 </div>
 <div class="family-overview no-print" aria-label="إحصائيات العائلات">
  <div class="family-overview-card"><span>إجمالي العائلات</span><strong id="familyStatTotal">—</strong></div>
