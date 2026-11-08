@@ -2130,6 +2130,60 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 })();
 </script>
 
+
+<!-- Interaction phase 4: final responsive, accessibility and performance hardening. -->
+<style id="moood-interaction-phase4">
+/* Preserve clickability and contrast across themes, without touching application logic. */
+:root{--mo-touch-target:44px;--mo-interaction-ring:#2563eb}
+@media (pointer:coarse){
+ .mobile-bottom-nav button,.drawer-items button,.drawer-close,.tabs button{min-height:var(--mo-touch-target)}
+ .modal button:where(:not(.tiny)),.modal [role="button"]{min-height:40px}
+}
+/* Never animate large datasets row by row; avoid unintended movement on print. */
+.table tbody tr,.table tbody td,.table tbody th{animation:none!important}
+@media (hover:none){.card[onclick]:hover,.card[role="button"]:hover,a.card:hover{transform:none}}
+/* Ensure keyboard focus stays visible, even where component styles reset outlines. */
+.drawer-items button:focus-visible,.mobile-bottom-nav button:focus-visible,.tabs button:focus-visible,.modal button:focus-visible{
+ outline:3px solid var(--mo-interaction-ring)!important;outline-offset:2px!important
+}
+html[data-theme="dark"]{--mo-interaction-ring:#93c5fd;--motion-focus:rgba(147,197,253,.24)}
+/* A long toast should remain legible and scrollable on short screens. */
+#toast{overscroll-behavior:contain;scrollbar-width:thin}
+@media(max-width:480px){#toast{max-height:min(50dvh,380px)!important}}
+/* Explicitly avoid decorative transitions on print and reduced-motion devices. */
+@media print{.mo-busy-indicator{display:none!important}.view.active,.modal .modalbox{animation:none!important;transform:none!important}}
+@media(prefers-reduced-motion:reduce){
+ html:focus-within{scroll-behavior:auto!important}
+ .view.active,.modal .modalbox,.drawer-panel,.drawer-backdrop,.mobile-bottom-nav button{animation:none!important;transition:none!important}
+ .mo-busy-indicator{animation:none!important}
+}
+</style>
+<script id="moood-interaction-phase4-behavior">
+(function(){'use strict';
+ function init(){
+  // Make existing mobile navigation and drawer buttons report the active page.
+  // Only add accessibility metadata: never dispatch clicks or change navigation state.
+  const navs=[...document.querySelectorAll('.mobile-bottom-nav button,.drawer-items button')];
+  if(navs.length){
+   const refresh=()=>{
+    for(const b of navs){
+     const active=b.classList.contains('active')||b.getAttribute('data-active')==='true';
+     if(active)b.setAttribute('aria-current','page');
+     else b.removeAttribute('aria-current');
+    }
+   };
+   const observer=new MutationObserver(refresh);
+   for(const b of navs)observer.observe(b,{attributes:true,attributeFilter:['class','data-active']});
+   refresh();
+  }
+  // Keep modal overlays from exposing invisible controls to screen readers only
+  // where the app explicitly sets aria-hidden; no interference with modal lifecycle.
+  document.querySelectorAll('button[disabled]').forEach(b=>b.setAttribute('aria-disabled','true'));
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+})();
+</script>
+
 </body>
 </html>
 <style>.original-governorate-card .housing-chart-item{cursor:pointer}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-track{box-shadow:0 0 0 3px rgba(59,130,246,.18),0 4px 14px rgba(37,99,235,.13);transform:translateY(-1px)}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-fill{filter:brightness(1.16)}</style>
