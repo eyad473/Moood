@@ -736,69 +736,83 @@ html[data-theme="dark"] .abu-badge-float{border-color:#141e2b}
 </style>
 <style>.fund-quick-exports{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}.fund-quick-exports .btn{white-space:normal;min-height:52px}@media(max-width:430px){.fund-quick-exports{grid-template-columns:1fr}}</style>
 
-<style id="ab-premium-typography-2026">
-/* Premium Arabic visual hierarchy — presentation-only overrides */
-:root{--font-heading:'Cairo',Arial,sans-serif;--font-body:'Tajawal','Cairo',Arial,sans-serif}
-html,body{font-family:var(--font-body);font-optical-sizing:auto;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-body{font-size:15px;font-weight:500;line-height:1.75}
-button,input,select,textarea,option{font-family:var(--font-body)}
-h1,h2,h3,h4,h5,h6,.brand h1,.cardhead,.daily-greeting,.sector-hero h2{font-family:var(--font-heading);letter-spacing:0;line-height:1.5}
-h1,.brand h1{font-weight:800}h2,h3,h4{font-weight:700}
-.brand h1{font-size:clamp(18px,2.5vw,23px);line-height:1.65;overflow-wrap:normal}
-.brand small,.daily-brand-context,.daily-welcome-note,.muted,.sub,.label,.daily-time-meta{font-family:var(--font-body);font-weight:500;letter-spacing:0;line-height:1.8}
-.daily-greeting{font-size:clamp(29px,4vw,42px);font-weight:800;letter-spacing:0;line-height:1.55}
-.daily-welcome-note{font-size:clamp(13px,1.6vw,16px);line-height:1.95;font-weight:500}
-.daily-brandline{font-family:var(--font-body);font-weight:600;letter-spacing:0}
-.daily-header .daily-time-meta{font-size:13px;line-height:1.8}
-.btn,button,.tab,[role="button"],.bottom-nav,.mobile-bottom-nav{font-family:var(--font-body);font-weight:700;letter-spacing:0;line-height:1.55}
-.stat .label,.stat small,.stat .sub{font-family:var(--font-body);font-weight:600;font-size:clamp(13px,1.6vw,16px);line-height:1.65}
-.stat .num,.num,.stat strong{font-family:var(--font-heading);font-weight:800;letter-spacing:0;line-height:1.45;font-variant-numeric:tabular-nums}
-.cardhead,.chart-head h2,.fund-section-title,.modal h2{font-family:var(--font-heading);font-weight:700;line-height:1.65}
-table,th,td,.table,.familybox,.badge,.chip{font-family:var(--font-body);letter-spacing:0;line-height:1.7}
-th,.table th{font-weight:700}
-input,select,textarea{font-size:15px;line-height:1.65;font-weight:500}
-@media(max-width:760px){.brand h1{font-size:clamp(17px,4.2vw,21px);line-height:1.6}.daily-greeting{font-size:clamp(27px,7.2vw,35px);line-height:1.55}.daily-welcome-note{font-size:13px;line-height:1.9}.daily-time-meta{font-size:12px}.stat .num,.num{line-height:1.5}}
-</style>
-<style id="abu-oreiban-local-typography">
-@font-face{font-family:'Yamama Local';src:url('./assets/fonts/yamama_Light.ttf') format('truetype');font-weight:300;font-style:normal;font-display:swap}
-@font-face{font-family:'Yamama Local';src:url('./assets/fonts/yamama_Regular.ttf') format('truetype');font-weight:400;font-style:normal;font-display:swap}
-@font-face{font-family:'Yamama Local';src:url('./assets/fonts/yamama_SemiBold.ttf') format('truetype');font-weight:600;font-style:normal;font-display:swap}
-@font-face{font-family:'Yamama Local';src:url('./assets/fonts/yamama_Bold.ttf') format('truetype');font-weight:700;font-style:normal;font-display:swap}
-@font-face{font-family:'Yamama Local';src:url('./assets/fonts/yamama_ExtraBold.ttf') format('truetype');font-weight:800;font-style:normal;font-display:swap}
-@font-face{font-family:'Yamama Local';src:url('./assets/fonts/yamama_Black.ttf') format('truetype');font-weight:900;font-style:normal;font-display:swap}
-@font-face{font-family:'MF Tahadath Local';src:url('./assets/fonts/MF_Tahadath_Light.woff2') format('woff2');font-weight:300;font-style:normal;font-display:swap}
-@font-face{font-family:'MF Tahadath Local';src:url('./assets/fonts/MF_Tahadath_Regular.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}
-@font-face{font-family:'MF Tahadath Local';src:url('./assets/fonts/MF_Tahadath_Bold.woff2') format('woff2');font-weight:700;font-style:normal;font-display:swap}
-/* Abu Oreiban typography — local, offline-capable fonts; presentation only */
-:root{--font-heading:'Yamama Local',Arial,sans-serif;--font-body:'MF Tahadath Local','Yamama Local',Arial,sans-serif;--font-numbers:'Yamama Local',Arial,sans-serif}
-html{font-synthesis:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
-body,button,input,select,textarea{font-family:var(--font-body)!important;letter-spacing:normal;}
-body{font-size:15px;line-height:1.75;font-weight:400}
-h1,h2,h3,h4,h5,h6,.brand h1,.cardhead,.logo,.hero-title,.welcome-title,.section-title,.page-title{font-family:var(--font-heading)!important;line-height:1.4;font-weight:700;letter-spacing:0}
-h1,.brand h1{font-weight:800}h2,h3{font-weight:700}
-button,.btn,.tab,[role="button"],nav a,.bottom-nav a{font-family:var(--font-body)!important;font-weight:700;line-height:1.45}
-input,select,textarea{font-weight:400;line-height:1.65}
-small,.muted,.sub,.label,.hint,.description{line-height:1.75;font-weight:400}
-table,td,th,.table{font-family:var(--font-body)!important;line-height:1.65}th,.table th{font-weight:700}
-.num,.stat .num,.stat strong,.donut-center b,.fund-stat strong{font-family:var(--font-numbers)!important;font-weight:700;line-height:1.3;font-variant-numeric:tabular-nums}
-.stat .label,.badge,.chart-chip{font-family:var(--font-body)!important;font-weight:700}
-.chart-label,.campmap-board svg text{font-family:'Yamama Local',Arial,sans-serif!important}
-@media(max-width:600px){body{font-size:14px;line-height:1.75}.brand h1{font-size:17px;line-height:1.45}button,.btn{line-height:1.5}}
-</style>
 
-<!-- Codec Pro ME: primary typography, test build (trial license) -->
-<style id="codec-pro-primary-typography">
-@font-face{font-family:'Codec Pro ME Local';src:url('./assets/fonts/Codec_Pro_ME_Trial_Regular.ttf') format('truetype');font-style:normal;font-weight:400;font-display:swap}
-@font-face{font-family:'Codec Pro ME Local';src:url('./assets/fonts/Codec_Pro_ME_Trial_Bold.ttf') format('truetype');font-style:normal;font-weight:700;font-display:swap}
-@font-face{font-family:'Codec Pro ME Local';src:url('./assets/fonts/Codec_Pro_ME_Trial_ExtraBold.ttf') format('truetype');font-style:normal;font-weight:800 900;font-display:swap}
-:root{--font-heading:'Codec Pro ME Local','Yamama Local',Arial,sans-serif;--font-body:'Codec Pro ME Local','MF Tahadath Local','Yamama Local',Arial,sans-serif;--font-numbers:'Codec Pro ME Local',Arial,sans-serif}
-html,body,button,input,select,textarea,option{font-family:var(--font-body)!important}
-h1,h2,h3,h4,h5,h6,.brand h1,.cardhead,.logo,.hero-title,.welcome-title,.section-title,.page-title,.daily-greeting,.sector-hero h2{font-family:var(--font-heading)!important;font-weight:800;line-height:1.48}
-button,.btn,.tab,[role="button"],nav a,.bottom-nav,.mobile-bottom-nav{font-family:var(--font-body)!important;font-weight:700;line-height:1.5}
-.stat .num,.num,.stat strong,.donut-center b,.fund-stat strong{font-family:var(--font-numbers)!important;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.35}
-.stat .label,.stat small,.stat .sub,.muted,.sub,.label,.daily-welcome-note,.daily-time-meta{font-family:var(--font-body)!important;font-weight:400;line-height:1.75}
-table,th,td,.table,.familybox,.badge,.chip{font-family:var(--font-body)!important;line-height:1.7}
-th,.table th,.badge{font-weight:700}
+<!-- Open-source font: IBM Plex Sans Arabic, SIL OFL 1.1; official Google Fonts distribution. -->
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style id="abu-oreiban-enterprise-typography-v1">
+:root {
+  --type-family:'IBM Plex Sans Arabic',Tahoma,Arial,sans-serif;
+  --type-xs:clamp(.75rem,.72rem + .12vw,.8125rem);
+  --type-sm:clamp(.8125rem,.79rem + .13vw,.875rem);
+  --type-base:clamp(.9375rem,.91rem + .15vw,1rem);
+  --type-md:clamp(1rem,.97rem + .18vw,1.125rem);
+  --type-lg:clamp(1.125rem,1.05rem + .38vw,1.375rem);
+  --type-xl:clamp(1.375rem,1.22rem + .75vw,1.75rem);
+  --type-display:clamp(1.875rem,1.57rem + 1.4vw,2.625rem);
+  --type-stat:clamp(1.65rem,1.35rem + 1.25vw,2.375rem);
+  --type-leading:1.72;
+  --type-leading-heading:1.43;
+  --type-tracking:0;
+  --font-heading:var(--type-family);
+  --font-body:var(--type-family);
+  --font-numbers:var(--type-family);
+}
+html{font-synthesis:none;text-size-adjust:100%;-webkit-text-size-adjust:100%;}
+html[dir="rtl"]{direction:rtl;}
+body,button,input,select,textarea,option,table,th,td,svg text{
+  font-family:var(--type-family)!important;letter-spacing:var(--type-tracking);
+}
+body{font-size:var(--type-base);line-height:var(--type-leading);font-weight:400;}
+:is(h1,h2,h3,h4,h5,h6,.brand h1,.daily-greeting,.cardhead,.page-title,.section-title,.hero-title,.welcome-title){
+  font-family:var(--type-family)!important;letter-spacing:0;overflow-wrap:break-word;
+}
+h1,.brand h1,.page-title{font-size:var(--type-xl);font-weight:700;line-height:var(--type-leading-heading);}
+h2,.cardhead,.section-title,.chart-head h2,.fund-section-title,.modal h2{font-size:var(--type-lg);font-weight:700;line-height:1.5;}
+h3,h4,h5,h6{font-size:var(--type-md);font-weight:600;line-height:1.55;}
+.daily-greeting{font-size:var(--type-display)!important;font-weight:700!important;line-height:1.42!important;}
+.daily-welcome-note{font-size:var(--type-base)!important;font-weight:400!important;line-height:1.9!important;}
+.daily-brandline,.daily-brand-context{font-size:var(--type-sm);font-weight:600;line-height:1.6;}
+.daily-time-meta,.daily-date-meta{font-size:var(--type-xs);font-weight:500;line-height:1.7;}
+:is(.stat .num,.stat strong,.num,.donut-center b,.fund-stat strong){
+  font-family:var(--type-family)!important;font-size:var(--type-stat);font-weight:700!important;
+  line-height:1.35!important;font-variant-numeric:tabular-nums lining-nums;
+  font-feature-settings:"tnum" 1;letter-spacing:0;unicode-bidi:plaintext;
+}
+:is(.stat .label,.stat small,.stat .sub){font-size:var(--type-sm);font-weight:600;line-height:1.65;}
+:is(.muted,.sub,.hint,.description,.daily-time-meta,.label,small){line-height:1.75;}
+:is(.muted,.sub,.hint,.description){font-weight:400;}
+:is(button,.btn,.tab,[role="button"],.bottom-nav,.mobile-bottom-nav,nav a){
+  font-family:var(--type-family)!important;font-size:var(--type-sm);font-weight:600!important;
+  line-height:1.55!important;letter-spacing:0;min-width:0;
+}
+:is(input,select,textarea){font-size:max(16px,var(--type-base));font-weight:400;line-height:1.65;min-width:0;}
+:is(label,.field label,.campmap-form label){font-size:var(--type-sm);font-weight:600;line-height:1.65;}
+:is(table,.table){font-size:var(--type-sm);line-height:1.7;}
+:is(th,.table th){font-weight:600;line-height:1.6;}
+:is(td,.table td){font-weight:400;line-height:1.7;overflow-wrap:anywhere;}
+:is(.badge,.chip,.chart-chip){font-size:var(--type-xs);font-weight:600;line-height:1.5;}
+:is(.toast,.notice,[role="alert"],[role="status"]){
+  font-family:var(--type-family)!important;font-size:var(--type-sm);line-height:1.7;
+  white-space:normal!important;overflow-wrap:anywhere;word-break:normal;
+}
+:is(.toast,.notice) *{text-overflow:clip;}
+:is(.modal,.dialog,[role="dialog"]){line-height:1.75;}
+:is(.topin,.actions){min-width:0;}
+.actions{flex-wrap:wrap;gap:8px;}
+.actions .btn{white-space:normal;text-align:center;min-height:42px;}
+.brand{min-width:0;}
+.brand h1{overflow-wrap:normal;}
+:is(.btn,button,.tab,a,input,select,textarea):focus-visible{outline:2px solid #2563eb;outline-offset:3px;}
+@media(max-width:600px){
+  .brand h1{font-size:var(--type-lg);line-height:1.5;}
+  .daily-greeting{font-size:clamp(1.85rem,7vw,2.3rem)!important;}
+  .daily-welcome-note{font-size:var(--type-sm)!important;line-height:1.85!important;}
+  .stat .num,.num{font-size:clamp(1.6rem,7vw,2rem);}
+  .actions .btn{font-size:var(--type-sm);}
+}
+@media print{body{font-family:var(--type-family),Arial,sans-serif!important;} }
 </style>
 </head>
 <body>
