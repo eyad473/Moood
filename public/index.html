@@ -900,6 +900,24 @@ html[data-theme="dark"] #dashboard .home-stat-icon{background:rgba(125,211,252,.
 @media(max-width:360px){#dashboard .daily-header-actions{flex-wrap:wrap!important}#dashboard .theme-toggle{flex:1 1 auto}#dashboard>.grid.stats>.stat{padding:10px!important}#dashboard>.grid.stats .num{font-size:25px!important}}
 @media(prefers-reduced-motion:reduce){#dashboard .daily-header *,#dashboard>.grid.stats *{animation:none!important;transition:none!important}}
 </style>
+<style id="home-phase2-style">
+#dashboard .home-ops,#dashboard .home-brief,#dashboard .home-alerts{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:19px;padding:17px;box-shadow:var(--shadow);min-width:0}
+#dashboard .home-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}
+#dashboard .home-section-head h2{font-size:17px;line-height:1.5;margin:0;color:var(--text)}
+#dashboard .home-section-head p{font-size:11px;color:var(--muted);margin:3px 0 0}
+#dashboard .home-section-tag{border-radius:99px;background:rgba(59,130,246,.09);color:#2563eb;font-size:10px;font-weight:700;padding:7px 10px;white-space:nowrap}
+#dashboard .home-ops-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+#dashboard .home-ops-grid button{min-width:0;min-height:78px;border:1px solid var(--line);border-radius:14px;background:var(--bg);color:var(--text);font:inherit;font-size:12px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:9px 5px;transition:transform .15s,border-color .15s}
+#dashboard .home-ops-grid button span{font-size:21px;line-height:1;color:#2563eb}
+#dashboard .home-ops-grid button:active{transform:scale(.97)}
+#dashboard .home-ops-grid button:focus-visible,#dashboard .home-section-head button:focus-visible{outline:3px solid #60a5fa;outline-offset:2px}
+#dashboard .home-brief p{margin:0;font-size:13px;line-height:2;color:var(--text)}
+#dashboard .home-alerts #homeAlertsBody{font-size:12px;line-height:1.9;color:var(--text);border-radius:12px;background:var(--bg);padding:11px 13px}
+#dashboard .home-alerts .home-section-head button{background:transparent;border:1px solid var(--line);border-radius:10px;padding:8px 10px;color:var(--text);font:inherit;font-size:11px;cursor:pointer;white-space:nowrap}
+@media(max-width:600px){#dashboard .home-ops,#dashboard .home-brief,#dashboard .home-alerts{padding:13px;border-radius:16px}#dashboard .home-ops-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}#dashboard .home-ops-grid button{min-height:72px;font-size:10px;line-height:1.5;padding:7px 3px}#dashboard .home-ops-grid button span{font-size:19px}#dashboard .home-section-head h2{font-size:15px}}
+@media(max-width:350px){#dashboard .home-ops-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(prefers-reduced-motion:reduce){#dashboard .home-ops-grid button{transition:none}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -998,6 +1016,28 @@ html[data-theme="dark"] #dashboard .home-stat-icon{background:rgba(125,211,252,.
 <div class="stat"><span class="home-stat-icon" aria-hidden="true">▣</span><div class="label">داخل المخيم</div><div class="num" id="sInside">0</div><div class="sub">عائلات داخل المخيم</div></div>
 <div class="stat"><span class="home-stat-icon" aria-hidden="true">✓</span><div class="label">اكتمال البيانات</div><div class="num" id="sComplete">0%</div><div class="sub">نسبة العائلات المكتملة</div></div>
 </div>
+<!-- Home phase 2: administrative shortcuts and live overview, read-only -->
+<section class="home-ops no-print" aria-labelledby="homeOpsTitle">
+ <div class="home-section-head"><div><h2 id="homeOpsTitle">مركز العمليات السريعة</h2><p>اختصارات مباشرة للأدوات الإدارية الموجودة</p></div><span class="home-section-tag">إدارة المخيم</span></div>
+ <div class="home-ops-grid">
+  <button type="button" data-home-op="family-add"><span aria-hidden="true">＋</span>إضافة عائلة</button>
+  <button type="button" data-home-op="family-search"><span aria-hidden="true">⌕</span>بحث عن عائلة</button>
+  <button type="button" data-home-op="person-add"><span aria-hidden="true">♙</span>إضافة فرد</button>
+  <button type="button" data-home-op="families"><span aria-hidden="true">▤</span>إدارة العائلات</button>
+  <button type="button" data-home-op="support"><span aria-hidden="true">✉</span>الدعم الفني</button>
+  <button type="button" data-home-op="excel"><span aria-hidden="true">⇩</span>تصدير Excel</button>
+  <button type="button" data-home-op="backup"><span aria-hidden="true">◫</span>نسخة احتياطية</button>
+  <button type="button" data-home-op="fund"><span aria-hidden="true">◈</span>المساهمات الشهرية</button>
+ </div>
+</section>
+<section class="home-brief" aria-labelledby="homeBriefTitle">
+ <div class="home-section-head"><div><h2 id="homeBriefTitle">نظرة سريعة على المخيم</h2><p>ملخص تلقائي من إحصائيات الصفحة الحالية</p></div></div>
+ <p id="homeBriefText" aria-live="polite">جارٍ تحميل ملخص المخيم…</p>
+</section>
+<section class="home-alerts" aria-labelledby="homeAlertsTitle">
+ <div class="home-section-head"><div><h2 id="homeAlertsTitle">تنبيهات تحتاج انتباهك</h2><p>متابعة جودة سجلات الأسر من الفحص الحالي</p></div><button type="button" data-home-op="quality">فحص التفاصيل</button></div>
+ <div id="homeAlertsBody" role="status" aria-live="polite">جارٍ التحقق من جودة البيانات…</div>
+</section>
 <div class="quality-banner ok" id="qualityBanner">
 <span id="qualityBannerText">جاري فحص جودة البيانات...</span>
 <button class="btn no-print" onclick="openQualityModal()">فحص التفاصيل</button>
@@ -1782,6 +1822,24 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
  if(sec){new MutationObserver(watch).observe(sec,{attributes:true,attributeFilter:['class']});}
  document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-view="whatsapp"],[data-drawer-view="whatsapp"]');if(!b)return;setTimeout(function(){var target=$('whatsapp');if(target){document.querySelectorAll('.view.active').forEach(function(v){v.classList.remove('active')});document.querySelectorAll('.tab.active').forEach(function(t){t.classList.remove('active')});target.classList.add('active');var mainTab=document.querySelector('.tab[data-view="whatsapp"]');if(mainTab)mainTab.classList.add('active');var drawer=$('mobileDrawerBackdrop');if(drawer)drawer.classList.remove('open');window.scrollTo(0,0);watch();}},80);});
  window.addEventListener('online',watch);
+})();
+</script>
+<script id="home-phase2-behavior">
+(function(){'use strict';
+ const $=id=>document.getElementById(id);
+ const numeric=id=>{const v=$(id)?.textContent||'';if(!/[0-9٠-٩۰-۹]/.test(v))return null;const normalized=v.replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[٬,\s]/g,'');const n=Number(normalized.replace(/[^0-9.]/g,''));return Number.isFinite(n)?n:null};
+ const format=n=>n.toLocaleString('ar-EG');
+ function update(){const families=numeric('sFamilies'),people=numeric('sPeople'),inside=numeric('sInside'),complete=numeric('sComplete'),partial=numeric('dashPartial'),missing=numeric('dashIncomplete'),issues=numeric('dashErrors');
+ const brief=$('homeBriefText'),alerts=$('homeAlertsBody');if(!brief||!alerts)return;
+ if(families===null||people===null){brief.textContent='الإحصائيات غير متاحة حالياً. يرجى التأكد من تحميل البيانات.';alerts.textContent='بانتظار اكتمال تحميل فحص البيانات.';return;}
+ brief.textContent=`يضم الكشف حالياً ${format(families)} عائلة بإجمالي ${format(people)} فرد. ${inside===null?'':`منها ${format(inside)} عائلة داخل المخيم. `}${complete===null?'':`نسبة اكتمال البيانات ${format(complete)}%.`}`;
+ if(issues===null||partial===null||missing===null){alerts.textContent='بانتظار اكتمال فحص جودة السجلات.';return;}
+ const parts=[];if(missing>0)parts.push(`${format(missing)} عائلة ببيانات ناقصة`);if(partial>0)parts.push(`${format(partial)} عائلة ببيانات جزئية`);if(issues>0)parts.push(`${format(issues)} ملاحظة في فحص جودة البيانات`);
+ alerts.textContent=parts.length?parts.join(' · ')+' — افتح فحص التفاصيل للمراجعة.':'لا توجد ملاحظات ظاهرة في فحص جودة البيانات الحالي.';
+ }
+ function act(type){try{switch(type){case 'family-add':return typeof openFamilyModal==='function'?openFamilyModal():undefined;case 'person-add':return typeof openPersonModal==='function'?openPersonModal():undefined;case 'families':return typeof showView==='function'?showView('families'):undefined;case 'family-search':return typeof showView==='function'?showView('familySearch'):undefined;case 'support':return typeof window.openSupportInbox==='function'?window.openSupportInbox():undefined;case 'excel':return typeof exportExcel==='function'?exportExcel():undefined;case 'backup':return typeof backup==='function'?backup():undefined;case 'fund':return typeof showView==='function'?showView('campFund'):undefined;case 'quality':return typeof openQualityModal==='function'?openQualityModal():undefined;}}catch(err){console.error('Home shortcut:',err);if(typeof toast==='function')toast('تعذر فتح الإجراء، يرجى المحاولة من القائمة الرئيسية.');}}
+ document.addEventListener('click',e=>{const btn=e.target.closest('[data-home-op]');if(btn)act(btn.dataset.homeOp)});
+ document.addEventListener('DOMContentLoaded',()=>{update();const ids=['sFamilies','sPeople','sInside','sComplete','dashPartial','dashIncomplete','dashErrors'];let scheduled=false;const observer=new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;update()})});ids.forEach(id=>{if($(id))observer.observe($(id),{childList:true,characterData:true,subtree:true})});});
 })();
 </script>
 <script src="./app.js?v=71.0-admin-login"></script>
