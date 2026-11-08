@@ -2008,6 +2008,56 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 })();
 </script>
 <script src="./app.js?v=71.0-admin-login"></script>
+
+<!-- Interaction phase 2: navigation, drawer and dialog motion; no data-layer changes -->
+<style id="moood-interaction-phase2">
+:root{--mo-motion-fast:130ms;--mo-motion-standard:210ms;--mo-motion-panel:260ms;--mo-motion-ease:cubic-bezier(.2,.8,.2,1)}
+/* Animate only the newly active view, not hidden views. */
+.view{animation:none!important}
+.view.active{animation:mo-view-enter var(--mo-motion-standard) var(--mo-motion-ease) both!important}
+@keyframes mo-view-enter{from{opacity:.65;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+.drawer-backdrop{transition:opacity var(--mo-motion-standard) ease,visibility var(--mo-motion-standard) ease!important}
+.drawer-panel{transition:transform var(--mo-motion-panel) var(--mo-motion-ease)!important;overscroll-behavior:contain}
+.drawer-items button,.mobile-bottom-nav button{transition:background-color var(--mo-motion-fast) ease,color var(--mo-motion-fast) ease,transform var(--mo-motion-fast) ease,border-color var(--mo-motion-fast) ease!important}
+.drawer-items button:active,.mobile-bottom-nav button:active{filter:brightness(.96)}
+/* The application's actual dialog container is .modalbox, not .box. */
+.modal .modalbox{opacity:0;transform:translateY(12px) scale(.985);transition:opacity var(--mo-motion-standard) ease,transform var(--mo-motion-panel) var(--mo-motion-ease)!important}
+.modal.show .modalbox{opacity:1;transform:none}
+.modal .modalhead,.modal .modalfoot{isolation:isolate}
+.drawer-close:focus-visible,.drawer-items button:focus-visible,.mobile-bottom-nav button:focus-visible,.modal button:focus-visible{outline:3px solid #3b82f6;outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.view.active{animation:none!important}.drawer-backdrop,.drawer-panel,.drawer-items button,.mobile-bottom-nav button,.modal .modalbox{transition:none!important}.modal .modalbox{transform:none!important}}
+</style>
+<script id="moood-interaction-phase2-behavior">
+(function(){'use strict';
+function setup(){
+ const drawer=document.getElementById('mobileDrawerBackdrop');
+ const openButton=document.getElementById('mobileDrawerOpen');
+ const closeButton=document.getElementById('mobileDrawerClose');
+ if(!drawer||!openButton)return;
+ let wasOpen=drawer.classList.contains('open');
+ let previousFocus=null;
+ const update=()=>{
+  const opened=drawer.classList.contains('open');
+  drawer.setAttribute('aria-hidden',String(!opened));
+  openButton.setAttribute('aria-expanded',String(opened));
+  if(opened===wasOpen)return;
+  wasOpen=opened;
+  if(opened){previousFocus=document.activeElement;requestAnimationFrame(()=>{if(drawer.classList.contains('open'))(closeButton||drawer.querySelector('button'))?.focus({preventScroll:true})})}
+  else if(drawer.contains(document.activeElement)){(previousFocus&&previousFocus.isConnected?previousFocus:openButton).focus({preventScroll:true})}
+ };
+ new MutationObserver(update).observe(drawer,{attributes:true,attributeFilter:['class']});update();
+ drawer.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){e.preventDefault();(closeButton||openButton).click();return}
+  if(e.key!=='Tab'||!drawer.classList.contains('open'))return;
+  const controls=[...drawer.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(x=>x.getClientRects().length);
+  if(!controls.length)return;
+  if(e.shiftKey&&document.activeElement===controls[0]){e.preventDefault();controls[controls.length-1].focus()}
+  else if(!e.shiftKey&&document.activeElement===controls[controls.length-1]){e.preventDefault();controls[0].focus()}
+ });
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
+})();
+</script>
 </body>
 </html>
 <style>.original-governorate-card .housing-chart-item{cursor:pointer}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-track{box-shadow:0 0 0 3px rgba(59,130,246,.18),0 4px 14px rgba(37,99,235,.13);transform:translateY(-1px)}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-fill{filter:brightness(1.16)}</style>
