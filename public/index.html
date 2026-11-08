@@ -959,8 +959,17 @@ html[data-theme="dark"] #dashboard .health-track,html[data-theme="dark"] #dashbo
 @media(prefers-reduced-motion:reduce){#dashboard *,#dashboard *::before,#dashboard *::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 @media print{#dashboard .home-readiness{display:none!important}}
 </style>
+<style id="mo-icon-system-v1">
+.mo-icon{width:1.25em;height:1.25em;display:inline-block;vertical-align:-.22em;flex-shrink:0;color:inherit;stroke:currentColor;fill:none}
+.drawer-items button{display:flex;align-items:center;gap:12px;min-height:48px;text-align:right}
+.drawer-items .mo-drawer-icon{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex:0 0 24px;font-size:20px;color:inherit}
+.drawer-items .mo-drawer-icon .mo-icon{width:22px;height:22px}
+.tabs .mo-icon{width:18px;height:18px;margin-inline-end:5px}
+@media (prefers-reduced-motion:reduce){.mo-icon{transition:none!important}}
+</style>
 </head>
 <body>
+<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"><defs><symbol id="mo-icon-house" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol><symbol id="mo-icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol><symbol id="mo-icon-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol><symbol id="mo-icon-map-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></symbol><symbol id="mo-icon-map" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15m6-12v15"/></symbol><symbol id="mo-icon-database" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></symbol><symbol id="mo-icon-table" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16M15 4v16"/></symbol><symbol id="mo-icon-wallet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="15" rx="2"/><path d="M3 9V5a2 2 0 0 1 2-2h13M16 14h5M16 14h-2"/></symbol><symbol id="mo-icon-package" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5ZM3 7v10l9 5 9-5V7M12 12v10"/></symbol><symbol id="mo-icon-headset" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14v-3a9 9 0 0 1 18 0v3M3 14h4v6H5a2 2 0 0 1-2-2zm18 0h-4v6h2a2 2 0 0 0 2-2zM17 20c0 2-2 2-5 2"/></symbol><symbol id="mo-icon-megaphone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 13-6v14L3 13zm13-3 4-2v12l-4-2M6 14l2 7h4l-3-8"/></symbol><symbol id="mo-icon-message" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 9 9 0 0 1-4-.9L3 21l1.9-5.5a9 9 0 0 1-.9-4A8.5 8.5 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5Z"/></symbol><symbol id="mo-icon-log-in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5m5 5H3M13 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></symbol><symbol id="mo-icon-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 17a4 4 0 0 0-.5-8 7.5 7.5 0 0 0-14.4 2A3.5 3.5 0 0 0 6.5 18H19"/></symbol><symbol id="mo-icon-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l-2 2a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6H10a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-2-2a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1v-4a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l2-2a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6h4a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l2 2a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1v4a1.7 1.7 0 0 0-1.6 1z"/></symbol><symbol id="mo-icon-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5m5 5H3M13 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></symbol><symbol id="mo-icon-compass" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-2 4-4 2 2-4z"/></symbol><symbol id="mo-icon-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol><symbol id="mo-icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7v5h-5M4 17v-5h5M5 9a8 8 0 0 1 14-2l1 5M4 12l1 5a8 8 0 0 0 14-2"/></symbol><symbol id="mo-icon-printer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 15h12v6H6z"/></symbol><symbol id="mo-icon-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></symbol><symbol id="mo-icon-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></symbol><symbol id="mo-icon-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h8l5 5v15H6zM14 2v5h5M9 12h7M9 16h7"/></symbol></defs></svg>
 <div class="app">
 <header class="top">
 <div class="topin">
@@ -976,21 +985,21 @@ html[data-theme="dark"] #dashboard .health-track,html[data-theme="dark"] #dashbo
 <main class="wrap">
 <nav class="tabs no-print">
 <button class="tab active" data-view="dashboard">لوحة القيادة</button>
-<button class="tab" data-view="familySearch">🔎 بحث العائلات</button>
+<button class="tab" data-view="familySearch"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-search"></use></svg> بحث العائلات</button>
 <button class="tab" data-view="families">إدارة العائلات</button>
-<button class="tab" data-view="sectors">🧭 قواطع المخيم</button>
-<button class="tab" data-view="campMap">🗺️ خريطة المخيم</button>
-<button class="tab" data-view="campFund">💰 صندوق المخيم</button>
+<button class="tab" data-view="sectors"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-compass"></use></svg> قواطع المخيم</button>
+<button class="tab" data-view="campMap"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-map"></use></svg> خريطة المخيم</button>
+<button class="tab" data-view="campFund"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-wallet"></use></svg> صندوق المخيم</button>
 <button class="tab" data-view="distributions">إدارة التوزيعات</button>
-<button class="tabx" type="button" data-menu-action="supportInbox">🛠️ طلبات الدعم الفني<i class="abu-badge abu-support-badge abu-badge-tab" hidden>0</i></button>
-<button class="tabx" type="button" data-menu-action="campAnnouncements">📢 إعلانات المخيم</button>
-<button class="tab" data-view="whatsapp">🟢 واتساب العائلات</button>
-<button class="tab" data-view="loginLog">🔐 سجل دخول الأهالي</button>
+<button class="tabx" type="button" data-menu-action="supportInbox"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-headset"></use></svg> طلبات الدعم الفني<i class="abu-badge abu-support-badge abu-badge-tab" hidden>0</i></button>
+<button class="tabx" type="button" data-menu-action="campAnnouncements"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-megaphone"></use></svg> إعلانات المخيم</button>
+<button class="tab" data-view="whatsapp"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-message"></use></svg> واتساب العائلات</button>
+<button class="tab" data-view="loginLog"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-lock"></use></svg> سجل دخول الأهالي</button>
 <button class="tab" data-view="records">السجلات</button>
 <button class="tab" data-view="classified">الكشوفات المصنفة</button>
-<button class="tab" data-view="syncCenter">☁️ مركز المزامنة</button>
+<button class="tab" data-view="syncCenter"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-cloud"></use></svg> مركز المزامنة</button>
 <button class="tab" data-view="settings">الحماية والبيانات</button>
-<button class="tabx" type="button" onclick="displayAuthLogout()">⎋ تسجيل الخروج</button>
+<button class="tabx" type="button" onclick="displayAuthLogout()"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-logout"></use></svg> تسجيل الخروج</button>
 </nav>
 <section class="view" id="whatsapp">
  <div class="section-head">
@@ -1709,22 +1718,22 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
  <aside class="drawer-panel" role="dialog" aria-modal="true" aria-label="القائمة الجانبية">
   <div class="drawer-head"><b>قائمة التطبيق</b><button class="drawer-close" id="mobileDrawerClose" type="button" aria-label="إغلاق القائمة">×</button></div>
   <div class="drawer-items">
-   <button data-drawer-view="dashboard"><span>⌂</span>الرئيسية</button>
-   <button data-drawer-view="familySearch"><span>⌕</span>البحث</button>
-   <button data-drawer-view="families"><span>♧</span>العائلات</button>
-   <button data-drawer-view="sectors"><span>⌖</span>القواطع</button>
-   <button data-drawer-view="campMap"><span>🗺</span>خريطة المخيم</button>
-   <button data-drawer-view="records"><span>▤</span>السجلات</button>
-   <button data-drawer-view="classified"><span>▥</span>الكشوفات</button>
-   <button type="button" data-drawer-view="campFund" aria-label="فتح تبويب صندوق المخيم"><span>💰</span>صندوق المخيم</button>
-   <button data-drawer-view="distributions"><span>◫</span>التوزيعات</button>
-   <button type="button" data-menu-action="supportInbox"><span>🛠</span>طلبات الدعم الفني<i class="abu-badge abu-support-badge abu-badge-inline" hidden>0</i></button>
-   <button type="button" data-menu-action="campAnnouncements"><span>📢</span>إعلانات المخيم</button>
-   <button data-drawer-view="whatsapp"><span>🟢</span>واتساب العائلات</button>
-   <button data-drawer-view="loginLog"><span>🔐</span>سجل دخول الأهالي</button>
-   <button data-drawer-view="syncCenter"><span>☁</span>السحابة</button>
-   <button data-drawer-view="settings"><span>⚙</span>الإعدادات</button>
-   <button type="button" onclick="displayAuthLogout()"><span>⎋</span>تسجيل الخروج</button>
+   <button data-drawer-view="dashboard"><span class="mo-drawer-icon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-house"></use></svg></span>الرئيسية</button>
+   <button data-drawer-view="familySearch"><span class="mo-drawer-icon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-search"></use></svg></span>البحث</button>
+   <button data-drawer-view="families"><span class="mo-drawer-icon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-users"></use></svg></span>العائلات</button>
+   <button data-drawer-view="sectors"><span class="mo-drawer-icon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-map-pin"></use></svg></span>القواطع</button>
+   <button data-drawer-view="campMap"><span class="mo-drawer-icon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-map"></use></svg></span>خريطة المخيم</button>
+   <button data-drawer-view="records"><span class="mo-drawer-icon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-database"></use></svg></span>السجلات</button>
+   <button data-drawer-view="classified"><span class="mo-drawer-icon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-table"></use></svg></span>الكشوفات</button>
+   <button type="button" data-drawer-view="campFund" aria-label="فتح تبويب صندوق المخيم"><span class="mo-drawer-icon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-wallet"></use></svg></span>صندوق المخيم</button>
+   <button data-drawer-view="distributions"><span class="mo-drawer-icon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-package"></use></svg></span>التوزيعات</button>
+   <button type="button" data-menu-action="supportInbox"><span class="mo-drawer-icon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-headset"></use></svg></span>طلبات الدعم الفني<i class="abu-badge abu-support-badge abu-badge-inline" hidden>0</i></button>
+   <button type="button" data-menu-action="campAnnouncements"><span class="mo-drawer-icon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-megaphone"></use></svg></span>إعلانات المخيم</button>
+   <button data-drawer-view="whatsapp"><span class="mo-drawer-icon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-message"></use></svg></span>واتساب العائلات</button>
+   <button data-drawer-view="loginLog"><span class="mo-drawer-icon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-lock"></use></svg></span>سجل دخول الأهالي</button>
+   <button data-drawer-view="syncCenter"><span class="mo-drawer-icon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-cloud"></use></svg></span>السحابة</button>
+   <button data-drawer-view="settings"><span class="mo-drawer-icon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-settings"></use></svg></span>الإعدادات</button>
+   <button type="button" onclick="displayAuthLogout()"><span class="mo-drawer-icon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-logout"></use></svg></span>تسجيل الخروج</button>
   </div>
   <div class="drawer-copyright" aria-label="حقوق الملكية">
    <div class="drawer-copyright-year">© 2026</div>
