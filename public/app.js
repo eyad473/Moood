@@ -351,7 +351,7 @@ let __familyCache={key:"",html:""};
 function renderFamiliesFast(){
  const q=(document.getElementById("fq")?.value||"").toLowerCase().trim(),fs=document.getElementById("fsize")?.value||"",st=document.getElementById("fstatus")?.value||"";
  const key=q+"|"+fs+"|"+st+"|"+data.length+"|"+(data[0]?.__syncId||"")+"|"+(data[data.length-1]?.__syncId||"");
- if(__familyCache.key===key){document.getElementById("familyList").innerHTML=__familyCache.html;return;}
+ if(__familyCache.key===key){updateFamilyOverview();document.getElementById("familyList").innerHTML=__familyCache.html;return;}
  renderFamiliesCore(); __familyCache={key,html:document.getElementById("familyList").innerHTML};
 }
 
@@ -1275,7 +1275,17 @@ function filterFamiliesStatus(status){
   const el=document.getElementById("fstatus"); if(el){el.value=status;renderFamiliesFast()}
 }
 
+function updateFamilyOverview(){
+ const root=document.getElementById("familyStatTotal");if(!root)return;
+ try{
+  const families=familyMap();let people=0,complete=0,partial=0,missing=0;
+  families.forEach(rows=>{people+=familyDisplayCount(rows);const state=familyStatus(rows).status;if(state==="مكتملة")complete++;else if(state==="جزئية")partial++;else missing++;});
+  const values={familyStatTotal:families.size,familyStatPeople:people,familyStatComplete:complete,familyStatPartial:partial,familyStatMissing:missing};
+  Object.entries(values).forEach(([id,n])=>{const el=document.getElementById(id);if(el)el.textContent=n.toLocaleString("ar-EG")});
+ }catch(err){console.warn("Family overview unavailable",err)}
+}
 function renderFamiliesCore(){
+  updateFamilyOverview();
   const q=(document.getElementById("fq")?.value||"").toLowerCase().trim();
   const fs=document.getElementById("fsize")?.value||"";
   const st=document.getElementById("fstatus")?.value||"";

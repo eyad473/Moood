@@ -241,6 +241,33 @@ th,.table th{font-weight:700}
 .stat .label{font-size:13px;font-weight:600}
 .badge{font-family:var(--font-body);font-weight:700;line-height:1.45}
 @media(max-width:600px){body{font-size:14px;line-height:1.7}.brand h1{font-size:17px}.num{line-height:1.4}}
+
+/* Family management · phase 1: isolated visual layout; existing controls and handlers preserved */
+#families .card{min-width:0;overflow:visible}
+#families .family-admin-hero{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:7px 2px 18px;flex-wrap:wrap}
+#families .family-admin-heading{min-width:0;flex:1 1 230px}
+#families .family-admin-kicker{display:block;font-size:11px;color:#2563eb;font-weight:800;margin-bottom:5px}
+#families .family-admin-heading h2{font-size:clamp(20px,3vw,26px);line-height:1.4;margin:0;color:#172033}
+#families .family-admin-heading p{margin:5px 0 0;font-size:12px;color:#64748b;line-height:1.8}
+#families .family-admin-tools{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+#families .family-add-btn{min-height:43px;padding-inline:18px}
+#families .family-action-menu{position:relative}
+#families .family-action-menu summary{list-style:none;display:flex;align-items:center;min-height:43px;cursor:pointer;white-space:nowrap}
+#families .family-action-menu summary::-webkit-details-marker{display:none}
+#families .family-action-panel{position:absolute;left:0;top:calc(100% + 7px);z-index:12;display:grid;gap:7px;min-width:225px;padding:10px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;box-shadow:0 15px 35px #0f172a20}
+#families .family-action-panel .btn{text-align:right;white-space:nowrap}
+#families .family-overview{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:0 0 19px}
+#families .family-overview-card{min-width:0;border:1px solid #e5eaf2;background:#f8fafc;border-radius:15px;padding:13px 12px;display:flex;flex-direction:column;gap:5px}
+#families .family-overview-card span{font-size:11px;color:#64748b;font-weight:700}
+#families .family-overview-card strong{font-size:clamp(19px,2.5vw,26px);font-weight:800;color:#172033;font-variant-numeric:tabular-nums}
+#families .filters{grid-template-columns:minmax(0,2fr) repeat(2,minmax(0,1fr))!important}
+#families .filters .field{min-width:0}
+#families .filters input,#families .filters select{width:100%;min-width:0}
+@media(max-width:850px){#families .family-overview{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:600px){#families .card{padding:12px}#families .family-admin-hero{align-items:stretch;gap:12px}#families .family-admin-tools{width:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}#families .family-admin-tools>.btn,#families .family-action-menu,#families .family-action-menu summary{width:100%;justify-content:center}#families .family-action-panel{left:0;right:auto;max-width:calc(100vw - 38px)}#families .family-overview{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#families .family-overview-card{padding:11px}#families .filters{grid-template-columns:repeat(2,minmax(0,1fr))!important}#families .filters .field:first-child{grid-column:1/-1}#families .family-admin-heading p{font-size:11px}}
+@media(max-width:350px){#families .family-admin-tools{grid-template-columns:1fr}}
+@media print{#families .family-admin-hero,#families .family-overview{display:none!important}}
+
 </style>
 <style>
 .family-search-card{margin-bottom:18px}
@@ -969,7 +996,17 @@ h3,h4,h5,h6{font-size:var(--type-md);font-weight:600;line-height:1.55;}
 </section>
 <section class="view" id="families">
 <div class="card">
-<div class="cardhead"><h2>إدارة العائلات</h2><div class="actions no-print"><button class="btn primary" onclick="openFamilyModal()">＋ إضافة عائلة</button><button class="btn" onclick="openFamilyPrintModal()">🖨 طباعة كشف العائلات</button><button class="btn" onclick="exportExcel()">تصدير الكشف Excel</button></div></div>
+<div class="family-admin-hero no-print">
+ <div class="family-admin-heading"><span class="family-admin-kicker">سجلات المخيم · إدارة الأسر</span><h2>إدارة العائلات</h2><p>متابعة بيانات الأسر والأفراد واكتمال سجلاتهم من مكان واحد.</p></div>
+ <div class="family-admin-tools"><button class="btn primary family-add-btn" type="button" onclick="openFamilyModal()">＋ إضافة عائلة</button><details class="family-action-menu"><summary class="btn">الإجراءات الأخرى ▾</summary><div class="family-action-panel"><button class="btn" type="button" onclick="openFamilyPrintModal()">🖨 طباعة كشف العائلات</button><button class="btn" type="button" onclick="exportExcel()">تصدير الكشف Excel</button></div></details></div>
+</div>
+<div class="family-overview no-print" aria-label="إحصائيات العائلات">
+ <div class="family-overview-card"><span>إجمالي العائلات</span><strong id="familyStatTotal">—</strong></div>
+ <div class="family-overview-card"><span>إجمالي الأفراد</span><strong id="familyStatPeople">—</strong></div>
+ <div class="family-overview-card"><span>مكتملة</span><strong id="familyStatComplete">—</strong></div>
+ <div class="family-overview-card"><span>جزئية</span><strong id="familyStatPartial">—</strong></div>
+ <div class="family-overview-card"><span>ناقصة</span><strong id="familyStatMissing">—</strong></div>
+</div>
 <div class="filters no-print" style="grid-template-columns:2fr 1fr 1fr">
 <div class="field"><label>بحث عن عائلة</label><input id="fq" oninput="renderFamilies()" placeholder="اسم رب الأسرة أو رقم الهوية أو الجوال"/></div>
 <div class="field"><label>عدد أفراد الأسرة</label><select id="fsize" onchange="renderFamilies()"><option value="">الكل</option><option value="1">فرد واحد</option><option value="2-4">2 - 4</option><option value="5-7">5 - 7</option><option value="8">8 فأكثر</option></select></div>
