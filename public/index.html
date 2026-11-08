@@ -936,6 +936,29 @@ html[data-theme="dark"] #dashboard .home-stat-icon{background:rgba(125,211,252,.
 @media(max-width:650px){#dashboard .home-analysis-strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#dashboard .home-analysis-item{padding:11px}#dashboard .home-analysis-item strong{font-size:16px}#dashboard .home-analysis-item:last-child{grid-column:1/-1}#dashboard .chart-main-grid{grid-template-columns:minmax(0,1fr)!important}#dashboard .chart-svgbox svg{width:100%}}
 @media(max-width:360px){#dashboard .home-analysis-strip{grid-template-columns:minmax(0,1fr)}#dashboard .home-analysis-item:last-child{grid-column:auto}}
 </style>
+
+<style id="home-phase4-stability-styles">
+/* Home phase 4: dashboard-only layout, accessibility and theme adjustments. */
+#dashboard{min-width:0;overflow-wrap:break-word;padding-bottom:calc(78px + env(safe-area-inset-bottom,0px))}
+#dashboard .grid,#dashboard .stats,#dashboard .dashboard-charts,#dashboard .chart-main-grid{min-width:0}
+#dashboard .stat,#dashboard .chart-card,#dashboard .home-ops,#dashboard .home-brief,#dashboard .home-alerts{min-width:0}
+#dashboard .stat .num{font-variant-numeric:tabular-nums;overflow-wrap:anywhere;line-height:1.35}
+#dashboard .chart-svgbox{min-width:0;overflow:hidden}
+#dashboard .chart-svgbox svg{max-width:100%}
+#dashboard button:focus-visible{outline:3px solid #38bdf8;outline-offset:3px}
+#dashboard .home-readiness{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:12px 0 0;padding:10px 13px;border:1px solid var(--line);border-radius:13px;background:var(--card);color:var(--muted);font-size:12px}
+#dashboard .home-readiness strong{color:var(--text)}
+#dashboard .home-readiness[data-status="offline"]{border-color:#f59e0b}
+#dashboard .home-readiness[data-status="waiting"]{border-style:dashed}
+html[data-theme="dark"] #dashboard .home-brief,html[data-theme="dark"] #dashboard .home-alerts,html[data-theme="dark"] #dashboard .home-ops,html[data-theme="dark"] #dashboard .home-analysis-item{background:var(--card,#111827)!important;color:var(--text,#e5e7eb)!important;border-color:var(--line,#293548)!important}
+html[data-theme="dark"] #dashboard .home-section-head p,html[data-theme="dark"] #dashboard .home-analysis-item small{color:var(--muted,#94a3b8)!important}
+html[data-theme="dark"] #dashboard .chart-svgbox{background:#101b2d!important;border-color:#334155!important}
+html[data-theme="dark"] #dashboard .health-track,html[data-theme="dark"] #dashboard .housing-chart-track{background:#293548!important}
+@media(max-width:700px){#dashboard .daily-header{max-width:100%}#dashboard .stats{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px}#dashboard .stat{padding:13px!important}#dashboard .stat .num{font-size:clamp(21px,6vw,30px)!important}#dashboard .home-ops-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#dashboard .dashboard-charts{grid-template-columns:minmax(0,1fr)!important}#dashboard .chart-main-grid{grid-template-columns:minmax(0,1fr)!important}}
+@media(max-width:360px){#dashboard .stat{padding:10px!important}#dashboard .stat .label{font-size:11px}#dashboard .home-readiness{font-size:11px}}
+@media(prefers-reduced-motion:reduce){#dashboard *,#dashboard *::before,#dashboard *::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+@media print{#dashboard .home-readiness{display:none!important}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -1028,6 +1051,7 @@ html[data-theme="dark"] #dashboard .home-stat-icon{background:rgba(125,211,252,.
     
   </div>
 </section>
+<div id="homeReadiness" class="home-readiness no-print" data-status="waiting" role="status" aria-live="polite"><span><strong>حالة بيانات اللوحة:</strong> <span id="homeReadinessText">بانتظار تحميل الإحصائيات</span></span><span id="homeReadinessTime">—</span></div>
 <div class="grid stats">
 <div class="stat"><span class="home-stat-icon" aria-hidden="true">♙</span><div class="label">إجمالي الأفراد</div><div class="num" id="sPeople">0</div><div class="sub">كل أفراد الكشف</div></div>
 <div class="stat"><span class="home-stat-icon" aria-hidden="true">⌂</span><div class="label">إجمالي العائلات</div><div class="num" id="sFamilies">0</div><div class="sub">بحسب رب الأسرة</div></div>
@@ -1884,6 +1908,34 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
  }
  function setup(){const ids=['sFamilies','sInside','sPeople','healthChart'];let queued=false;const observer=new MutationObserver(()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;update()})});ids.forEach(id=>{const el=$(id);if(el)observer.observe(el,{childList:true,subtree:true,characterData:true})});update()}
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
+})();
+</script>
+<script id="home-phase4-readonly-health">
+(function(){'use strict';
+ // Display-only observer: never calls APIs, changes records or alters existing render functions.
+ const ready=()=>{
+  const panel=document.getElementById('homeReadiness'),label=document.getElementById('homeReadinessText'),stamp=document.getElementById('homeReadinessTime');
+  if(!panel||!label||!stamp)return;
+  const ids=['sFamilies','sPeople','sInside','sComplete'];
+  const els=ids.map(id=>document.getElementById(id));
+  const hasNumber=el=>el&&/[0-9٠-٩۰-۹]/.test(el.textContent||'');
+  let lastSnapshot='',lastValidAt=null;
+  const refresh=()=>{
+   const online=navigator.onLine;
+   const valid=els.every(hasNumber);
+   const snapshot=els.map(el=>(el?.textContent||'').trim()).join('|');
+   if(valid&&snapshot!==lastSnapshot){lastSnapshot=snapshot;lastValidAt=new Date();}
+   const status=!online?'offline':valid?'ready':'waiting';panel.dataset.status=status;
+   label.textContent=!online?'الجهاز غير متصل بالإنترنت؛ قد تكون الأرقام المعروضة محلية أو قديمة':valid?'الإحصائيات ظاهرة في الواجهة (لا يؤكد هذا نجاح المزامنة السحابية)':'بانتظار ظهور الإحصائيات؛ تحقق من تحميل البيانات';
+   stamp.textContent=lastValidAt?'آخر تغيّر ظاهر: '+lastValidAt.toLocaleTimeString('ar-PS',{hour:'2-digit',minute:'2-digit'}):'لم يُرصد تحديث بعد';
+  };
+  let pending=false;const schedule=()=>{if(pending)return;pending=true;requestAnimationFrame(()=>{pending=false;refresh()})};
+  const observer=new MutationObserver(schedule);
+  els.filter(Boolean).forEach(el=>observer.observe(el,{childList:true,characterData:true,subtree:true}));
+  window.addEventListener('online',schedule);window.addEventListener('offline',schedule);
+  refresh();
+ };
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
 })();
 </script>
 <script src="./app.js?v=71.0-admin-login"></script>
