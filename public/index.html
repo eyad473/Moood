@@ -759,6 +759,47 @@ th,.table th{font-weight:700}
 input,select,textarea{font-size:15px;line-height:1.65;font-weight:500}
 @media(max-width:760px){.brand h1{font-size:clamp(17px,4.2vw,21px);line-height:1.6}.daily-greeting{font-size:clamp(27px,7.2vw,35px);line-height:1.55}.daily-welcome-note{font-size:13px;line-height:1.9}.daily-time-meta{font-size:12px}.stat .num,.num{line-height:1.5}}
 </style>
+<style id="abu-oreiban-local-typography">
+@font-face{font-family:'Yamama Local';src:url('./assets/fonts/yamama_Light.ttf') format('truetype');font-weight:300;font-style:normal;font-display:swap}
+@font-face{font-family:'Yamama Local';src:url('./assets/fonts/yamama_Regular.ttf') format('truetype');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'Yamama Local';src:url('./assets/fonts/yamama_SemiBold.ttf') format('truetype');font-weight:600;font-style:normal;font-display:swap}
+@font-face{font-family:'Yamama Local';src:url('./assets/fonts/yamama_Bold.ttf') format('truetype');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Yamama Local';src:url('./assets/fonts/yamama_ExtraBold.ttf') format('truetype');font-weight:800;font-style:normal;font-display:swap}
+@font-face{font-family:'Yamama Local';src:url('./assets/fonts/yamama_Black.ttf') format('truetype');font-weight:900;font-style:normal;font-display:swap}
+@font-face{font-family:'MF Tahadath Local';src:url('./assets/fonts/MF_Tahadath_Light.woff2') format('woff2');font-weight:300;font-style:normal;font-display:swap}
+@font-face{font-family:'MF Tahadath Local';src:url('./assets/fonts/MF_Tahadath_Regular.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'MF Tahadath Local';src:url('./assets/fonts/MF_Tahadath_Bold.woff2') format('woff2');font-weight:700;font-style:normal;font-display:swap}
+/* Abu Oreiban typography — local, offline-capable fonts; presentation only */
+:root{--font-heading:'Yamama Local',Arial,sans-serif;--font-body:'MF Tahadath Local','Yamama Local',Arial,sans-serif;--font-numbers:'Yamama Local',Arial,sans-serif}
+html{font-synthesis:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body,button,input,select,textarea{font-family:var(--font-body)!important;letter-spacing:normal;}
+body{font-size:15px;line-height:1.75;font-weight:400}
+h1,h2,h3,h4,h5,h6,.brand h1,.cardhead,.logo,.hero-title,.welcome-title,.section-title,.page-title{font-family:var(--font-heading)!important;line-height:1.4;font-weight:700;letter-spacing:0}
+h1,.brand h1{font-weight:800}h2,h3{font-weight:700}
+button,.btn,.tab,[role="button"],nav a,.bottom-nav a{font-family:var(--font-body)!important;font-weight:700;line-height:1.45}
+input,select,textarea{font-weight:400;line-height:1.65}
+small,.muted,.sub,.label,.hint,.description{line-height:1.75;font-weight:400}
+table,td,th,.table{font-family:var(--font-body)!important;line-height:1.65}th,.table th{font-weight:700}
+.num,.stat .num,.stat strong,.donut-center b,.fund-stat strong{font-family:var(--font-numbers)!important;font-weight:700;line-height:1.3;font-variant-numeric:tabular-nums}
+.stat .label,.badge,.chart-chip{font-family:var(--font-body)!important;font-weight:700}
+.chart-label,.campmap-board svg text{font-family:'Yamama Local',Arial,sans-serif!important}
+@media(max-width:600px){body{font-size:14px;line-height:1.75}.brand h1{font-size:17px;line-height:1.45}button,.btn{line-height:1.5}}
+</style>
+
+<!-- Codec Pro ME: primary typography, test build (trial license) -->
+<style id="codec-pro-primary-typography">
+@font-face{font-family:'Codec Pro ME Local';src:url('./assets/fonts/Codec_Pro_ME_Trial_Regular.ttf') format('truetype');font-style:normal;font-weight:400;font-display:swap}
+@font-face{font-family:'Codec Pro ME Local';src:url('./assets/fonts/Codec_Pro_ME_Trial_Bold.ttf') format('truetype');font-style:normal;font-weight:700;font-display:swap}
+@font-face{font-family:'Codec Pro ME Local';src:url('./assets/fonts/Codec_Pro_ME_Trial_ExtraBold.ttf') format('truetype');font-style:normal;font-weight:800 900;font-display:swap}
+:root{--font-heading:'Codec Pro ME Local','Yamama Local',Arial,sans-serif;--font-body:'Codec Pro ME Local','MF Tahadath Local','Yamama Local',Arial,sans-serif;--font-numbers:'Codec Pro ME Local',Arial,sans-serif}
+html,body,button,input,select,textarea,option{font-family:var(--font-body)!important}
+h1,h2,h3,h4,h5,h6,.brand h1,.cardhead,.logo,.hero-title,.welcome-title,.section-title,.page-title,.daily-greeting,.sector-hero h2{font-family:var(--font-heading)!important;font-weight:800;line-height:1.48}
+button,.btn,.tab,[role="button"],nav a,.bottom-nav,.mobile-bottom-nav{font-family:var(--font-body)!important;font-weight:700;line-height:1.5}
+.stat .num,.num,.stat strong,.donut-center b,.fund-stat strong{font-family:var(--font-numbers)!important;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.35}
+.stat .label,.stat small,.stat .sub,.muted,.sub,.label,.daily-welcome-note,.daily-time-meta{font-family:var(--font-body)!important;font-weight:400;line-height:1.75}
+table,th,td,.table,.familybox,.badge,.chip{font-family:var(--font-body)!important;line-height:1.7}
+th,.table th,.badge{font-weight:700}
+</style>
 </head>
 <body>
 <div class="app">
