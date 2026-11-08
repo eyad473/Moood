@@ -2058,6 +2058,78 @@ function setup(){
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
 })();
 </script>
+
+<!-- Interaction phase 3: feedback, real loading states and filter affordances. Presentation only. -->
+<style id="moood-interaction-phase3">
+/* Override older toast truncation rules. Long administrative messages must remain readable. */
+#toast.toast,#toast{width:max-content!important;max-width:min(92vw,560px)!important;min-width:0!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;word-break:normal!important;text-overflow:clip!important;overflow-x:hidden!important;overflow-y:auto!important;max-height:min(60dvh,450px)!important;padding:13px 18px!important;font-size:clamp(12px,2.7vw,15px)!important;line-height:1.7!important;text-align:start!important;box-sizing:border-box!important}
+@media(max-width:700px){#toast.toast,#toast{left:50%!important;right:auto!important;top:max(14px,env(safe-area-inset-top))!important;bottom:auto!important;max-width:calc(100vw - 28px)!important}}
+#toast.mo-toast-error{border-inline-start:4px solid #ef4444!important}
+#toast.mo-toast-success{border-inline-start:4px solid #16a34a!important}
+#toast.mo-toast-warning{border-inline-start:4px solid #f59e0b!important}
+#toast:focus-visible{outline:3px solid #60a5fa;outline-offset:3px}
+/* Loading decorations only when existing code explicitly declares a busy state. */
+[aria-busy="true"]{cursor:progress}
+.mo-busy-indicator{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:mo-phase3-spin .85s linear infinite;vertical-align:middle;margin-inline-start:8px;opacity:.8}
+@keyframes mo-phase3-spin{to{transform:rotate(360deg)}}
+button[aria-busy="true"],.btn[aria-busy="true"]{opacity:.82}
+/* Filters: communicate focus and active values without changing search behavior. */
+.filters :is(input,select):focus-visible,.dist-filters :is(input,select):focus-visible{outline:2px solid #3b82f6;outline-offset:2px;transition:box-shadow .16s ease,border-color .16s ease}
+.filters .mo-filter-active,.dist-filters .mo-filter-active{border-color:#2563eb!important;box-shadow:0 0 0 2px rgba(37,99,235,.12)!important}
+/* Existing empty states get consistent, calm visual treatment. */
+.empty,.dist-empty,.dist-smart-empty{border-radius:14px;line-height:1.75;transition:background-color .18s ease}
+/* Avoid expensive animation on every row of long tables. */
+.table tbody tr{transition:background-color .12s ease}
+.table tbody tr:hover{background-color:rgba(37,99,235,.045)}
+@media(prefers-reduced-motion:reduce){.mo-busy-indicator{animation:none;border-right-color:currentColor}.filters :is(input,select),.dist-filters :is(input,select),.empty,.dist-empty,.dist-smart-empty,.table tbody tr{transition:none!important}}
+</style>
+<script id="moood-interaction-phase3-behavior">
+(function(){'use strict';
+function setup(){
+ const toast=document.getElementById('toast');
+ if(toast){
+  toast.setAttribute('aria-atomic','true');
+  toast.setAttribute('tabindex','0');
+  // Observe only text and class changes; never intercept the existing toast function.
+  let pending=false;
+  const update=()=>{
+   pending=false;
+   const msg=(toast.textContent||'').trim();
+   const error=/تعذر|فشل|خطأ|غير متاح|لم يتم|error|failed/i.test(msg);
+   const warning=!error&&/تنبيه|تحذير|انتبه|يرجى|warning/i.test(msg);
+   const success=!error&&!warning&&/تم |نجاح|بنجاح|اكتمل|success/i.test(msg);
+   toast.classList.toggle('mo-toast-error',error);
+   toast.classList.toggle('mo-toast-warning',warning);
+   toast.classList.toggle('mo-toast-success',success);
+   toast.setAttribute('role',error?'alert':'status');
+   toast.setAttribute('aria-live',error?'assertive':'polite');
+  };
+  new MutationObserver(()=>{if(!pending){pending=true;requestAnimationFrame(update)}}).observe(toast,{childList:true,subtree:true,characterData:true});
+  update();
+  toast.addEventListener('keydown',e=>{if(e.key==='Escape'&&toast.classList.contains('show')){toast.click();e.preventDefault()}});
+ }
+ // Visual indicators only: do not debounce or replace application search listeners.
+ const fields=document.querySelectorAll('.filters input,.filters select,.dist-filters input,.dist-filters select');
+ for(const field of fields){
+  const sync=()=>{const value=String(field.value||'').trim();const defaultValue=field.tagName==='SELECT'?(field.options[0]?.value||''):'';field.classList.toggle('mo-filter-active',value!==''&&value!==defaultValue)};
+  field.addEventListener('input',sync,{passive:true});field.addEventListener('change',sync);sync();
+ }
+ // If the existing application explicitly marks a button busy, show a spinner.
+ // Never infer loading from a click or declare success before the server confirms it.
+ const refreshBusy=(el)=>{
+  if(!(el instanceof HTMLElement)||!el.matches('button[aria-busy],.btn[aria-busy]'))return;
+  const busy=el.getAttribute('aria-busy')==='true';
+  const indicator=el.querySelector(':scope > .mo-busy-indicator');
+  if(busy&&!indicator){const i=document.createElement('span');i.className='mo-busy-indicator';i.setAttribute('aria-hidden','true');el.appendChild(i)}
+  if(!busy&&indicator)indicator.remove();
+ };
+ document.querySelectorAll('button[aria-busy],.btn[aria-busy]').forEach(refreshBusy);
+ new MutationObserver(records=>{for(const r of records)if(r.type==='attributes')refreshBusy(r.target)}).observe(document.body,{subtree:true,attributes:true,attributeFilter:['aria-busy']});
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
+})();
+</script>
+
 </body>
 </html>
 <style>.original-governorate-card .housing-chart-item{cursor:pointer}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-track{box-shadow:0 0 0 3px rgba(59,130,246,.18),0 4px 14px rgba(37,99,235,.13);transform:translateY(-1px)}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-fill{filter:brightness(1.16)}</style>
