@@ -1408,47 +1408,66 @@ function renderOriginalGovernorateChart(families){
 function conditionFieldOptions(){
  return [
   ["اسم رب الأسرة","اسم رب الأسرة"],["رقم هوية الأسرة","رقم هوية الأسرة"],["رقم الجوال","رقم الجوال"],
-  ["العنوان","العنوان"],["داخل/خارج المخيم","داخل/خارج المخيم"],["حالة اكتمال بيانات الأسرة","حالة الأسرة"],
+  ["العنوان","العنوان"],["داخل/خارج المخيم","مكان الإقامة (داخل/خارج المخيم)"],["حالة اكتمال بيانات الأسرة","حالة الأسرة"],
   ["المحافظة الأصلية","المحافظة الأصلية"],["نوع السكن الحالي","نوع السكن"],["اسم الفرد","اسم الفرد"],
   ["رقم هوية الفرد","رقم هوية الفرد"],["صلة القرابة","صلة القرابة"],["الجنس","الجنس"],["الحالة الاجتماعية","الحالة الاجتماعية"],
-  ["العمر","العمر"],["عدد أفراد الأسرة","عدد أفراد الأسرة"],["مرض مزمن؟","مرض مزمن"],["نوع المرض","نوع المرض"],["إصابة؟","إصابة"],["سبب الإصابة","سبب الإصابة"],
+  ["العمر","العمر"],["عدد أفراد الأسرة","عدد الأفراد في الأسرة"],["مرض مزمن؟","مرض مزمن"],["نوع المرض","نوع المرض"],["إصابة؟","إصابة"],["سبب الإصابة","سبب الإصابة"],
   ["تفاصيل الإصابة","تفاصيل الإصابة"],["إعاقة؟","إعاقة"],["نوع الإعاقة","نوع الإعاقة"],["يتيم/منفصل عن ذويه؟","يتيم"],
   ["حامل؟","حامل"],["مرضعة؟","مرضعة"],["بيانات ناقصة","بيانات ناقصة"]
  ];
 }
 function addReportCondition(field="",op="contains",value=""){
- reportConditions.push({field,op,value});renderConditionRows();
+ reportConditions.push({field:field||"اسم الفرد",op,value});renderConditionRows();
 }
 function removeReportCondition(i){reportConditions.splice(i,1);renderConditionRows()}
 function clearReportConditions(){reportConditions=[];renderConditionRows()}
+// Report conditions: family-scoped values are inherited from the actual family head,
+// while person-scoped conditions always inspect the current person record.
+const REPORT_FAMILY_FIELDS=new Set(["اسم رب الأسرة","رقم هوية الأسرة","رقم الجوال","العنوان","داخل/خارج المخيم","حالة اكتمال بيانات الأسرة","المحافظة الأصلية","نوع السكن الحالي","حالة المسكن الأصلي","عدد أفراد الأسرة","بيانات ناقصة"]);
+function reportConditionValue(row,field){
+ const family=familyPeople(row);
+ const head=family.find(x=>smartStatusNorm(x["صلة القرابة"])==="رب الاسره")||family[0]||row;
+ if(field==="العمر")return ageOf(row);
+ if(field==="عدد أفراد الأسرة")return familyCount(row);
+ if(field==="بيانات ناقصة")return familyStatus(family).status!=="مكتملة"?"نعم":"لا";
+ if(field==="حالة اكتمال بيانات الأسرة")return head["حالة اكتمال بيانات الأسرة"]||familyStatus(family).status;
+ if(field==="إصابة؟")return row["إصابة؟"]??row["إصابة?"];
+ if(REPORT_FAMILY_FIELDS.has(field))return head[field]??row[field];
+ return row[field];
+}
+function reportConditionNormalize(v){return String(v??"").normalize("NFKC").replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))).replace(/[ًٌٍَُِّْـٰ]/g,"").replace(/[أإآٱ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/\s+/g," ").trim().toLowerCase()}
 function renderConditionRows(){
- const box=document.getElementById("conditionRows"); if(!box)return;
+ const box=document.getElementById("conditionRows");if(!box)return;
  const fields=conditionFieldOptions();
- const ops=`<option value="contains">يحتوي على</option><option value="eq">يساوي</option><option value="neq">لا يساوي</option><option value="min">أكبر أو يساوي</option><option value="max">أصغر أو يساوي</option><option value="filled">معبأ</option><option value="empty">فارغ</option>`;
+ const ops=[["contains","يحتوي على"],["eq","يساوي"],["neq","لا يساوي"],["min","أكبر أو يساوي"],["max","أصغر أو يساوي"],["filled","معبأ"],["empty","فارغ"]];
  box.innerHTML=reportConditions.map((c,i)=>`<div class="condition-row">
-   <div class="field"><label>الحقل</label><select onchange="reportConditions[${i}].field=this.value;renderConditionRows()">${fields.map(([v,l])=>`<option value="${esc(v)}" ${c.field===v?"selected":""}>${esc(l)}</option>`).join("")}</select></div>
-   <div class="field"><label>العملية</label><select onchange="reportConditions[${i}].op=this.value;renderConditionRows()">${ops}</select></div>
-   <div class="field condition-value"><label>القيمة</label><input value="${esc(c.value)}" oninput="reportConditions[${i}].value=this.value" ${["filled","empty"].includes(c.op)?"disabled":""}></div>
-   <button class="btn danger" onclick="removeReportCondition(${i})">حذف</button>
- </div>`).join("") || '<div class="empty" style="padding:15px">لم تتم إضافة شروط متقدمة. يمكنك الاعتماد على الشروط الأساسية أعلاه.</div>';
+  <div class="field"><label>الحقل</label><select aria-label="حقل الشرط ${i+1}" onchange="reportConditions[${i}].field=this.value;renderConditionRows()">${fields.map(([v,l])=>`<option value="${esc(v)}" ${c.field===v?"selected":""}>${esc(l)}</option>`).join("")}</select></div>
+  <div class="field"><label>العملية</label><select aria-label="عملية الشرط ${i+1}" onchange="reportConditions[${i}].op=this.value;renderConditionRows()">${ops.map(([v,l])=>`<option value="${v}" ${c.op===v?"selected":""}>${l}</option>`).join("")}</select></div>
+  <div class="field condition-value"><label>القيمة</label><input aria-label="قيمة الشرط ${i+1}" value="${esc(c.value??"")}" oninput="reportConditions[${i}].value=this.value" ${["filled","empty"].includes(c.op)?"disabled":""}></div>
+  <button class="btn danger" type="button" onclick="removeReportCondition(${i})">حذف</button>
+ </div>`).join("")||'<div class="empty" style="padding:15px">لم تتم إضافة شروط متقدمة. يمكنك الاعتماد على الشروط الأساسية أعلاه.</div>';
 }
 function conditionPass(r,c){
- let v=c.field==="العمر"?ageOf(r):c.field==="عدد أفراد الأسرة"?familyCount(r):c.field==="إصابة؟"?(r["إصابة؟"]||r["إصابة?"]):c.field==="بيانات ناقصة"?familyStatus(familyMap().get(r["اسم رب الأسرة"])||[]).status!=="مكتملة":r[c.field];
- const target=c.value;
- if(c.field==="بيانات ناقصة")v=v?"نعم":"لا";
- if(c.op==="filled")return filled(v);
- if(c.op==="empty")return !filled(v);
- if(c.op==="min")return Number(v)>=Number(target);
- if(c.op==="max")return Number(v)<=Number(target);
- if(c.op==="eq")return norm(v)===norm(target);
- if(c.op==="neq")return norm(v)!==norm(target);
- return norm(v).toLowerCase().includes(norm(target).toLowerCase());
+ if(!c||!c.field)return true;
+ const v=reportConditionValue(r,c.field),target=c.value??"",op=c.op||"contains";
+ if(op==="filled")return v!==null&&v!==undefined&&String(v).trim()!=="";
+ if(op==="empty")return v===null||v===undefined||String(v).trim()==="";
+ if(["min","max"].includes(op)){
+  if(v===null||v===undefined||String(v).trim()===""||String(target).trim()==="")return false;
+  const number=Number(reportConditionNormalize(v)),limit=Number(reportConditionNormalize(target));
+  if(!Number.isFinite(number)||!Number.isFinite(limit))return false;
+  return op==="min"?number>=limit:number<=limit;
+ }
+ const actual=reportConditionNormalize(v),expected=reportConditionNormalize(target);
+ if(op==="eq")return actual===expected;
+ if(op==="neq")return actual!==expected;
+ return actual.includes(expected);
 }
 function applyAdvancedConditions(r){
- if(!reportConditions.length)return true;
+ const conditions=reportConditions.filter(c=>c&&c.field);
+ if(!conditions.length)return true;
  const mode=document.querySelector('input[name="conditionMode"]:checked')?.value||"and";
- const results=reportConditions.map(c=>conditionPass(r,c));
- return mode==="or"?results.some(Boolean):results.every(Boolean);
+ return mode==="or"?conditions.some(c=>conditionPass(r,c)):conditions.every(c=>conditionPass(r,c));
 }
 function runCustomReport(){
  const name=(document.getElementById("cr_name").value||"").trim()||"كشف مصنف";
@@ -1472,7 +1491,7 @@ function runCustomReport(){
  });
  const colsForScope=reportColumns();
  if(reportUsesOnlyFamilyLevelColumns(colsForScope)) classifiedRows=uniqueFamilyRows(classifiedRows);
- else if(reportConditions.length>0 && reportConditions.every(c=>["داخل/خارج المخيم","اسم رب الأسرة","رقم هوية الأسرة","رقم الجوال","العنوان","حالة اكتمال بيانات الأسرة","المحافظة الأصلية","حالة المسكن الأصلي","نوع السكن الحالي","عدد أفراد الأسرة"].includes(c.field))) classifiedRows=uniqueFamilyRows(classifiedRows);
+
  const sort=document.getElementById("cr_sort").value;
  classifiedRows.sort((a,b)=>sort==="name"?(a["اسم الفرد"]||"").localeCompare(b["اسم الفرد"]||"","ar"):sort==="age"?(ageOf(a)??999)-(ageOf(b)??999):(a["اسم رب الأسرة"]||"").localeCompare(b["اسم رب الأسرة"]||"","ar"));
  renderClassified(); toast(`تم إنشاء ${name} — ${classifiedRows.length} سجل`);
@@ -4418,3 +4437,28 @@ function fundExport(){
  try{downloadXLSX(matrix,'كشف_صندوق_أبو_عريبان_'+scope+'_'+month+'.xlsx',{headerRow:6,title:'كشف '+titles[scope]});toast('تم تصدير '+titles[scope]+' بصيغة Excel XLSX');}
  catch(e){console.error(e);alert('تعذر تصدير كشف Excel: '+(e?.message||'خطأ غير معروف'));}
 }
+
+/* Interaction repair: route the two critical actions through their existing app functions.
+   Capture prevents competing UI-only listeners from swallowing a tap. */
+(function(){
+ 'use strict';
+ document.addEventListener('click',function(e){
+  const button=e.target.closest('button');if(!button)return;
+  const add=button.matches('.top .actions button[onclick="openFamilyModal()"],.family-add-btn,[data-v59-action="add-family"],[data-home-op="family-add"]');
+  const search=button.matches('.v59-search-open,[data-v59-action="search"],[data-home-op="search"]');
+  if(!add&&!search)return;
+  e.preventDefault();e.stopImmediatePropagation();
+  try{
+   if(add){
+    if(typeof appReadOnly!=='undefined'&&appReadOnly===true){if(typeof toast==='function')toast('جهاز العرض للقراءة فقط');return;}
+    if(typeof openFamilyModal==='function')openFamilyModal();
+    else throw new Error('تعذر تحميل نموذج إضافة عائلة');
+   }else{
+    const palette=document.getElementById('v59Palette');
+    if(palette){palette.classList.add('open');palette.setAttribute('aria-hidden','false');const input=palette.querySelector('#v59PaletteInput');if(input){input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();}}
+    else if(typeof showView==='function')showView('familySearch');
+    else throw new Error('تعذر فتح البحث');
+   }
+  }catch(err){console.error('Moood critical action',err);if(typeof toast==='function')toast('تعذر فتح الإجراء، أعد تحميل الصفحة وحاول مجدداً');}
+ },true);
+})();
