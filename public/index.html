@@ -268,6 +268,13 @@ th,.table th{font-weight:700}
 @media(max-width:350px){#families .family-admin-tools{grid-template-columns:1fr}}
 @media print{#families .family-admin-hero,#families .family-overview{display:none!important}}
 
+
+/* Families phase 2 — compact mobile-first layout */
+.family-filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0 10px}.family-filter-bar #familyResultsCount{margin-inline-end:auto;font-weight:750;color:var(--text)}
+.family-main-filters{display:grid!important;grid-template-columns:minmax(180px,2fr) minmax(120px,1fr) minmax(120px,1fr)!important;gap:10px!important}
+.family-advanced-filters:not([hidden]){display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0;padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--card)}
+.familybox.family-v2{padding:15px;margin:10px 0;border-radius:17px}.family-v2 .familyrow{align-items:flex-start;gap:12px}.family-v2 .familytitle{font-size:clamp(15px,3.8vw,19px);line-height:1.7;overflow-wrap:anywhere}.family-v2 .family-v2-meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:9px;font-size:12px}.family-v2 .family-v2-meta span{unicode-bidi:plaintext}.family-v2 .family-v2-progress{height:5px;background:var(--border);border-radius:10px;overflow:hidden;margin-top:11px}.family-v2 .family-v2-progress i{display:block;height:100%;background:#16a34a;border-radius:10px}.family-v2 .family-v2-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.family-v2 .family-v2-actions .btn{font-size:12px;padding:9px 12px}.family-v2 details.family-v2-details{margin-top:12px;border-top:1px solid var(--border);padding-top:9px}.family-v2 details.family-v2-details summary{cursor:pointer;font-weight:700}.family-v2 .memberlist{margin-top:9px}.family-v2 .family-v2-missing{font-size:12px;margin-top:9px;color:#a16207;overflow-wrap:anywhere}
+@media(max-width:680px){.family-main-filters{grid-template-columns:repeat(2,minmax(0,1fr))!important}.family-main-filters .field:first-child{grid-column:1/-1}.family-advanced-filters:not([hidden]){grid-template-columns:1fr}.family-v2 .familyrow{display:block}.family-v2 .family-v2-actions{width:100%}.family-v2 .family-v2-actions .btn{flex:1 1 auto}.family-filter-bar .btn{padding:8px 10px;font-size:12px}}
 </style>
 <style>
 .family-search-card{margin-bottom:18px}
@@ -1007,10 +1014,16 @@ h3,h4,h5,h6{font-size:var(--type-md);font-weight:600;line-height:1.55;}
  <div class="family-overview-card"><span>جزئية</span><strong id="familyStatPartial">—</strong></div>
  <div class="family-overview-card"><span>ناقصة</span><strong id="familyStatMissing">—</strong></div>
 </div>
-<div class="filters no-print" style="grid-template-columns:2fr 1fr 1fr">
-<div class="field"><label>بحث عن عائلة</label><input id="fq" oninput="renderFamilies()" placeholder="اسم رب الأسرة أو رقم الهوية أو الجوال"/></div>
+<div class="family-filter-bar no-print"><span id="familyResultsCount" aria-live="polite">نتائج العائلات</span><button class="btn" type="button" onclick="resetFamilyFilters()">مسح الفلاتر</button><button class="btn" type="button" onclick="toggleFamilyAdvanced()" aria-controls="familyAdvancedFilters" aria-expanded="false" id="familyAdvancedToggle">فلاتر متقدمة ▾</button></div>
+<div class="filters family-main-filters no-print">
+<div class="field"><label>بحث عن عائلة</label><input id="fq" oninput="scheduleFamilyRender()" placeholder="الاسم أو الهوية أو الجوال الأساسي أو البديل"/></div>
 <div class="field"><label>عدد أفراد الأسرة</label><select id="fsize" onchange="renderFamilies()"><option value="">الكل</option><option value="1">فرد واحد</option><option value="2-4">2 - 4</option><option value="5-7">5 - 7</option><option value="8">8 فأكثر</option></select></div>
 <div class="field"><label>حالة البيانات</label><select id="fstatus" onchange="renderFamilies()"><option value="">كل الحالات</option><option value="مكتملة">مكتملة</option><option value="جزئية">جزئية</option><option value="غير مكتملة">ناقصة</option></select></div>
+</div>
+<div id="familyAdvancedFilters" class="family-advanced-filters no-print" hidden>
+<div class="field"><label>مكان الإقامة</label><select id="finside" onchange="renderFamiliesFast()"><option value="">الكل</option><option value="داخل المخيم">داخل المخيم</option><option value="خارج المخيم">خارج المخيم</option></select></div>
+<div class="field"><label>نوع السكن الحالي</label><select id="fhousing" onchange="renderFamiliesFast()"><option value="">جميع الأنواع</option></select></div>
+<div class="field"><label>ترتيب النتائج</label><select id="fsort" onchange="renderFamiliesFast()"><option value="original">الترتيب الأصلي</option><option value="name">الاسم أبجدياً</option><option value="members-desc">الأفراد: الأكثر أولاً</option><option value="members-asc">الأفراد: الأقل أولاً</option><option value="completion">الأقل اكتمالاً أولاً</option></select></div>
 </div>
 <div class="notice no-print" style="margin-top:10px">الأخضر = مكتملة، الأصفر = جزئية، الأحمر = ناقصة. الحالة تُحسب تلقائياً من البيانات الفعلية ويمكن أن تتغير فور التعديل.</div>
 <div id="familyList"></div>

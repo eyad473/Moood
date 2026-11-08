@@ -347,13 +347,12 @@ function closeModal(id){document.getElementById(id).classList.remove("show")}
 document.querySelectorAll(".modal").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)m.classList.remove("show")}));
 
 function renderAll(){applyFilters();renderFamiliesFast();renderDashboard()}
-let __familyCache={key:"",html:""};
-function renderFamiliesFast(){
- const q=(document.getElementById("fq")?.value||"").toLowerCase().trim(),fs=document.getElementById("fsize")?.value||"",st=document.getElementById("fstatus")?.value||"";
- const key=q+"|"+fs+"|"+st+"|"+data.length+"|"+(data[0]?.__syncId||"")+"|"+(data[data.length-1]?.__syncId||"");
- if(__familyCache.key===key){updateFamilyOverview();document.getElementById("familyList").innerHTML=__familyCache.html;return;}
- renderFamiliesCore(); __familyCache={key,html:document.getElementById("familyList").innerHTML};
-}
+let __familySearchTimer=null;
+function scheduleFamilyRender(){clearTimeout(__familySearchTimer);__familySearchTimer=setTimeout(renderFamiliesFast,160)}
+function toggleFamilyAdvanced(){const el=document.getElementById("familyAdvancedFilters"),btn=document.getElementById("familyAdvancedToggle");if(!el)return;el.hidden=!el.hidden;btn?.setAttribute("aria-expanded",String(!el.hidden))}
+function resetFamilyFilters(){["fq","fsize","fstatus","finside","fhousing","fsort"].forEach(id=>{const el=document.getElementById(id);if(el)el.value=id==="fsort"?"original":""});renderFamiliesFast()}
+function familySearchNormalize(value){return String(value??"").normalize("NFKC").toLowerCase().replace(/[\u064b-\u065f\u0670\u0640]/g,"").replace(/[أإآٱ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/[٠-٩]/g,d=>String(d.charCodeAt(0)-1632)).replace(/[۰-۹]/g,d=>String(d.charCodeAt(0)-1776)).replace(/\s+/g," ").trim()}
+function renderFamiliesFast(){renderFamiliesCore()}
 
 function renderDashboard(){
  const fm=familyMap(), inside=new Set(), complete=new Set();
@@ -1285,35 +1284,40 @@ function updateFamilyOverview(){
  }catch(err){console.warn("Family overview unavailable",err)}
 }
 function renderFamiliesCore(){
-  updateFamilyOverview();
-  const q=(document.getElementById("fq")?.value||"").toLowerCase().trim();
-  const fs=document.getElementById("fsize")?.value||"";
-  const st=document.getElementById("fstatus")?.value||"";
-  const m=familyMap(); let arr=[...m.entries()];
-  arr=arr.filter(([h,rows])=>{
-    const first=rows[0]||{}, blob=[h,first["رقم هوية الأسرة"],first["رقم الجوال"],first["العنوان"]].join(" ").toLowerCase();
-    if(q&&!blob.includes(q))return false;
-    const n=familyDisplayCount(rows);
-    if(fs==="1"&&n!==1)return false;if(fs==="2-4"&&(n<2||n>4))return false;if(fs==="5-7"&&(n<5||n>7))return false;if(fs==="8"&&n<8)return false;
-    const status=familyStatus(rows).status;
-    if(st && status!==st)return false;
-    return true;
-  });
-  document.getElementById("familyList").innerHTML=arr.map(([h,rows])=>{
-    const r=rows[0]||{}, key=encodeURIComponent(h), a=familyStatus(rows), cls=familyClass(a.status);
-    const missing=a.missing.slice(0,3).map(esc).join("، ");
-    return `<div class="familybox ${cls}">
-      <div class="familyrow">
-       <div style="min-width:0">
-        <div class="familytitle">${esc(h)} ${statusBadge(a.status)}</div>
-        <div class="muted">هوية الأسرة: ${esc(r["رقم هوية الأسرة"]||"—")} · الجوال: ${esc(r["رقم الجوال"]||"—")} · عدد الأفراد: <b>${familyDisplayCount(rows)}</b> · اكتمال: <b>${a.score}%</b></div>
-        ${a.status!=="مكتملة"?`<div style="margin-top:5px;color:#92400e;font-size:11px">أهم النواقص: ${missing||"راجع البيانات"}</div>`:""}
-       </div>
-       <div class="actions no-print"><button class="btn" onclick="editFamily(decodeURIComponent('${key}'))">تعديل الأسرة</button><button class="btn primary" onclick="addMemberToFamily(decodeURIComponent('${key}'))">＋ فرد</button><button class="btn danger" onclick="deleteFamily(decodeURIComponent('${key}'))">حذف العائلة</button></div>
-      </div>
-      <div class="memberlist">${rows.map(x=>`<div class="member"><span>${esc(x["اسم الفرد"]||"")} — ${esc(x["صلة القرابة"]||"")} — ${esc(x["رقم هوية الفرد"]||"")} ${((x["إصابة؟"]||x["إصابة?"])==="نعم")?" · إصابة":""}${x["إعاقة؟"]==="نعم"?" · إعاقة":""}</span><span class="no-print"><button class="pagebtn" onclick="editPerson(${data.indexOf(x)})">تعديل</button></span></div>`).join("")}</div>
-    </div>`;
-  }).join("") || `<div class="empty">لا توجد عائلات مطابقة</div>`;
+ updateFamilyOverview();
+ const val=id=>document.getElementById(id)?.value||"";
+ const q=familySearchNormalize(val("fq")),fs=val("fsize"),st=val("fstatus"),inside=val("finside"),housing=val("fhousing"),sort=val("fsort");
+ let arr=[...familyMap().entries()];
+ const housingSelect=document.getElementById("fhousing");
+ if(housingSelect){const values=[...new Set(arr.map(([,rows])=>String((rows[0]||{})["نوع السكن الحالي"]||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"ar"));const current=housingSelect.value;const signature=values.join("\u0001");if(housingSelect.dataset.signature!==signature){housingSelect.innerHTML='<option value="">جميع الأنواع</option>'+values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");housingSelect.dataset.signature=signature;housingSelect.value=values.includes(current)?current:""}}
+ arr=arr.filter(([h,rows])=>{
+  const r=rows[0]||{};
+  const searchable=[h,...rows.map(x=>x["اسم رب الأسرة"]),r["رقم هوية الأسرة"],r["رقم الجوال"],r["رقم جوال بديل"],r["العنوان"]].map(familySearchNormalize).join(" ");
+  if(q&&!searchable.includes(q))return false;
+  const n=familyDisplayCount(rows);
+  if(fs==="1"&&n!==1)return false;if(fs==="2-4"&&(n<2||n>4))return false;if(fs==="5-7"&&(n<5||n>7))return false;if(fs==="8"&&n<8)return false;
+  if(st&&familyStatus(rows).status!==st)return false;
+  if(inside&&r["داخل/خارج المخيم"]!==inside)return false;
+  if(housing&&r["نوع السكن الحالي"]!==housing)return false;
+  return true;
+ });
+ if(sort==="name")arr.sort((a,b)=>a[0].localeCompare(b[0],"ar"));
+ else if(sort==="members-desc")arr.sort((a,b)=>familyDisplayCount(b[1])-familyDisplayCount(a[1]));
+ else if(sort==="members-asc")arr.sort((a,b)=>familyDisplayCount(a[1])-familyDisplayCount(b[1]));
+ else if(sort==="completion")arr.sort((a,b)=>familyStatus(a[1]).score-familyStatus(b[1]).score);
+ const countEl=document.getElementById("familyResultsCount");if(countEl)countEl.textContent=`عرض ${arr.length.toLocaleString("ar-EG")} من ${familyMap().size.toLocaleString("ar-EG")} عائلة`;
+ document.getElementById("familyList").innerHTML=arr.map(([h,rows],i)=>{
+  const r=rows[0]||{},key=encodeURIComponent(h),a=familyStatus(rows),cls=familyClass(a.status),missing=a.missing.slice(0,3).map(esc).join("، ");
+  const members=rows.map(x=>`<div class="member"><span>${esc(x["اسم الفرد"]||"")} — ${esc(x["صلة القرابة"]||"")} — ${esc(x["رقم هوية الفرد"]||"")}</span><span class="no-print"><button class="pagebtn" onclick="editPerson(${data.indexOf(x)})">تعديل</button></span></div>`).join("");
+  return `<article class="familybox family-v2 ${cls}">
+    <div class="familytitle">${esc(h)} ${statusBadge(a.status)}</div>
+    <div class="family-v2-meta muted"><span>الهوية: <b dir="ltr">${esc(r["رقم هوية الأسرة"]||"—")}</b></span><span>الجوال: <b dir="ltr">${esc(r["رقم الجوال"]||"—")}</b></span><span>الأفراد: <b>${familyDisplayCount(rows)}</b></span><span>الاكتمال: <b>${a.score}%</b></span></div>
+    <div class="family-v2-progress" aria-label="اكتمال البيانات ${a.score}%"><i style="width:${Math.max(0,Math.min(100,a.score))}%"></i></div>
+    ${a.status!=="مكتملة"?`<div class="family-v2-missing">أبرز النواقص: ${missing||"راجع بيانات الأسرة"}</div>`:""}
+    <div class="family-v2-actions no-print"><button class="btn primary" onclick="editFamily(decodeURIComponent('${key}'))">تعديل الأسرة</button><button class="btn" onclick="addMemberToFamily(decodeURIComponent('${key}'))">＋ إضافة فرد</button></div>
+    <details class="family-v2-details"><summary>أفراد الأسرة (${rows.length}) والإجراءات الإضافية</summary><div class="memberlist">${members}</div><div class="no-print" style="margin-top:10px"><button class="btn danger" onclick="deleteFamily(decodeURIComponent('${key}'))">حذف العائلة</button></div></details>
+  </article>`;
+ }).join("")||'<div class="empty">لا توجد عائلات مطابقة للبحث والفلاتر الحالية</div>';
 }
 
 function renderDashboard(){
