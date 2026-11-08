@@ -918,6 +918,24 @@ html[data-theme="dark"] #dashboard .home-stat-icon{background:rgba(125,211,252,.
 @media(max-width:350px){#dashboard .home-ops-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(prefers-reduced-motion:reduce){#dashboard .home-ops-grid button{transition:none}}
 </style>
+<style id="home-phase3-analysis-style">
+#dashboard .home-analysis-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:15px 0}
+#dashboard .home-analysis-item{min-width:0;padding:14px 15px;border:1px solid var(--line);border-radius:16px;background:var(--card);display:flex;flex-direction:column;gap:7px;box-shadow:var(--shadow)}
+#dashboard .home-analysis-item span{font-size:12px;color:var(--muted);font-weight:700}
+#dashboard .home-analysis-item strong{font-size:19px;color:var(--text);overflow-wrap:anywhere;line-height:1.5}
+#dashboard .home-analysis-item small{font-size:10px;color:var(--muted);line-height:1.7}
+#dashboard .dashboard-charts{gap:15px}
+#dashboard .dashboard-charts .chart-card{min-width:0;overflow:hidden;border-radius:18px}
+#dashboard .dashboard-charts .chart-head{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
+#dashboard .dashboard-charts .chart-head h2{line-height:1.6}
+#dashboard .chart-main-grid{min-width:0}
+#dashboard .chart-svgbox{min-width:0;overflow:hidden}
+#dashboard .chart-svgbox svg{max-width:100%;height:auto;display:block}
+#dashboard .health-bars .health-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#dashboard .health-bars .health-top b{font-variant-numeric:tabular-nums}
+@media(max-width:650px){#dashboard .home-analysis-strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}#dashboard .home-analysis-item{padding:11px}#dashboard .home-analysis-item strong{font-size:16px}#dashboard .home-analysis-item:last-child{grid-column:1/-1}#dashboard .chart-main-grid{grid-template-columns:minmax(0,1fr)!important}#dashboard .chart-svgbox svg{width:100%}}
+@media(max-width:360px){#dashboard .home-analysis-strip{grid-template-columns:minmax(0,1fr)}#dashboard .home-analysis-item:last-child{grid-column:auto}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -1048,6 +1066,11 @@ html[data-theme="dark"] #dashboard .home-stat-icon{background:rgba(125,211,252,.
 <div class="mini-stat"><span class="muted">عائلات ناقصة</span><b id="dashIncomplete">0</b><button class="btn no-print" onclick="filterFamiliesStatus('غير مكتملة')">عرض</button></div>
 <div class="mini-stat"><span class="muted">أخطاء تحتاج مراجعة</span><b id="dashErrors">0</b><button class="btn no-print" onclick="openQualityModal()">مراجعة</button></div>
 </div>
+<section class="home-analysis-strip" aria-label="ملخص التحليلات السكانية">
+ <div class="home-analysis-item"><span>عائلات خارج المخيم</span><strong id="homeOutsideCount">—</strong><small>من إجمالي العائلات المسجلة</small></div>
+ <div class="home-analysis-item"><span>التوزيع السكاني</span><strong id="homePopulationSummary">بانتظار البيانات</strong><small>ذكور وإناث وفئات عمرية</small></div>
+ <div class="home-analysis-item"><span>الحالات المسجلة</span><strong id="homeHealthSummary">بانتظار البيانات</strong><small>قد تنطبق عدة حالات على الفرد الواحد</small></div>
+</section>
 <div class="dashboard-charts">
 <div class="chart-card chart-wide">
 <div class="chart-head"><div><h2>نظرة سريعة على التركيبة السكانية</h2><p>توزيع أفراد المخيم حسب الجنس والفئات العمرية</p></div><span class="chart-chip">تحليل مباشر</span></div>
@@ -1840,6 +1863,27 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
  function act(type){try{switch(type){case 'family-add':return typeof openFamilyModal==='function'?openFamilyModal():undefined;case 'person-add':return typeof openPersonModal==='function'?openPersonModal():undefined;case 'families':return typeof showView==='function'?showView('families'):undefined;case 'family-search':return typeof showView==='function'?showView('familySearch'):undefined;case 'support':return typeof window.openSupportInbox==='function'?window.openSupportInbox():undefined;case 'excel':return typeof exportExcel==='function'?exportExcel():undefined;case 'backup':return typeof backup==='function'?backup():undefined;case 'fund':return typeof showView==='function'?showView('campFund'):undefined;case 'quality':return typeof openQualityModal==='function'?openQualityModal():undefined;}}catch(err){console.error('Home shortcut:',err);if(typeof toast==='function')toast('تعذر فتح الإجراء، يرجى المحاولة من القائمة الرئيسية.');}}
  document.addEventListener('click',e=>{const btn=e.target.closest('[data-home-op]');if(btn)act(btn.dataset.homeOp)});
  document.addEventListener('DOMContentLoaded',()=>{update();const ids=['sFamilies','sPeople','sInside','sComplete','dashPartial','dashIncomplete','dashErrors'];let scheduled=false;const observer=new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;update()})});ids.forEach(id=>{if($(id))observer.observe($(id),{childList:true,characterData:true,subtree:true})});});
+})();
+</script>
+<script id="home-phase3-analysis-behavior">
+(function(){'use strict';
+ const $=id=>document.getElementById(id);
+ const number=id=>{const raw=$(id)?.textContent||'';if(!/[0-9٠-٩۰-۹]/.test(raw))return null;const v=raw.replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[٬,\s]/g,'').replace(/[^0-9.]/g,'');const n=Number(v);return Number.isFinite(n)?n:null};
+ const fmt=n=>n.toLocaleString('ar-EG');
+ function update(){
+  const families=number('sFamilies'),inside=number('sInside'),people=number('sPeople');
+  const outside=$('homeOutsideCount'),pop=$('homePopulationSummary'),health=$('homeHealthSummary');
+  if(!outside||!pop||!health)return;
+  outside.textContent=families===null||inside===null||inside>families?'غير متاح':fmt(families-inside);
+  if(people===null){pop.textContent='بانتظار البيانات';health.textContent='بانتظار البيانات';return}
+  const genders=$('genderChart');const labels=genders?.querySelectorAll('svg g[transform="translate(250 62)"] text')||[];
+  pop.textContent=people===0?'لا توجد سجلات':fmt(people)+' فرد مسجل';
+  const rows=Array.from($('healthChart')?.querySelectorAll('.health-item')||[]);
+  let total=0,valid=0;for(const row of rows){const b=row.querySelector('.health-top b');if(!b)continue;const n=Number(b.textContent.replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[٬,\s]/g,''));if(Number.isFinite(n)){total+=n;valid++}}
+  health.textContent=people===0?'لا توجد سجلات':valid?fmt(total)+' حالة مصنفة':'غير متاح';
+ }
+ function setup(){const ids=['sFamilies','sInside','sPeople','healthChart'];let queued=false;const observer=new MutationObserver(()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;update()})});ids.forEach(id=>{const el=$(id);if(el)observer.observe(el,{childList:true,subtree:true,characterData:true})});update()}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
 })();
 </script>
 <script src="./app.js?v=71.0-admin-login"></script>
