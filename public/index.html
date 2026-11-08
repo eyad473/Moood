@@ -991,6 +991,33 @@ button>.mo-icon,h2>.mo-icon,.fund-section-title .mo-icon{width:19px;height:19px;
 .home-ops-grid button>span .mo-icon{width:24px;height:24px}
 .dist-campaign-result-icon .mo-icon{width:20px;height:20px}
 </style>
+
+<style id="moood-interaction-motion-v1">
+/* Phase 1: presentation-only motion tokens; no data or event handlers changed. */
+:root{--motion-fast:110ms;--motion-normal:180ms;--motion-slow:240ms;--motion-ease:cubic-bezier(.2,.8,.2,1);--motion-focus:rgba(37,99,235,.28)}
+/* Touch feedback works without hover and without modifying click handlers. */
+button,.btn,[role="button"],.tabs button,.nav-item,.bottom-nav button{
+  -webkit-tap-highlight-color:transparent;
+  transition:transform var(--motion-fast) var(--motion-ease),background-color var(--motion-normal) ease,border-color var(--motion-normal) ease,color var(--motion-normal) ease,box-shadow var(--motion-normal) ease;
+  touch-action:manipulation;
+}
+button:not(:disabled):active,.btn:not(:disabled):active,[role="button"]:active{
+  transform:scale(.98);
+}
+button:focus-visible,.btn:focus-visible,[role="button"]:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:2px solid #2563eb;outline-offset:3px;box-shadow:0 0 0 4px var(--motion-focus);
+}
+input,select,textarea{transition:border-color var(--motion-normal) ease,box-shadow var(--motion-normal) ease,background-color var(--motion-normal) ease}
+button:disabled,.btn:disabled{cursor:not-allowed;opacity:.65}
+/* Cards with an actual click affordance only; static data cards stay still. */
+.card[onclick],.card[role="button"],a.card{transition:transform var(--motion-normal) var(--motion-ease),box-shadow var(--motion-normal) ease,border-color var(--motion-normal) ease}
+@media(hover:hover) and (pointer:fine){.card[onclick]:hover,.card[role="button"]:hover,a.card:hover{transform:translateY(-2px)}}
+/* Existing show/hide mechanics remain authoritative. */
+.modal.show .modalbox{animation:moood-dialog-enter var(--motion-slow) var(--motion-ease) both}
+@keyframes moood-dialog-enter{from{opacity:.65;transform:translateY(9px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+@media print{*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
 </head>
 <body>
 <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"><defs><symbol id="mo-icon-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></symbol>
