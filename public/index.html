@@ -12,7 +12,7 @@
 <meta content="#0f172a" name="theme-color"/>
 <title>إدارة وكشف المخيمات</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Tajawal:wght@400;500;600;700;800&display=swap');
 :root{--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#64748b;--line:#e5e7eb;--primary:#2563eb;--primary2:#1d4ed8;--danger:#dc2626;--ok:#059669;--warn:#d97706;--shadow:0 8px 30px rgba(15,23,42,.07);--radius:18px}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Cairo,Tajawal,Arial,sans-serif}
 button,input,select,textarea{font:inherit}button{cursor:pointer}
@@ -224,6 +224,23 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}
 #campFund .fund-table-scroll{margin-top:14px}
 @media(max-width:720px){#campFund .fund-head{padding:17px!important}#campFund .fund-head h2{font-size:19px!important}#campFund .fund-panel{padding:14px!important}#campFund .fund-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}#campFund .fund-stat{padding:13px 11px!important;min-height:78px!important}#campFund .fund-stat strong{font-size:21px!important}#campFund .fund-toolbar{grid-template-columns:1fr 1fr!important}#campFund .fund-toolbar>.fund-field{grid-column:1/-1!important}#campFund .fund-form{grid-template-columns:1fr!important}#campFund .fund-form .fund-search{grid-column:auto!important}#campFund .fund-export-controls{grid-template-columns:1fr!important}#campFund .fund-export-button{grid-column:auto!important}#campFund .fund-section-title span{font-size:17px}}
 
+
+/* Abu Oreiban — unified Arabic typography system (2026-11) */
+:root{--font-heading:'Cairo',Arial,sans-serif;--font-body:'Tajawal','Cairo',Arial,sans-serif}
+html{font-synthesis:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{font-family:var(--font-body);font-size:15px;font-weight:500;line-height:1.75;letter-spacing:0}
+h1,h2,h3,h4,h5,h6,.brand h1,.cardhead,.logo{font-family:var(--font-heading);line-height:1.5;letter-spacing:0}
+h1{font-weight:800}h2,h3{font-weight:700}
+.brand h1{font-size:clamp(17px,2vw,21px);font-weight:800}
+.brand small,.muted,.label,.sub,small{line-height:1.65}
+.btn,.tab,button,[role="button"]{font-family:var(--font-body);font-weight:700;line-height:1.45;letter-spacing:0}
+input,select,textarea{font-family:var(--font-body);font-size:15px;line-height:1.55}
+.table,table,td,th{font-family:var(--font-body);line-height:1.6}
+th,.table th{font-weight:700}
+.num{font-family:var(--font-heading);font-weight:800;line-height:1.35;font-variant-numeric:tabular-nums}
+.stat .label{font-size:13px;font-weight:600}
+.badge{font-family:var(--font-body);font-weight:700;line-height:1.45}
+@media(max-width:600px){body{font-size:14px;line-height:1.7}.brand h1{font-size:17px}.num{line-height:1.4}}
 </style>
 <style>
 .family-search-card{margin-bottom:18px}
