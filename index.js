@@ -1567,6 +1567,21 @@ async function fundVoid(request,env){
 async function fundLedgerSchema(env){
  await fundSchema(env);
  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS camp_fund_expenses(id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL CHECK(kind IN ('debt','operating')),payee TEXT NOT NULL,description TEXT NOT NULL,amount_agorot INTEGER NOT NULL CHECK(amount_agorot>0),created_at INTEGER NOT NULL,created_by TEXT NOT NULL,reference TEXT NOT NULL DEFAULT '')`).run();
+ // Older deployed versions may already have the table with fewer columns.
+ // Add only missing optional fields; never drop, replace, or reset existing transactions.
+ const info=await env.DB.prepare('PRAGMA table_info(camp_fund_expenses)').all();
+ const columns=new Set((info.results||[]).map(x=>x.name));
+ for(const [name,sql] of [
+  ['reference',`ALTER TABLE camp_fund_expenses ADD COLUMN reference TEXT NOT NULL DEFAULT ''`],
+  ['created_by',`ALTER TABLE camp_fund_expenses ADD COLUMN created_by TEXT NOT NULL DEFAULT 'legacy'`]
+ ]){
+  if(!columns.has(name)){
+   try{await env.DB.prepare(sql).run()}catch(e){
+    const check=await env.DB.prepare('PRAGMA table_info(camp_fund_expenses)').all();
+    if(!(check.results||[]).some(x=>x.name===name))throw e;
+   }
+  }
+ }
 }
 async function fundLedger(request,env){
  const auth=await fundAdmin(request,env);if(auth.error)return auth.error;
@@ -1982,7 +1997,9 @@ export default {
       if (env.ASSETS) return await env.ASSETS.fetch(request);
       return json({ ok: false, error: "واجهة التطبيق غير مفعلة: اربط Static Assets" }, 404);
     } catch (e) {
-      return json({ ok: false, error: "خطأ داخلي", detail: String(e?.message || e) }, 500);
+      const incidentId=crypto.randomUUID();
+      console.error('worker_internal_error',incidentId,url.pathname,String(e?.stack||e));
+      return json({ ok: false, error: "خطأ داخلي", code:"SERVER_ERROR", incidentId, detail: String(e?.message || e) }, 500);
     }
   }
 };
