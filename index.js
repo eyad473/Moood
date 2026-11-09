@@ -15,7 +15,7 @@ function json(data, status = 200, extra = {}) {
       ...JSON_HEADERS,
       "access-control-allow-origin": ALLOWED_ORIGIN,
       "access-control-allow-methods": "GET,POST,OPTIONS",
-      "access-control-allow-headers": "Content-Type, Authorization, X-Device-Id, X-Support-Session",
+      "access-control-allow-headers": "Content-Type, Authorization, X-Device-Id, X-Support-Session, X-Winter-Token",
       ...extra
     }
   });
@@ -1545,44 +1545,50 @@ async function fundSchema(env) {
   }
   await env.DB.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_fund_source_event ON camp_fund_payments(source_event_id) WHERE source_event_id IS NOT NULL`).run();
 }
-// Family contribution is based on the authoritative residence field, never on payment size.
-async function fundRequired(env,familyId){
- const row=await env.DB.prepare(`SELECT json_extract(data_json, '$."داخل/خارج المخيم"') AS residence FROM sync_records WHERE deleted=0 AND json_valid(data_json) AND CAST(json_extract(data_json, '$."رقم هوية الأسرة"') AS TEXT)=? LIMIT 1`).bind(familyId).first();
- const residence=String(row?.residence||'').trim();
- if(residence==='داخل المخيم')return 300;
- if(residence==='خارج المخيم')return 200;
- return null;
+// Residency is authoritative in sync_records; ambiguous values must never be billed automatically.
+function fundRateForResidence(value){const v=String(value||'').trim();return v==='داخل المخيم'?300:v==='خارج المخيم'?200:null;}
+async function fundFamilyRate(env,id){
+ const rows=await env.DB.prepare(`SELECT json_extract(data_json, '$."داخل/خارج المخيم"') AS residence FROM sync_records WHERE deleted=0 AND json_valid(data_json) AND CAST(json_extract(data_json, '$."رقم هوية الأسرة"') AS TEXT)=? LIMIT 100`).bind(id).all();
+ const values=new Set((rows.results||[]).map(r=>fundRateForResidence(r.residence)).filter(x=>x!==null));
+ return values.size===1? [...values][0]:null;
 }
 async function fundVoid(request,env){
  const auth=await fundAdmin(request,env);if(auth.error)return auth.error;
  let b;try{b=await request.json()}catch{return json({ok:false,error:'طلب غير صالح'},400)}
  const id=Number(b.id),reason=String(b.reason||'').trim();
- if(!Number.isSafeInteger(id)||id<1||reason.length<5||reason.length>400)return json({ok:false,error:'حدد العملية وسبب الإلغاء (5 أحرف على الأقل)'},400);
+ if(!Number.isSafeInteger(id)||id<1||reason.length<5||reason.length>500)return json({ok:false,error:'حدد الدفعة واكتب سبب إلغاء واضحاً (5 أحرف على الأقل)'},400);
  await fundSchema(env);
- const r=await env.DB.prepare(`UPDATE camp_fund_payments SET voided_at=?,voided_by=?,void_reason=? WHERE id=? AND voided_at IS NULL`).bind(Date.now(),auth.session.username||'admin',reason,id).run();
- if(!r.meta?.changes)return json({ok:false,error:'الدفعة غير موجودة أو ملغاة مسبقًا'},409);
- return json({ok:true});
+ const row=await env.DB.prepare('SELECT id,source_event_id FROM camp_fund_payments WHERE id=? AND voided_at IS NULL').bind(id).first();
+ if(!row)return json({ok:false,error:'الدفعة غير موجودة أو ملغاة مسبقاً'},409);
+ const result=await env.DB.prepare('UPDATE camp_fund_payments SET voided_at=?,voided_by=?,void_reason=? WHERE id=? AND voided_at IS NULL').bind(Date.now(),auth.session.username||'admin',reason,id).run();
+ if(result.meta?.changes!==1)return json({ok:false,error:'تغيرت الدفعة أثناء العملية؛ حدّث الكشف'},409);
+ return json({ok:true,id});
 }
-async function fundExpenseSchema(env){
- await env.DB.prepare(`CREATE TABLE IF NOT EXISTS camp_fund_expenses (id INTEGER PRIMARY KEY AUTOINCREMENT, amount_agorot INTEGER NOT NULL CHECK(amount_agorot>0), category TEXT NOT NULL, payee TEXT NOT NULL, reason TEXT NOT NULL, created_at INTEGER NOT NULL, created_by TEXT NOT NULL, voided_at INTEGER, void_reason TEXT)`).run();
+async function fundLedgerSchema(env){
+ await fundSchema(env);
+ await env.DB.prepare(`CREATE TABLE IF NOT EXISTS camp_fund_expenses(id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL CHECK(kind IN ('debt','operating')),payee TEXT NOT NULL,description TEXT NOT NULL,amount_agorot INTEGER NOT NULL CHECK(amount_agorot>0),created_at INTEGER NOT NULL,created_by TEXT NOT NULL,reference TEXT NOT NULL DEFAULT '')`).run();
 }
-async function fundExpenses(request,env){
+async function fundLedger(request,env){
  const auth=await fundAdmin(request,env);if(auth.error)return auth.error;
- await fundSchema(env);await fundExpenseSchema(env);
- if(request.method==='GET'){
-  const expenses=await env.DB.prepare(`SELECT * FROM camp_fund_expenses ORDER BY id DESC LIMIT 500`).all();
-  const income=await env.DB.prepare(`SELECT COALESCE(SUM(amount_agorot),0) total FROM camp_fund_payments WHERE voided_at IS NULL`).first();
-  const spent=await env.DB.prepare(`SELECT COALESCE(SUM(amount_agorot),0) total FROM camp_fund_expenses WHERE voided_at IS NULL`).first();
-  return json({ok:true,expenses:expenses.results||[],incomeAgorot:Number(income?.total||0),spentAgorot:Number(spent?.total||0),balanceAgorot:Number(income?.total||0)-Number(spent?.total||0)});
- }
+ await fundLedgerSchema(env);await winterClothingSchema(env);
+ const [income,expense,rows,clothing]=await Promise.all([
+ env.DB.prepare('SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_payments WHERE voided_at IS NULL').first(),
+ env.DB.prepare('SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_expenses').first(),
+ env.DB.prepare('SELECT * FROM camp_fund_expenses ORDER BY id DESC LIMIT 150').all(),
+ env.DB.prepare('SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_clothing_income WHERE voided_at IS NULL').first()]);
+ return json({ok:true,incomeAgorot:Number(income?.total||0)+Number(clothing?.total||0),contributionIncomeAgorot:Number(income?.total||0),clothingIncomeAgorot:Number(clothing?.total||0),expenseAgorot:Number(expense?.total||0),balanceAgorot:Number(income?.total||0)+Number(clothing?.total||0)-Number(expense?.total||0),expenses:rows.results||[]});
+}
+async function fundExpenseSave(request,env){
+ const auth=await fundAdmin(request,env);if(auth.error)return auth.error;
  let b;try{b=await request.json()}catch{return json({ok:false,error:'طلب غير صالح'},400)}
- const amount=Number(b.amountAgorot),category=String(b.category||''),payee=String(b.payee||'').trim(),reason=String(b.reason||'').trim();
- if(!['debt','operations','supplies','other'].includes(category)||!Number.isSafeInteger(amount)||amount<1||amount>100000000||payee.length<3||payee.length>150||reason.length<5||reason.length>500)return json({ok:false,error:'بيانات المصروف غير صالحة'},400);
- // Conditional SQL insert checks available balance atomically in D1.
- const r=await env.DB.prepare(`INSERT INTO camp_fund_expenses(amount_agorot,category,payee,reason,created_at,created_by)
- SELECT ?,?,?,?,?,? WHERE (SELECT COALESCE(SUM(amount_agorot),0) FROM camp_fund_payments WHERE voided_at IS NULL)-(SELECT COALESCE(SUM(amount_agorot),0) FROM camp_fund_expenses WHERE voided_at IS NULL)>=?`).bind(amount,category,payee,reason,Date.now(),auth.session.username||'admin',amount).run();
- if(!r.meta?.changes)return json({ok:false,error:'الرصيد المتاح لا يكفي للصرف'},409);
- return json({ok:true,id:r.meta?.last_row_id});
+ const kind=String(b.kind||''),payee=String(b.payee||'').trim(),description=String(b.description||'').trim(),reference=String(b.reference||'').trim(),amount=Number(b.amountAgorot);
+ if(!['debt','operating'].includes(kind)||payee.length<3||payee.length>150||description.length<8||description.length>500||reference.length>100||!Number.isSafeInteger(amount)||amount<1||amount>100000000)return json({ok:false,error:'بيانات المصروف غير صحيحة'},400);
+ await fundLedgerSchema(env);await winterClothingSchema(env);
+ // Conditional SQL INSERT enforces the balance against simultaneous expense submissions.
+ const result=await env.DB.prepare(`INSERT INTO camp_fund_expenses(kind,payee,description,amount_agorot,created_at,created_by,reference)
+ SELECT ?,?,?,?,?,?,? WHERE (SELECT COALESCE(SUM(amount_agorot),0) FROM camp_fund_payments WHERE voided_at IS NULL)+(SELECT COALESCE(SUM(amount_agorot),0) FROM camp_fund_clothing_income WHERE voided_at IS NULL)-(SELECT COALESCE(SUM(amount_agorot),0) FROM camp_fund_expenses)>=?`).bind(kind,payee,description,amount,Date.now(),auth.session.username||'admin',reference,amount).run();
+ if(result.meta?.changes!==1)return json({ok:false,error:'الرصيد المتاح غير كافٍ، لم يُسجل المصروف'},409);
+ return json({ok:true,id:result.meta?.last_row_id});
 }
 function fundMonth(v) { return /^20\d{2}-(0[1-9]|1[0-2])$/.test(String(v||"")) && String(v)>="2026-11"; }
 async function fundList(request,env) {
@@ -1605,8 +1611,8 @@ async function fundSave(request,env) {
   const matched=!!match;
   if(!matched)return json({ok:false,error:"الأسرة غير موجودة في السجلات السحابية المطابقة. يرجى مزامنة بيانات الأسر أولاً."},409);
   const existing=await env.DB.prepare(`SELECT COALESCE(SUM(amount_agorot),0) total FROM camp_fund_payments WHERE family_id=? AND month=? AND voided_at IS NULL`).bind(familyId,month).first();
-  const required=await fundRequired(env,familyId);
-  if(required===null)return json({ok:false,error:"إقامة الأسرة غير محددة، يلزم تصحيحها أولًا"},409);
+  const required=await fundFamilyRate(env,familyId);
+  if(required===null)return json({ok:false,error:'إقامة الأسرة غير مؤكدة في السجلات؛ لا يمكن تحديد المساهمة'},409);
   if(Number(existing?.total||0)+amount>required)return json({ok:false,error:"المبلغ يتجاوز المساهمة المطلوبة لهذا الشهر. راجع الدفعات السابقة."},409);
   const result=await env.DB.prepare(`INSERT INTO camp_fund_payments(family_id,family_name,month,amount_agorot,note,created_at,created_by) VALUES(?,?,?,?,?,?,?)`).bind(familyId,familyName,month,amount,note,Date.now(),auth.session.username||'admin').run();
   return json({ok:true,id:result.meta?.last_row_id||null});
@@ -1618,7 +1624,7 @@ async function fundSave(request,env) {
 async function fundAutoApply(env,eventId){
   await fundSchema(env);
   const event=await env.DB.prepare(`SELECT event_id,sender_name,amount_agorot,currency,direction,notification_time,status FROM palpay_notification_inbox WHERE event_id=?`).bind(eventId).first();
-  if(!event||event.status!=='pending_review'||event.direction!=='incoming'||event.currency!=='ILS')return;
+  if(!event||event.status!=='pending_review'||event.direction!=='incoming'||event.currency!=='ILS'||![200,300].includes(Number(event.amount_agorot)))return;
   const norm=s=>String(s||'').normalize('NFKC').replace(/[\u064B-\u065F\u0670\u0640]/g,'').replace(/[إأآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/\s+/g,' ').trim();
   const sender=norm(event.sender_name);
   if(!sender||/[^\u0600-\u06FF ]/.test(sender))return;
@@ -1627,8 +1633,7 @@ async function fundAutoApply(env,eventId){
   for(const r of rows.results||[]){const id=String(r.family_id||'').trim(),name=String(r.family_name||'').trim();if(/^\d{9}$/.test(id)&&norm(name)===sender)matches.set(id,name)}
   if(matches.size!==1)return;
   const [familyId,familyName]=[...matches.entries()][0];
-  const required=await fundRequired(env,familyId);
-  if(required===null||Number(event.amount_agorot)!==required)return;
+  if(await fundFamilyRate(env,familyId)!==Number(event.amount_agorot))return;
   const month=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Gaza',year:'numeric',month:'2-digit'}).format(new Date(Number(event.notification_time)));
   if(!fundMonth(month))return;
   const t=Date.now();
@@ -1637,7 +1642,7 @@ async function fundAutoApply(env,eventId){
     env.DB.prepare(`INSERT INTO camp_fund_payments(family_id,family_name,month,amount_agorot,note,created_at,created_by,source_event_id)
       SELECT ?,?,?,?,'PalPay: automatic exact match',?,'palpay_auto',?
       WHERE NOT EXISTS(SELECT 1 FROM camp_fund_payments WHERE source_event_id=?)
-      AND (SELECT COALESCE(SUM(amount_agorot),0) FROM camp_fund_payments WHERE family_id=? AND month=? AND voided_at IS NULL)=0`).bind(familyId,familyName,month,required,t,eventId,eventId,familyId,month),
+      AND (SELECT COALESCE(SUM(amount_agorot),0) FROM camp_fund_payments WHERE family_id=? AND month=? AND voided_at IS NULL)=0`).bind(familyId,familyName,month,Number(event.amount_agorot),t,eventId,eventId,familyId,month),
     env.DB.prepare(`UPDATE palpay_notification_inbox SET status=CASE WHEN EXISTS(SELECT 1 FROM camp_fund_payments WHERE source_event_id=?) THEN 'auto_paid' ELSE status END WHERE event_id=?`).bind(eventId,eventId)
   ]);
   return result;
@@ -1687,11 +1692,10 @@ async function fundResidentSearch(request, env) {
   for(const [id,entry] of choices){
     const paid=await env.DB.prepare(`SELECT COALESCE(SUM(amount_agorot),0) AS paid
       FROM camp_fund_payments WHERE family_id=? AND month=? AND voided_at IS NULL`).bind(id,month).first();
-    const required=await fundRequired(env,id);
-    if(required===null)continue;
-    const remaining=Math.max(0,required-Number(paid?.paid||0));
+    const required=await fundFamilyRate(env,id);
+    const remaining=required===null?null:Math.max(0,required-Number(paid?.paid||0));
     results.push({familyRef:entry.familyRef,familyName:entry.familyName,
-      status:remaining===0?'paid':'unpaid',remainingAgorot:remaining});
+      status:remaining===null?'unknown':remaining===0?'paid':'unpaid',remainingAgorot:remaining});
   }
   return json({ok:true,month,results});
 }
@@ -1707,11 +1711,166 @@ async function fundResidentStatus(request,env) {
   await fundSchema(env);
   const familyId=String(session.family_id);
   const row=await env.DB.prepare(`SELECT COALESCE(SUM(amount_agorot),0) AS paid FROM camp_fund_payments WHERE family_id=? AND month=? AND voided_at IS NULL`).bind(familyId,month).first();
-  const paid=Math.max(0,Number(row?.paid||0)),required=await fundRequired(env,familyId);
-  if(required===null)return json({ok:false,error:'إقامة الأسرة غير محددة'},409);
-  return json({ok:true,month,requiredAgorot:required,paidAgorot:paid,remainingAgorot:Math.max(0,required-paid),status:paid>=required?'paid':paid>0?'partial':'unpaid'});
+  const paid=Math.max(0,Number(row?.paid||0)),required=await fundFamilyRate(env,familyId);
+  return json({ok:true,month,requiredAgorot:required,paidAgorot:paid,remainingAgorot:required===null?null:Math.max(0,required-paid),status:required===null?'unknown':paid>=required?'paid':paid>0?'partial':'unpaid'});
 }
 
+
+// Temporary contribution intake: untrusted submissions NEVER credit the ledger.
+async function winterQueueSchema(env){
+ await env.DB.prepare(`CREATE TABLE IF NOT EXISTS winter_contribution_requests(
+ event_id TEXT PRIMARY KEY, family_id TEXT NOT NULL, family_name TEXT NOT NULL,
+ amount_agorot INTEGER NOT NULL CHECK(amount_agorot > 0 AND amount_agorot <= 300),
+ month TEXT NOT NULL, created_at INTEGER NOT NULL, received_at INTEGER NOT NULL,
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
+ reviewed_at INTEGER, reviewed_by TEXT, review_reason TEXT, payment_id INTEGER)`).run();
+ await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_winter_requests_status ON winter_contribution_requests(status,received_at)').run();
+}
+async function winterAdminQueue(request,env){
+ const auth=await fundAdmin(request,env);if(auth.error)return auth.error;
+ await winterQueueSchema(env);await fundSchema(env);
+ if(request.method==='GET'){
+  const rows=await env.DB.prepare('SELECT * FROM winter_contribution_requests ORDER BY received_at DESC LIMIT 300').all();
+  return json({ok:true,requests:rows.results||[]});
+ }
+ let b;try{b=await request.json()}catch{return json({ok:false,error:'طلب غير صالح'},400)}
+ const eventId=String(b.eventId||''),decision=String(b.decision||''),reason=String(b.reason||'').trim();
+ if(!/^[a-f0-9-]{36}$/.test(eventId)||!['approved','rejected'].includes(decision)||reason.length<5)return json({ok:false,error:'القرار وسبب المراجعة مطلوبان'},400);
+ const r=await env.DB.prepare('SELECT * FROM winter_contribution_requests WHERE event_id=?').bind(eventId).first();
+ if(!r)return json({ok:false,error:'الطلب غير موجود'},404);
+ if(r.status!=='pending')return json({ok:true,status:r.status,paymentId:r.payment_id,alreadyReviewed:true});
+ if(decision==='rejected'){
+  const update=await env.DB.prepare("UPDATE winter_contribution_requests SET status='rejected',reviewed_at=?,reviewed_by=?,review_reason=? WHERE event_id=? AND status='pending'").bind(Date.now(),auth.session.username||'admin',reason,eventId).run();
+  return json({ok:!!update.meta?.changes,status:'rejected'});
+ }
+ await fundSchema(env);
+ const required=await fundFamilyRate(env,r.family_id);
+ if(required===null)return json({ok:false,error:'إقامة الأسرة غير مؤكدة؛ يجب مراجعتها في Moood'},409);
+ const existing=await env.DB.prepare('SELECT COALESCE(SUM(amount_agorot),0) AS paid FROM camp_fund_payments WHERE family_id=? AND month=? AND voided_at IS NULL').bind(r.family_id,r.month).first();
+ if(Number(existing?.paid||0)+r.amount_agorot>required)return json({ok:false,error:'المساهمة مسددة أو المبلغ يتجاوز المتبقي؛ راجع الدفعات قبل الاعتماد'},409);
+ // A single D1 transaction ensures request status and ledger entry cannot diverge.
+ const batch=await env.DB.batch([
+  env.DB.prepare(`INSERT INTO camp_fund_payments(family_id,family_name,month,amount_agorot,note,created_at,created_by,source_event_id)
+  SELECT ?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM camp_fund_payments WHERE source_event_id=?)
+  AND (SELECT COALESCE(SUM(amount_agorot),0) FROM camp_fund_payments WHERE family_id=? AND month=? AND voided_at IS NULL)+? <= ?`).bind(r.family_id,r.family_name,r.month,r.amount_agorot,'كسوة شتوية · '+reason,Date.now(),auth.session.username||'admin',eventId,eventId,r.family_id,r.month,r.amount_agorot,required),
+  env.DB.prepare(`UPDATE winter_contribution_requests SET status='approved',reviewed_at=?,reviewed_by=?,review_reason=?,payment_id=(SELECT id FROM camp_fund_payments WHERE source_event_id=?) WHERE event_id=? AND status='pending' AND EXISTS(SELECT 1 FROM camp_fund_payments WHERE source_event_id=?)`).bind(Date.now(),auth.session.username||'admin',reason,eventId,eventId,eventId)
+ ]);
+ const updated=await env.DB.prepare('SELECT status,payment_id FROM winter_contribution_requests WHERE event_id=?').bind(eventId).first();
+ if(updated.status!=='approved')return json({ok:false,error:'لم يتم اعتماد الطلب؛ راجع رصيد الأسرة'},409);
+ return json({ok:true,status:'approved',paymentId:updated.payment_id});
+}
+// Clothing receipts are a separate income category; never mix them into monthly family contributions.
+async function winterClothingSchema(env){
+ await env.DB.prepare(`CREATE TABLE IF NOT EXISTS winter_clothing_requests(
+ event_id TEXT PRIMARY KEY, child_id TEXT NOT NULL, family_id TEXT NOT NULL,
+ child_name TEXT NOT NULL, amount_agorot INTEGER NOT NULL CHECK(amount_agorot=200),
+ action TEXT NOT NULL CHECK(action IN ('pay','void')),
+ original_event_id TEXT, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
+ received_at INTEGER NOT NULL, reviewed_at INTEGER, reviewed_by TEXT, review_reason TEXT)`).run();
+ await env.DB.prepare(`CREATE TABLE IF NOT EXISTS camp_fund_clothing_income(
+ event_id TEXT PRIMARY KEY, child_id TEXT NOT NULL, family_id TEXT NOT NULL,
+ child_name TEXT NOT NULL, amount_agorot INTEGER NOT NULL CHECK(amount_agorot=200),
+ created_at INTEGER NOT NULL, created_by TEXT NOT NULL,
+ voided_at INTEGER, voided_by TEXT, void_reason TEXT)`).run();
+ await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_clothing_child ON camp_fund_clothing_income(child_id,voided_at)').run();
+}
+async function winterClothingAdmin(request,env){
+ const auth=await fundAdmin(request,env);if(auth.error)return auth.error;
+ await winterClothingSchema(env);
+ if(request.method==='GET'){
+  const r=await env.DB.prepare('SELECT * FROM winter_clothing_requests ORDER BY received_at DESC LIMIT 300').all();
+  return json({ok:true,requests:r.results||[]});
+ }
+ let b;try{b=await request.json()}catch{return json({ok:false,error:'طلب غير صالح'},400)}
+ const eventId=String(b.eventId||''),decision=String(b.decision||''),reason=String(b.reason||'').trim();
+ if(!/^[a-f0-9-]{36}$/.test(eventId)||!['approved','rejected'].includes(decision)||reason.length<5)return json({ok:false,error:'قرار وسبب صالحان مطلوبان'},400);
+ const r=await env.DB.prepare('SELECT * FROM winter_clothing_requests WHERE event_id=?').bind(eventId).first();
+ if(!r)return json({ok:false,error:'الطلب غير موجود'},404);
+ if(r.status!=='pending')return json({ok:true,status:r.status,alreadyReviewed:true});
+ const now=Date.now(),admin=auth.session.username||'admin';
+ if(decision==='rejected'){
+  await env.DB.prepare("UPDATE winter_clothing_requests SET status='rejected',reviewed_at=?,reviewed_by=?,review_reason=? WHERE event_id=? AND status='pending'").bind(now,admin,reason,eventId).run();
+  return json({ok:true,status:'rejected'});
+ }
+ if(r.action==='pay'){
+  const already=await env.DB.prepare('SELECT event_id FROM camp_fund_clothing_income WHERE child_id=? AND voided_at IS NULL').bind(r.child_id).first();
+  if(already)return json({ok:false,error:'يوجد دفع كسوة معتمد بالفعل لهذا الطفل'},409);
+  await env.DB.batch([
+   env.DB.prepare(`INSERT OR IGNORE INTO camp_fund_clothing_income(event_id,child_id,family_id,child_name,amount_agorot,created_at,created_by) VALUES(?,?,?,?,?,?,?)`).bind(r.event_id,r.child_id,r.family_id,r.child_name,200,now,admin),
+   env.DB.prepare(`UPDATE winter_clothing_requests SET status='approved',reviewed_at=?,reviewed_by=?,review_reason=? WHERE event_id=? AND status='pending'`).bind(now,admin,reason,eventId)
+  ]);
+ }else{
+  const original=await env.DB.prepare('SELECT * FROM camp_fund_clothing_income WHERE event_id=?').bind(r.original_event_id).first();
+  if(!original||original.child_id!==r.child_id||original.voided_at)return json({ok:false,error:'الدفعة الأصلية غير موجودة أو ملغاة بالفعل'},409);
+  await env.DB.batch([
+   env.DB.prepare('UPDATE camp_fund_clothing_income SET voided_at=?,voided_by=?,void_reason=? WHERE event_id=? AND voided_at IS NULL').bind(now,admin,reason,r.original_event_id),
+   env.DB.prepare(`UPDATE winter_clothing_requests SET status='approved',reviewed_at=?,reviewed_by=?,review_reason=? WHERE event_id=? AND status='pending'`).bind(now,admin,reason,eventId)
+  ]);
+ }
+ return json({ok:true,status:'approved'});
+}
+// Temporary winter-distribution bridge. Disable by removing WINTER_BRIDGE_TOKEN.
+// Tokens must be Cloudflare Worker secrets, never committed to source control.
+async function winterBridgeAuth(request,env){
+ const supplied=request.headers.get('X-Winter-Token')||'';
+ const expected=env.WINTER_BRIDGE_TOKEN||'';
+ if(!expected||expected.length<32||supplied.length!==expected.length)return false;
+ let diff=0;for(let i=0;i<expected.length;i++)diff|=expected.charCodeAt(i)^supplied.charCodeAt(i);
+ return diff===0;
+}
+async function winterBridge(request,env){
+ if(!(await winterBridgeAuth(request,env)))return json({ok:false,error:'الربط معطل أو رمز الربط غير صالح'},403);
+ const origin=request.headers.get('Origin')||'';
+ if(!env.WINTER_BRIDGE_ORIGIN||origin!==env.WINTER_BRIDGE_ORIGIN)return json({ok:false,error:'مصدر غير مصرح'},403);
+ const path=new URL(request.url).pathname;
+ if(path==='/winter/bridge/status'&&request.method==='GET')return json({ok:true,enabled:true});
+ if(path==='/winter/bridge/family'&&request.method==='GET'){
+  const fid=new URL(request.url).searchParams.get('familyId')||'';
+  if(!/^\d{9}$/.test(fid))return json({ok:false,error:'هوية الأسرة غير صالحة'},400);
+  await fundSchema(env);
+  const required=await fundFamilyRate(env,fid);
+  const row=await env.DB.prepare('SELECT COALESCE(SUM(amount_agorot),0) AS paid FROM camp_fund_payments WHERE family_id=? AND month=? AND voided_at IS NULL').bind(fid,'2026-11').first();
+  const paid=Number(row?.paid||0);
+  return json({ok:true,familyId:fid,month:'2026-11',requiredAgorot:required,paidAgorot:paid,remainingAgorot:required===null?null:Math.max(0,required-paid),status:required===null?'unknown':paid>=required?'paid':paid>0?'partial':'unpaid',checkedAt:Date.now()});
+ }
+ // Financial writes must pass the official fund administrator approval workflow.
+ // A shared browser-side bridge token is insufficient authority to credit the ledger.
+ if(path==='/winter/bridge/contribution'&&request.method==='POST'){
+  let b;try{b=await request.json()}catch{return json({ok:false,error:'طلب غير صالح'},400)}
+  const eventId=String(b.eventId||''),familyId=String(b.familyId||''),familyName=String(b.familyName||'').trim(),amount=Number(b.amountAgorot);
+  if(!/^[a-f0-9-]{36}$/.test(eventId)||!/^\d{9}$/.test(familyId)||!familyName||familyName.length>200||![100,200,300].includes(amount))return json({ok:false,error:'بيانات الطلب غير صالحة'},400);
+  await winterQueueSchema(env);
+  await env.DB.prepare('INSERT OR IGNORE INTO winter_contribution_requests(event_id,family_id,family_name,amount_agorot,month,created_at,received_at) VALUES(?,?,?,?,?,?,?)').bind(eventId,familyId,familyName,amount,'2026-11',Date.now(),Date.now()).run();
+  const r=await env.DB.prepare('SELECT family_id,amount_agorot,status FROM winter_contribution_requests WHERE event_id=?').bind(eventId).first();
+  if(r.family_id!==familyId||r.amount_agorot!==amount)return json({ok:false,error:'معرف العملية مستخدم لطلب مختلف'},409);
+  return json({ok:true,eventId,status:r.status});
+ }
+ if(path==='/winter/bridge/clothing'&&request.method==='POST'){
+  let b;try{b=await request.json()}catch{return json({ok:false,error:'طلب غير صالح'},400)}
+  const eventId=String(b.eventId||''),childId=String(b.childId||''),familyId=String(b.familyId||''),childName=String(b.childName||'').trim(),action=String(b.action||''),original=String(b.originalEventId||'');
+  if(!/^[a-f0-9-]{36}$/.test(eventId)||!childId||childId.length>80||!/^[0-9]{9}$/.test(familyId)||!childName||childName.length>200||!['pay','void'].includes(action)||Number(b.amountAgorot)!==200||(action==='void'&&!/^[a-f0-9-]{36}$/.test(original)))return json({ok:false,error:'بيانات تحصيل الكسوة غير صالحة'},400);
+  await winterClothingSchema(env);
+  await env.DB.prepare(`INSERT OR IGNORE INTO winter_clothing_requests(event_id,child_id,family_id,child_name,amount_agorot,action,original_event_id,received_at) VALUES(?,?,?,?,?,?,?,?)`).bind(eventId,childId,familyId,childName,200,action,action==='void'?original:null,Date.now()).run();
+  const r=await env.DB.prepare('SELECT child_id,family_id,action,original_event_id,status FROM winter_clothing_requests WHERE event_id=?').bind(eventId).first();
+  if(r.child_id!==childId||r.family_id!==familyId||r.action!==action||String(r.original_event_id||'')!==(action==='void'?original:''))return json({ok:false,error:'معرف العملية مستخدم سابقًا'},409);
+  return json({ok:true,eventId,status:r.status});
+ }
+ if(path==='/winter/bridge/clothing-status'&&request.method==='GET'){
+  const eventId=new URL(request.url).searchParams.get('eventId')||'';
+  if(!/^[a-f0-9-]{36}$/.test(eventId))return json({ok:false,error:'معرف غير صالح'},400);
+  await winterClothingSchema(env);
+  const r=await env.DB.prepare('SELECT status,review_reason FROM winter_clothing_requests WHERE event_id=?').bind(eventId).first();
+  return r?json({ok:true,...r}):json({ok:false,error:'الطلب غير موجود'},404);
+ }
+ if(path==='/winter/bridge/request'&&request.method==='GET'){
+  const eventId=new URL(request.url).searchParams.get('eventId')||'';
+  if(!/^[a-f0-9-]{36}$/.test(eventId))return json({ok:false,error:'معرف غير صالح'},400);
+  await winterQueueSchema(env);
+  const r=await env.DB.prepare('SELECT status,reviewed_at,review_reason FROM winter_contribution_requests WHERE event_id=?').bind(eventId).first();
+  return r?json({ok:true,...r}):json({ok:false,error:'غير موجود'},404);
+ }
+ return json({ok:false,error:'مسار غير معروف'},404);
+}
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
@@ -1720,13 +1879,14 @@ export default {
         headers: {
           "access-control-allow-origin": ALLOWED_ORIGIN,
           "access-control-allow-methods": "GET,POST,OPTIONS",
-          "access-control-allow-headers": "Content-Type, Authorization, X-Device-Id, X-Support-Session"
+          "access-control-allow-headers": "Content-Type, Authorization, X-Device-Id, X-Support-Session, X-Winter-Token"
         }
       });
     }
 
     const url = new URL(request.url);
     try {
+      if (url.pathname.startsWith("/winter/bridge/")) return await winterBridge(request,env);
       if (url.pathname === "/api/ai/chat" && request.method === "POST") return await aiChatWithRoutineIntake(request, env);
       if (url.pathname === "/palpay/ingest" && request.method === "POST") {
         const intakeCopy=request.clone();
@@ -1746,10 +1906,13 @@ export default {
       if (url.pathname === "/palpay/admin/candidates" && request.method === "GET") return await palpayCandidates(request,env,fundAdmin);
       if (url.pathname === "/fund/resident/search" && request.method === "GET") return await fundResidentSearch(request,env);
       if (url.pathname === "/fund/resident/status" && request.method === "GET") return await fundResidentStatus(request,env);
-      if (url.pathname === "/fund/admin/void" && request.method === "POST") return await fundVoid(request,env);
-      if (url.pathname === "/fund/admin/expenses" && ["GET","POST"].includes(request.method)) return await fundExpenses(request,env);
+      if (url.pathname === "/winter/admin/clothing" && ["GET","POST"].includes(request.method)) return await winterClothingAdmin(request,env);
+      if (url.pathname === "/winter/admin/requests" && ["GET","POST"].includes(request.method)) return await winterAdminQueue(request,env);
       if (url.pathname === "/fund/admin/list" && request.method === "GET") return await fundList(request,env);
       if (url.pathname === "/fund/admin/payment" && request.method === "POST") return await fundSave(request,env);
+      if (url.pathname === "/fund/admin/void" && request.method === "POST") return await fundVoid(request,env);
+      if (url.pathname === "/fund/admin/ledger" && request.method === "GET") return await fundLedger(request,env);
+      if (url.pathname === "/fund/admin/expense" && request.method === "POST") return await fundExpenseSave(request,env);
       if (url.pathname === "/announcements" && request.method === "GET") return await listPublicAnnouncements(request, env);
       if (url.pathname === "/announcements/admin" && request.method === "GET") return await listAdminAnnouncements(request, env);
       if (url.pathname === "/announcements/admin" && request.method === "POST") return await saveAnnouncement(request, env);
