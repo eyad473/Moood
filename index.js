@@ -1835,25 +1835,49 @@ async function winterBridge(request,env){
  }
  // Financial writes must pass the official fund administrator approval workflow.
  // A shared browser-side bridge token is insufficient authority to credit the ledger.
+ // The operator confirms receipt on the distribution device. The bridge credential is
+ // a financial capability: revoke it immediately when distribution ends.
  if(path==='/winter/bridge/contribution'&&request.method==='POST'){
   let b;try{b=await request.json()}catch{return json({ok:false,error:'طلب غير صالح'},400)}
-  const eventId=String(b.eventId||''),familyId=String(b.familyId||''),familyName=String(b.familyName||'').trim(),amount=Number(b.amountAgorot);
-  if(!/^[a-f0-9-]{36}$/.test(eventId)||!/^\d{9}$/.test(familyId)||!familyName||familyName.length>200||![100,200,300].includes(amount))return json({ok:false,error:'بيانات الطلب غير صالحة'},400);
-  await winterQueueSchema(env);
-  await env.DB.prepare('INSERT OR IGNORE INTO winter_contribution_requests(event_id,family_id,family_name,amount_agorot,month,created_at,received_at) VALUES(?,?,?,?,?,?,?)').bind(eventId,familyId,familyName,amount,'2026-11',Date.now(),Date.now()).run();
-  const r=await env.DB.prepare('SELECT family_id,amount_agorot,status FROM winter_contribution_requests WHERE event_id=?').bind(eventId).first();
-  if(r.family_id!==familyId||r.amount_agorot!==amount)return json({ok:false,error:'معرف العملية مستخدم لطلب مختلف'},409);
-  return json({ok:true,eventId,status:r.status});
+  const eventId=String(b.eventId||''),fid=String(b.familyId||''),amount=Number(b.amountAgorot);
+  if(!/^[a-f0-9-]{36}$/.test(eventId)||!/^[0-9]{9}$/.test(fid)||![100,200,300].includes(amount))return json({ok:false,error:'بيانات الدفع غير صالحة'},400);
+  await fundSchema(env);await winterQueueSchema(env);
+  const prior=await env.DB.prepare('SELECT family_id,amount_agorot,voided_at FROM camp_fund_payments WHERE source_event_id=?').bind(eventId).first();
+  if(prior)return prior.family_id===fid&&Number(prior.amount_agorot)===amount?json({ok:true,status:prior.voided_at?'voided':'approved',eventId}):json({ok:false,error:'معرف مكرر لعملية مختلفة'},409);
+  const family=await env.DB.prepare(`SELECT json_extract(data_json, '$."اسم رب الأسرة"') AS name FROM sync_records WHERE deleted=0 AND json_valid(data_json) AND CAST(json_extract(data_json, '$."رقم هوية الأسرة"') AS TEXT)=? LIMIT 1`).bind(fid).first();
+  if(!family?.name)return json({ok:false,error:'العائلة غير موجودة في قاعدة المخيم'},409);
+  const required=await fundFamilyRate(env,fid);
+  if(required===null)return json({ok:false,error:'مكان إقامة العائلة غير محدد'},409);
+  const result=await env.DB.prepare(`INSERT INTO camp_fund_payments(family_id,family_name,month,amount_agorot,note,created_at,created_by,source_event_id)
+    SELECT ?,?,'2026-11',?,'تحصيل مباشر من جهاز الكسوة',?,'winter-operator',?
+    WHERE (SELECT COALESCE(SUM(amount_agorot),0) FROM camp_fund_payments WHERE family_id=? AND month='2026-11' AND voided_at IS NULL)+?<=? AND NOT EXISTS(SELECT 1 FROM camp_fund_payments WHERE source_event_id=?)`).bind(fid,family.name,amount,Date.now(),eventId,fid,amount,required,eventId).run();
+  if(result.meta?.changes!==1)return json({ok:false,error:'المساهمة مسددة أو المبلغ يتجاوز المتبقي؛ حدّث بيانات الأسرة'},409);
+  return json({ok:true,eventId,status:'approved'});
  }
  if(path==='/winter/bridge/clothing'&&request.method==='POST'){
   let b;try{b=await request.json()}catch{return json({ok:false,error:'طلب غير صالح'},400)}
-  const eventId=String(b.eventId||''),childId=String(b.childId||''),familyId=String(b.familyId||''),childName=String(b.childName||'').trim(),action=String(b.action||''),original=String(b.originalEventId||'');
-  if(!/^[a-f0-9-]{36}$/.test(eventId)||!childId||childId.length>80||!/^[0-9]{9}$/.test(familyId)||!childName||childName.length>200||!['pay','void'].includes(action)||Number(b.amountAgorot)!==200||(action==='void'&&!/^[a-f0-9-]{36}$/.test(original)))return json({ok:false,error:'بيانات تحصيل الكسوة غير صالحة'},400);
+  const eventId=String(b.eventId||''),childId=String(b.childId||''),fid=String(b.familyId||''),name=String(b.childName||'').trim(),action=String(b.action||''),original=String(b.originalEventId||'');
+  if(!/^[a-f0-9-]{36}$/.test(eventId)||!childId||childId.length>80||!/^[0-9]{9}$/.test(fid)||!name||name.length>200||!['pay','void'].includes(action)||Number(b.amountAgorot)!==200||(action==='void'&&!/^[a-f0-9-]{36}$/.test(original)))return json({ok:false,error:'بيانات الكسوة غير صالحة'},400);
   await winterClothingSchema(env);
-  await env.DB.prepare(`INSERT OR IGNORE INTO winter_clothing_requests(event_id,child_id,family_id,child_name,amount_agorot,action,original_event_id,received_at) VALUES(?,?,?,?,?,?,?,?)`).bind(eventId,childId,familyId,childName,200,action,action==='void'?original:null,Date.now()).run();
-  const r=await env.DB.prepare('SELECT child_id,family_id,action,original_event_id,status FROM winter_clothing_requests WHERE event_id=?').bind(eventId).first();
-  if(r.child_id!==childId||r.family_id!==familyId||r.action!==action||String(r.original_event_id||'')!==(action==='void'?original:''))return json({ok:false,error:'معرف العملية مستخدم سابقًا'},409);
-  return json({ok:true,eventId,status:r.status});
+  const previous=await env.DB.prepare('SELECT * FROM winter_clothing_requests WHERE event_id=?').bind(eventId).first();
+  if(previous)return previous.child_id===childId&&previous.family_id===fid&&previous.action===action&&String(previous.original_event_id||'')===(action==='void'?original:'')?json({ok:true,status:previous.status,eventId}):json({ok:false,error:'معرف العملية مستخدم سابقًا'},409);
+  const now=Date.now();
+  if(action==='pay'){
+   const existing=await env.DB.prepare('SELECT event_id FROM camp_fund_clothing_income WHERE child_id=? AND voided_at IS NULL').bind(childId).first();
+   if(existing)return json({ok:false,error:'تم تحصيل كسوة هذا الطفل مسبقًا'},409);
+   await env.DB.batch([
+    env.DB.prepare(`INSERT INTO camp_fund_clothing_income(event_id,child_id,family_id,child_name,amount_agorot,created_at,created_by) VALUES(?,?,?,?,200,?,'winter-operator')`).bind(eventId,childId,fid,name,now),
+    env.DB.prepare(`INSERT INTO winter_clothing_requests(event_id,child_id,family_id,child_name,amount_agorot,action,original_event_id,status,received_at,reviewed_at,reviewed_by,review_reason) VALUES(?,?,?,?,200,'pay',NULL,'approved',?,?, 'winter-operator','تأكيد مباشر من جهاز التوزيع')`).bind(eventId,childId,fid,name,now,now)
+   ]);
+  }else{
+   const originalRow=await env.DB.prepare('SELECT * FROM camp_fund_clothing_income WHERE event_id=?').bind(original).first();
+   if(!originalRow||originalRow.child_id!==childId||originalRow.family_id!==fid||originalRow.voided_at)return json({ok:false,error:'الدفعة الأصلية غير موجودة أو ملغاة'},409);
+   await env.DB.batch([
+    env.DB.prepare('UPDATE camp_fund_clothing_income SET voided_at=?,voided_by=?,void_reason=? WHERE event_id=? AND voided_at IS NULL').bind(now,'winter-operator','تصحيح من جهاز الكسوة',original),
+    env.DB.prepare(`INSERT INTO winter_clothing_requests(event_id,child_id,family_id,child_name,amount_agorot,action,original_event_id,status,received_at,reviewed_at,reviewed_by,review_reason) VALUES(?,?,?,?,200,'void',?,'approved',?,?, 'winter-operator','تصحيح من جهاز التوزيع')`).bind(eventId,childId,fid,name,original,now,now)
+   ]);
+  }
+  return json({ok:true,eventId,status:'approved'});
  }
  if(path==='/winter/bridge/clothing-status'&&request.method==='GET'){
   const eventId=new URL(request.url).searchParams.get('eventId')||'';
