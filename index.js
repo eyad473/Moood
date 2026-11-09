@@ -1530,7 +1530,18 @@ async function fundAdmin(request, env) {
   if (!session.ok || session.role !== "admin") return {error: json({ok:false,error:"يلزم تسجيل الدخول بحساب المدير لإدارة الصندوق"},403)};
   return {session};
 }
+// Schema initialization is idempotent and cached per Worker isolate / D1 binding.
+// Never cache a failure: a temporary D1 quota error must be retryable after reset.
+const fundSchemaTasks = new WeakMap();
 async function fundSchema(env) {
+ const db = env.DB;
+ let task = fundSchemaTasks.get(db);
+ if (task) return task;
+ task = fundSchemaInit(env);
+ fundSchemaTasks.set(db, task);
+ try { await task; } catch (error) { fundSchemaTasks.delete(db); throw error; }
+}
+async function fundSchemaInit(env) {
   await env.DB.batch([
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS camp_fund_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, family_id TEXT NOT NULL, family_name TEXT NOT NULL, month TEXT NOT NULL, amount_agorot INTEGER NOT NULL CHECK(amount_agorot > 0), note TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, created_by TEXT NOT NULL, voided_at INTEGER, voided_by TEXT, void_reason TEXT)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_camp_fund_family_month ON camp_fund_payments(family_id,month,voided_at)`),
@@ -1564,7 +1575,16 @@ async function fundVoid(request,env){
  if(result.meta?.changes!==1)return json({ok:false,error:'تغيرت الدفعة أثناء العملية؛ حدّث الكشف'},409);
  return json({ok:true,id});
 }
+const fundLedgerSchemaTasks = new WeakMap();
 async function fundLedgerSchema(env){
+ const db=env.DB;
+ let task=fundLedgerSchemaTasks.get(db);
+ if(task)return task;
+ task=fundLedgerSchemaInit(env);
+ fundLedgerSchemaTasks.set(db,task);
+ try{await task;}catch(error){fundLedgerSchemaTasks.delete(db);throw error;}
+}
+async function fundLedgerSchemaInit(env){
  await fundSchema(env);
  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS camp_fund_expenses(id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL CHECK(kind IN ('debt','operating')),payee TEXT NOT NULL,description TEXT NOT NULL,amount_agorot INTEGER NOT NULL CHECK(amount_agorot>0),created_at INTEGER NOT NULL,created_by TEXT NOT NULL,reference TEXT NOT NULL DEFAULT '')`).run();
  // Older deployed versions may already have the table with fewer columns.
@@ -1775,7 +1795,16 @@ async function winterAdminQueue(request,env){
  return json({ok:true,status:'approved',paymentId:updated.payment_id});
 }
 // Clothing receipts are a separate income category; never mix them into monthly family contributions.
+const winterClothingSchemaTasks = new WeakMap();
 async function winterClothingSchema(env){
+ const db=env.DB;
+ let task=winterClothingSchemaTasks.get(db);
+ if(task)return task;
+ task=winterClothingSchemaInit(env);
+ winterClothingSchemaTasks.set(db,task);
+ try{await task;}catch(error){winterClothingSchemaTasks.delete(db);throw error;}
+}
+async function winterClothingSchemaInit(env){
  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS winter_clothing_requests(
  event_id TEXT PRIMARY KEY, child_id TEXT NOT NULL, family_id TEXT NOT NULL,
  child_name TEXT NOT NULL, amount_agorot INTEGER NOT NULL CHECK(amount_agorot=200),
