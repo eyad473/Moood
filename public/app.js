@@ -4385,12 +4385,11 @@ async function palpayShowCandidates(id){
 
 // Camp fund v1 — admin interface; never stores payments in localStorage.
 let fundPayments=[],fundLoadedMonth='',fundLoading=false;
-function fundFamilies(){const m=new Map();for(const r of data){const id=String(r['رقم هوية الأسرة']||'').trim(),name=String(r['اسم رب الأسرة']||'').trim();if(/^\d{9}$/.test(id)&&name&&!m.has(id))m.set(id,{id,name,residence:String(r['داخل/خارج المخيم']||'').trim()});}return [...m.values()].sort((a,b)=>a.name.localeCompare(b.name,'ar'));}
+function fundFamilies(){const m=new Map();for(const r of data){const id=String(r['رقم هوية الأسرة']||'').trim(),name=String(r['اسم رب الأسرة']||'').trim();if(/^\d{9}$/.test(id)&&name){const residence=String(r['داخل/خارج المخيم']||'').trim();if(!m.has(id))m.set(id,{id,name,residence});else if(residence&&m.get(id).residence!==residence)m.get(id).residence='بحاجة مراجعة';}}return [...m.values()].sort((a,b)=>a.name.localeCompare(b.name,'ar'));}
 function fundMonthValue(){return document.getElementById('fundMonth')?.value||'2026-11'}
-async function fundLoad(){if(fundLoading)return;fundLoading=true;const msg=document.getElementById('fundMessage');try{const month=fundMonthValue();const result=await authFetch('/fund/admin/list?month='+encodeURIComponent(month));fundPayments=result.payments||[];fundLoadedMonth=month;if(msg)msg.textContent='';fundRender();await fundFinancialPanel()}catch(e){fundLoadedMonth='';if(msg)msg.textContent='تعذر تحميل كشف الصندوق: '+e.message}finally{fundLoading=false}}
-function fundRequired(f){return f.residence==='داخل المخيم'?300:f.residence==='خارج المخيم'?200:null;}
-function fundState(f){const total=fundPayments.filter(p=>p.family_id===f.id).reduce((n,p)=>n+Number(p.amount_agorot||0),0);const required=fundRequired(f);return {total,required,remaining:required===null?null:Math.max(0,required-total),label:required===null?'إقامة غير محددة':total>=required?'مسدد':total>0?'جزئي':'غير مسدد'};}
-function fundMatchesFilter(f,filter){const x=fundState(f);return filter==='paid'?x.remaining===0:filter==='unpaid'?x.total===0:filter==='partial'?x.total>0&&x.remaining>0:filter==='outstanding'?x.remaining>0:filter==='all';}
+async function fundLoad(){if(fundLoading)return;fundLoading=true;const msg=document.getElementById('fundMessage');try{const month=fundMonthValue();const result=await authFetch('/fund/admin/list?month='+encodeURIComponent(month));fundPayments=result.payments||[];fundLoadedMonth=month;if(msg)msg.textContent='';fundRender();fundLoadLedger();fundLoadWinterRequests();fundLoadClothingRequests()}catch(e){fundLoadedMonth='';if(msg)msg.textContent='تعذر تحميل كشف الصندوق: '+e.message}finally{fundLoading=false}}
+function fundState(f){const total=fundPayments.filter(p=>p.family_id===f.id).reduce((n,p)=>n+Number(p.amount_agorot||0),0),required=f.residence==='داخل المخيم'?300:f.residence==='خارج المخيم'?200:null;return {total,required,remaining:required===null?null:Math.max(0,required-total),label:required===null?'إقامة غير مؤكدة':total>=required?'مسدد':total>0?'جزئي':'غير مسدد'};}
+function fundMatchesFilter(f,filter){const x=fundState(f);return filter==='paid'?x.remaining===0:filter==='unpaid'?x.total===0&&x.required!==null:filter==='partial'?x.total>0&&x.remaining>0:filter==='outstanding'?x.remaining>0:filter==='all';}
 function fundSetExportScope(scope){const sel=document.getElementById('fundExportScope');if(!sel)return;sel.value=scope;fundExport();}
 function fundSyncExportFilter(){const display=document.getElementById('fundFilter'),exportSel=document.getElementById('fundExportScope');if(display&&exportSel)exportSel.value=display.value;fundRender();}
 function fundRender(){
@@ -4399,45 +4398,26 @@ function fundRender(){
  const list=all.filter(f=>(f.name.includes(q)||f.id.includes(q))&&fundMatchesFilter(f,filter));
  const paid=all.filter(f=>fundState(f).remaining===0).length,partial=all.filter(f=>{const x=fundState(f);return x.total>0&&x.remaining>0}).length;
  const collected=fundPayments.reduce((n,p)=>n+Number(p.amount_agorot||0),0)/100;
- if(summary){const cards=[['إجمالي الأسر',all.length],['الأسر المسددة',paid],['سداد جزئي',partial],['غير المسددة',all.length-paid-partial],['المبلغ المحصّل',collected.toFixed(2)+' ₪'],['إجمالي المطلوب',(all.reduce((sum,f)=>sum+(fundRequired(f)||0),0)/100).toFixed(2)+' ₪']];summary.innerHTML=cards.map(([label,value])=>`<div class="fund-stat"><span>${label}</span><strong>${value}</strong></div>`).join('');}
+ if(summary){const cards=[['إجمالي الأسر',all.length],['الأسر المسددة',paid],['سداد جزئي',partial],['غير المسددة',all.length-paid-partial],['المبلغ المحصّل',collected.toFixed(2)+' ₪'],['إجمالي المطلوب',(all.reduce((n,f)=>n+(fundState(f).required||0),0)/100).toFixed(2)+' ₪']];summary.innerHTML=cards.map(([label,value])=>`<div class="fund-stat"><span>${label}</span><strong>${value}</strong></div>`).join('');}
  const percent=all.length?Math.round(paid/all.length*100):0;const bar=document.getElementById('fundProgressBar'),label=document.getElementById('fundProgressLabel');if(bar)bar.style.width=percent+'%';if(label)label.textContent=percent+'% من الأسر مسددة بالكامل';
  const count=document.getElementById('fundVisibleCount');if(count)count.textContent='الأسر المطابقة للفلتر والبحث: '+list.length+' من '+all.length;
  if(fundLoadedMonth!==fundMonthValue()){body.innerHTML='<tr><td colspan="6">يرجى تحميل الشهر المحدد أولاً</td></tr>';return;}
- body.innerHTML=list.map(f=>{const x=fundState(f);return `<tr><td>${esc(f.name)}</td><td>${esc(f.id)}</td><td>${(x.total/100).toFixed(2)}</td><td>${(x.remaining/100).toFixed(2)}</td><td>${x.label}</td><td><button class="btn" ${x.remaining===0||x.remaining===null?'disabled':''} onclick="fundPay('${f.id}')">تسجيل دفعة</button></td></tr>`}).join('')||'<tr><td colspan="6">لا توجد أسر مطابقة لهذه التصفية</td></tr>';
+ body.innerHTML=list.map(f=>{const x=fundState(f);return `<tr><td>${esc(f.name)}</td><td>${esc(f.id)}</td><td>${(x.total/100).toFixed(2)}</td><td>${x.remaining===null?'—':(x.remaining/100).toFixed(2)}</td><td>${x.label} (${x.required===null?'غير محدد':x.required/100+' ₪'})</td><td><button class="btn" ${x.remaining===null||x.remaining===0?'disabled':''} onclick="fundPay('${f.id}')">تسجيل دفعة</button> <button class="btn" onclick="fundShowPayments('${f.id}')">الدفعات / إلغاء</button></td></tr>`}).join('')||'<tr><td colspan="6">لا توجد أسر مطابقة لهذه التصفية</td></tr>';
 }
-async function fundVoidPayment(id){
- const reason=prompt('سبب إلغاء الدفعة المسجلة بالخطأ (إلزامي):');if(!reason||reason.trim().length<5)return;
- if(!confirm('هل تؤكد إلغاء هذه الدفعة؟ سيُعاد احتساب رصيد الصندوق.'))return;
- try{await authFetch('/fund/admin/void',{method:'POST',body:JSON.stringify({id,reason})});await fundLoad();alert('تم إلغاء الدفعة مع حفظ سجل التدقيق')}catch(e){alert(e.message)}
+async function fundPay(id){const f=fundFamilies().find(x=>x.id===id);if(!f||fundLoadedMonth!==fundMonthValue())return;const amount=Number(document.getElementById('fundAmount')?.value),agorot=Math.round(amount*100),note=String(document.getElementById('fundNote')?.value||'');if(!Number.isFinite(amount)||agorot<1||Math.abs(agorot/100-amount)>0.00001){alert('أدخل مبلغاً صحيحاً');return}if(fundState(f).remaining===null){alert('مكان إقامة الأسرة غير مؤكد، راجع بياناتها أولاً');return}if(agorot>fundState(f).remaining){alert('المبلغ أكبر من المتبقي لهذه الأسرة');return}if(!confirm(`هل تؤكد استلام ${amount.toFixed(2)} شيكل من ${f.name} عن شهر ${fundMonthValue()}؟`))return;const msg=document.getElementById('fundMessage');try{await authFetch('/fund/admin/payment',{method:'POST',body:JSON.stringify({familyId:id,familyName:f.name,month:fundMonthValue(),amountAgorot:agorot,note})});if(msg)msg.textContent='تم تسجيل الدفعة بنجاح';await fundLoad()}catch(e){if(msg)msg.textContent='لم يتم تأكيد الحفظ: '+e.message;await fundLoad()}}
+async function fundShowPayments(id){
+ const f=fundFamilies().find(x=>x.id===id);if(!f)return;
+ const rows=fundPayments.filter(p=>p.family_id===id);
+ if(!rows.length){alert('لا توجد دفعات مسجلة لهذه الأسرة');return;}
+ const lines=rows.map(p=>`#${p.id}: ${(p.amount_agorot/100).toFixed(2)} ₪ — ${new Date(p.created_at).toLocaleString('ar-PS')}`).join('\n');
+ const chosen=prompt('دفعات '+f.name+'\n'+lines+'\n\nلإلغاء دفعة خاطئة، اكتب رقمها (#). اتركه فارغاً للعودة:');
+ if(!chosen)return;const p=rows.find(x=>String(x.id)===chosen.trim());if(!p){alert('رقم الدفعة غير موجود');return;}
+ const reason=prompt('سبب إلغاء الدفعة #'+p.id+' (مطلوب، 5 أحرف على الأقل):');if(!reason||reason.trim().length<5)return;
+ if(!confirm('تأكيد إبطال الدفعة '+(p.amount_agorot/100)+' ₪؟ ستبقى العملية في سجل التدقيق.'))return;
+ try{await authFetch('/fund/admin/void',{method:'POST',body:JSON.stringify({id:p.id,reason:reason.trim()})});await fundLoad();await fundLoadLedger();toast('تم إبطال الدفعة الخاطئة')}catch(e){alert('فشل الإلغاء: '+e.message)}
 }
-async function fundFinancialPanel(){
- const host=document.getElementById('fundSummary');if(!host)return;
- let panel=document.getElementById('fundFinancialPanel');if(!panel){panel=document.createElement('section');panel.id='fundFinancialPanel';host.insertAdjacentElement('afterend',panel)}
- panel.className='fund-finance-panel';panel.dir='rtl';
- try{
-  const r=await authFetch('/fund/admin/expenses');
-  const money=n=>new Intl.NumberFormat('ar-PS',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(n||0)/100)+' ₪';
-  const expenses=Array.isArray(r.expenses)?r.expenses:[];
-  panel.innerHTML=`<div class="fund-finance-heading"><h3>حركة صندوق المخيم</h3><span>المقبوضات والمصروفات الموثقة</span></div>
-   <div class="fund-finance-stats"><div><small>إجمالي المقبوضات</small><strong>${money(r.incomeAgorot)}</strong></div><div><small>إجمالي المصروفات</small><strong>${money(r.spentAgorot)}</strong></div><div><small>الرصيد المتاح</small><strong>${money(r.balanceAgorot)}</strong></div></div>
-   <div class="fund-finance-section"><div class="fund-finance-section-head"><h4>المصروفات وسداد الديون</h4><button class="btn" id="fundAddExpense">+ تسجيل مصروف / سداد دين</button></div>
-   <div class="fund-finance-list">${expenses.length?expenses.map(e=>`<div class="fund-finance-entry"><div class="fund-finance-entry-main"><b>${esc(e.payee||'جهة غير محددة')}</b><span>${esc(e.reason||'بدون وصف')}</span></div><strong class="fund-finance-negative" dir="ltr">− ${money(e.amount_agorot)}</strong></div>`).join(''):'<p class="fund-finance-empty">لا توجد مصروفات مسجلة</p>'}</div></div>
-   <details class="fund-finance-section fund-payments-details" id="fundPaymentsDetails"><summary class="fund-finance-section-head fund-payments-summary"><strong>الدفعات المسجلة — تصحيح وإلغاء</strong><span>${fundPayments.length} دفعة · اضغط للبحث</span></summary>
-   <div class="fund-payments-controls"><label for="fundPaymentsSearch">ابحث عن دفعة بالاسم أو رقم الهوية</label><input id="fundPaymentsSearch" class="fund-payments-search" type="search" placeholder="اكتب اسم العائلة أو رقم هويتها" autocomplete="off" aria-controls="fundPaymentsResults"/><small id="fundPaymentsSearchStatus" role="status">اكتب للبحث عن الدفعة المطلوبة</small></div>
-   <div class="fund-finance-list" id="fundPaymentsResults"><p class="fund-finance-empty">اكتب اسم العائلة أو رقم هويتها لإظهار الدفعات المطابقة.</p></div></details>`;
-  const search=panel.querySelector('#fundPaymentsSearch'),results=panel.querySelector('#fundPaymentsResults'),status=panel.querySelector('#fundPaymentsSearchStatus');
-  const normalize=v=>String(v??'').normalize('NFKC').replace(/[\u064B-\u065F\u0670]/g,'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').toLocaleLowerCase('ar').trim();
-  function renderPaymentMatches(){const q=normalize(search.value);results.replaceChildren();if(q.length<2){status.textContent='اكتب حرفين على الأقل للبحث';results.innerHTML='<p class="fund-finance-empty">لن تُعرض الدفعات قبل البحث، لتقليل ازدحام الصفحة.</p>';return;}
-   const matches=fundPayments.filter(p=>normalize(p.family_name).includes(q)||normalize(p.family_id).includes(q));status.textContent=matches.length+' دفعة مطابقة';
-   if(!matches.length){results.innerHTML='<p class="fund-finance-empty">لا توجد دفعات مطابقة. جرّب اسمًا آخر أو رقم الهوية.</p>';return;}
-   for(const p of matches.slice(0,30)){const item=document.createElement('div');item.className='fund-finance-entry';const info=document.createElement('div');info.className='fund-finance-entry-main';const name=document.createElement('b');name.textContent=p.family_name||'عائلة';const amount=document.createElement('span');amount.textContent=money(p.amount_agorot);info.append(name,amount);const btn=document.createElement('button');btn.type='button';btn.className='btn fund-void-btn';btn.textContent='إلغاء الدفعة';btn.onclick=()=>fundVoidPayment(Number(p.id));item.append(info,btn);results.append(item);}
-   if(matches.length>30){const note=document.createElement('p');note.className='fund-finance-empty';note.textContent='تظهر أول 30 نتيجة؛ اكتب اسمًا أدق لتضييق البحث.';results.append(note);}
-  }
-  search.addEventListener('input',renderPaymentMatches);
-  panel.querySelector('#fundAddExpense').onclick=async()=>{const category=prompt('نوع المصروف: debt للدين، operations للتشغيل، supplies للمستلزمات، other لأخرى','debt');if(!category)return;const payee=prompt('الجهة المستفيدة / الدائن');if(!payee)return;const reason=prompt('سبب المصروف بالتفصيل');if(!reason)return;const amount=Number(prompt('المبلغ بالشيكل'));if(!Number.isFinite(amount)||amount<=0)return;if(!confirm('تأكيد صرف '+amount+' ₪ من صندوق المخيم؟'))return;try{await authFetch('/fund/admin/expenses',{method:'POST',body:JSON.stringify({category,payee,reason,amountAgorot:Math.round(amount*100)})});await fundLoad()}catch(e){alert(e.message)}};
- }catch(e){panel.textContent='تعذر تحميل حركة الصندوق: '+e.message}
-}
-async function fundPay(id){const f=fundFamilies().find(x=>x.id===id);if(!f||fundLoadedMonth!==fundMonthValue())return;const amount=Number(document.getElementById('fundAmount')?.value),agorot=Math.round(amount*100),note=String(document.getElementById('fundNote')?.value||'');if(!Number.isFinite(amount)||agorot<1||Math.abs(agorot/100-amount)>0.00001){alert('أدخل مبلغاً صحيحاً');return}if(agorot>fundState(f).remaining){alert('المبلغ أكبر من المتبقي لهذه الأسرة');return}if(!confirm(`هل تؤكد استلام ${amount.toFixed(2)} شيكل من ${f.name} عن شهر ${fundMonthValue()}؟`))return;const msg=document.getElementById('fundMessage');try{await authFetch('/fund/admin/payment',{method:'POST',body:JSON.stringify({familyId:id,familyName:f.name,month:fundMonthValue(),amountAgorot:agorot,note})});if(msg)msg.textContent='تم تسجيل الدفعة بنجاح';await fundLoad()}catch(e){if(msg)msg.textContent='لم يتم تأكيد الحفظ: '+e.message;await fundLoad()}}
+async function fundLoadLedger(){const target=document.getElementById('fundLedger');if(!target)return;try{const r=await authFetch('/fund/admin/ledger');target.textContent='مساهمات: '+(r.contributionIncomeAgorot/100).toFixed(2)+' ₪ | كسوة: '+(r.clothingIncomeAgorot/100).toFixed(2)+' ₪ | إجمالي المقبوضات: '+(r.incomeAgorot/100).toFixed(2)+' ₪ | المصروفات: '+(r.expenseAgorot/100).toFixed(2)+' ₪ | الرصيد: '+(r.balanceAgorot/100).toFixed(2)+' ₪';const history=document.getElementById('fundExpenses');if(history)history.replaceChildren(...(r.expenses||[]).slice(0,30).map(x=>{const d=document.createElement('div');d.textContent='#'+x.id+' · '+(x.kind==='debt'?'سداد دين':'مصروف تشغيل')+' · '+x.payee+' · '+(x.amount_agorot/100).toFixed(2)+' ₪ · '+x.description;return d}))}catch(e){target.textContent='تعذر تحميل الرصيد: '+e.message}}
+async function fundAddExpense(){const kind=document.getElementById('fundExpenseKind').value,payee=document.getElementById('fundExpensePayee').value.trim(),description=document.getElementById('fundExpenseDescription').value.trim(),amount=Number(document.getElementById('fundExpenseAmount').value),reference=document.getElementById('fundExpenseReference').value.trim();const amountAgorot=Math.round(amount*100);if(!Number.isFinite(amount)||amountAgorot<=0||Math.abs(amount*100-amountAgorot)>0.001)return alert('أدخل مبلغاً صحيحاً');if(!confirm('اعتماد صرف '+amount.toFixed(2)+' ₪ من صندوق المخيم لصالح '+payee+'؟'))return;try{await authFetch('/fund/admin/expense',{method:'POST',body:JSON.stringify({kind,payee,description,amountAgorot,reference})});await fundLoadLedger();toast('تم تسجيل المصروف وخصمه من الرصيد')}catch(e){alert('تعذر تسجيل المصروف: '+e.message)}}
 function fundExport(){
  if(fundLoadedMonth!==fundMonthValue()){alert('حمّل كشف الشهر أولاً');return;}
  const month=fundLoadedMonth,selector=document.getElementById('fundExportScope');
@@ -4460,12 +4440,12 @@ function fundExport(){
  const collected=families.reduce((sum,f)=>sum+fundState(f).total,0)/100;
  const matrix=[
   ['إدارة مخيم أبو عريبان — كشف المساهمات الشهرية'],
-  ['نوع الكشف: '+titles[scope]+' | الشهر: '+month+' | داخل المخيم 3 شواكل وخارجه 2 شيكل'],
+  ['نوع الكشف: '+titles[scope]+' | الشهر: '+month+' | داخل المخيم 3 ₪، خارج المخيم 2 ₪'],
   ['تاريخ إصدار الكشف: '+new Date().toLocaleDateString('ar-PS')],
   ['عدد الأسر في الكشف: '+families.length+' | مسدد: '+paid+' | جزئي: '+partial+' | غير مسدد: '+(families.length-paid-partial)+' | المحصّل: '+collected.toFixed(2)+' ₪'],
   [],
   ['م','اسم رب الأسرة','رقم هوية الأسرة','الشهر','المطلوب (₪)','المدفوع (₪)','المتبقي (₪)','حالة السداد'],
-  ...families.map((f,i)=>{const x=fundState(f);return [i+1,f.name,f.id,month,(x.required||0)/100,x.total/100,x.remaining===null?'غير محدد':x.remaining/100,x.label];})
+  ...families.map((f,i)=>{const x=fundState(f);return [i+1,f.name,f.id,month,x.required===null?'غير محدد':x.required/100,x.total/100,x.remaining===null?'غير محدد':x.remaining/100,x.label];})
  ];
  try{downloadXLSX(matrix,'كشف_صندوق_أبو_عريبان_'+scope+'_'+month+'.xlsx',{headerRow:6,title:'كشف '+titles[scope]});toast('تم تصدير '+titles[scope]+' بصيغة Excel XLSX');}
  catch(e){console.error(e);alert('تعذر تصدير كشف Excel: '+(e?.message||'خطأ غير معروف'));}
@@ -4495,3 +4475,31 @@ function fundExport(){
   }catch(err){console.error('Moood critical action',err);if(typeof toast==='function')toast('تعذر فتح الإجراء، أعد تحميل الصفحة وحاول مجدداً');}
  },true);
 })();
+
+// Winter intake review is administrator-only; never credits payments without approval.
+async function fundLoadWinterRequests(){
+ const root=document.getElementById('fundMessage');if(!root)return;
+ let panel=document.getElementById('winterRequestsPanel');
+ if(!panel){panel=document.createElement('section');panel.id='winterRequestsPanel';panel.style.cssText='padding:14px;margin:12px 0;border:1px solid #aaa;border-radius:12px';root.parentElement.appendChild(panel)}
+ panel.replaceChildren();const title=document.createElement('h3');title.textContent='طلبات المساهمات من تطبيق الكسوة بانتظار الاعتماد';panel.appendChild(title);
+ try{const response=await authFetch('/winter/admin/requests');const pending=(response.requests||[]).filter(x=>x.status==='pending');
+  if(!pending.length){const p=document.createElement('p');p.textContent='لا توجد طلبات معلقة';panel.appendChild(p);return}
+  for(const r of pending){const line=document.createElement('div');line.style.cssText='padding:10px;border-bottom:1px solid #ddd';const info=document.createElement('span');info.textContent=`${r.family_name} (${r.family_id}) — ${(r.amount_agorot/100).toFixed(2)} ₪ — ${new Date(r.received_at).toLocaleString('ar-PS')}`;line.appendChild(info);
+   for(const decision of ['approved','rejected']){const btn=document.createElement('button');btn.className='btn';btn.textContent=decision==='approved'?'اعتماد':'رفض';btn.onclick=async()=>{const reason=prompt('اكتب سبب '+(decision==='approved'?'الاعتماد':'الرفض')+' (5 أحرف على الأقل)');if(!reason||reason.trim().length<5)return;try{await authFetch('/winter/admin/requests',{method:'POST',body:JSON.stringify({eventId:r.event_id,decision,reason})});await fundLoad();}catch(e){alert('تعذر تنفيذ القرار: '+e.message)}};line.appendChild(btn)}panel.appendChild(line)}
+ }catch(e){const p=document.createElement('p');p.textContent='تعذر جلب الطلبات: '+e.message;panel.appendChild(p)}
+}
+
+// Separate clothing fee review: approved payments become income in the same fund ledger.
+async function fundLoadClothingRequests(){
+ const root=document.getElementById('fundMessage');if(!root)return;
+ let panel=document.getElementById('winterClothingPanel');if(!panel){panel=document.createElement('section');panel.id='winterClothingPanel';panel.style.cssText='padding:14px;margin:12px 0;border:1px solid #aaa;border-radius:12px';root.parentElement.appendChild(panel)}
+ panel.replaceChildren();const h=document.createElement('h3');h.textContent='رسوم الكسوة — طلبات التحصيل والإلغاء';panel.appendChild(h);
+ try{const result=await authFetch('/winter/admin/clothing');const pending=(result.requests||[]).filter(x=>x.status==='pending');
+  if(!pending.length){const p=document.createElement('p');p.textContent='لا توجد طلبات معلقة';panel.appendChild(p);return}
+  for(const r of pending){const line=document.createElement('div');line.style.cssText='padding:12px 0;border-bottom:1px solid #ddd;display:flex;flex-wrap:wrap;gap:8px;align-items:center';
+   const info=document.createElement('span');info.textContent=(r.action==='void'?'إلغاء دفعة':'تحصيل كسوة')+' · '+r.child_name+' · 2 ₪';line.appendChild(info);
+   for(const decision of ['approved','rejected']){const btn=document.createElement('button');btn.className='btn';btn.textContent=decision==='approved'?'اعتماد':'رفض';btn.onclick=async()=>{const reason=prompt('سبب '+(decision==='approved'?'الاعتماد':'الرفض')+' (5 أحرف على الأقل)');if(!reason||reason.trim().length<5)return;try{await authFetch('/winter/admin/clothing',{method:'POST',body:JSON.stringify({eventId:r.event_id,decision,reason})});await fundLoadClothingRequests();await fundLoadLedger()}catch(e){alert('فشل الإجراء: '+e.message)}};line.appendChild(btn)}panel.appendChild(line)}
+ }catch(e){const p=document.createElement('p');p.textContent='تعذر تحميل رسوم الكسوة: '+e.message;panel.appendChild(p)}
+}
+const winterClothingObserver=new MutationObserver(()=>{const root=document.getElementById('fundMessage');if(root&&!document.getElementById('winterClothingPanel'))fundLoadClothingRequests().catch(()=>{})});
+winterClothingObserver.observe(document.body,{childList:true,subtree:true});

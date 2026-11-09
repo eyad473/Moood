@@ -1,4 +1,4 @@
-const CACHE = "abu-oreiban-v70.19-support-inbox";
+const CACHE = "abu-oreiban-v70.20-winter-fund";
 const APP_SHELL = ["./", "./index.html", "./app.js", "./manifest.webmanifest"];
 
 self.addEventListener("install", event => {
