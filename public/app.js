@@ -2081,8 +2081,18 @@ function syncNormalizeRows(rows){return (Array.isArray(rows)?rows:[]).map((r,i)=
 function syncComparable(r){const x={};for(const k of COLUMNS)if(k!=="#")x[k]=r?.[k]??"";return JSON.stringify(x)}
 function syncLoadShadow(){try{syncShadow=syncNormalizeRows(JSON.parse(localStorage.getItem(SYNC_SHADOW_KEY)||"[]"))}catch(e){syncShadow=[]}}
 function syncSaveShadow(rows){syncShadow=syncNormalizeRows(structuredClone(rows));localStorage.setItem(SYNC_SHADOW_KEY,JSON.stringify(syncShadow))}
-function syncLoadPending(){try{return JSON.parse(localStorage.getItem(SYNC_PENDING_KEY)||"[]")}catch(e){return []}}
-function syncSavePending(changes){localStorage.setItem(SYNC_PENDING_KEY,JSON.stringify(changes||[]))}
+/* V73: Durable IndexedDB pending queue. Legacy localStorage remains untouched until verified migration. */
+const SYNC_PENDING_DB_NAME="aboreiban_sync_durable_v1";
+let syncPendingMemory=null, syncPendingReady=null, syncPendingWrite=Promise.resolve(), syncPendingFailure=null;
+function syncPendingDb(){return new Promise((resolve,reject)=>{if(!window.indexedDB)return reject(Error("IndexedDB غير مدعوم"));const req=indexedDB.open(SYNC_PENDING_DB_NAME,1);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains("queue"))req.result.createObjectStore("queue")};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error||Error("فشل فتح IndexedDB"))})}
+async function syncPendingDbGet(){const db=await syncPendingDb();try{return await new Promise((resolve,reject)=>{const tx=db.transaction("queue","readonly"),req=tx.objectStore("queue").get("pending");req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}finally{db.close()}}
+async function syncPendingDbPut(value){const db=await syncPendingDb();try{await new Promise((resolve,reject)=>{const tx=db.transaction("queue","readwrite");tx.objectStore("queue").put(value,"pending");tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||Error("فشل حفظ قائمة المزامنة"));tx.onabort=()=>reject(tx.error||Error("أُلغيت عملية الحفظ"))})}finally{db.close()}}
+function syncLegacyPending(){try{const value=JSON.parse(localStorage.getItem(SYNC_PENDING_KEY)||"[]");return Array.isArray(value)?value:[]}catch(e){throw Error("قائمة المزامنة القديمة غير قابلة للقراءة؛ لم يتم حذفها")}}
+function syncLoadPending(){if(syncPendingMemory!==null)return syncPendingMemory;return syncLegacyPending()}
+async function syncInitPending(){if(syncPendingReady)return syncPendingReady;syncPendingReady=(async()=>{const legacy=syncLegacyPending();const stored=await syncPendingDbGet();const old=Array.isArray(stored)?stored:[];const byOp=new Map();for(const c of old.concat(legacy)){if(c?.opId)byOp.set(c.opId,c)}const combined=[...byOp.values()];await syncPendingDbPut(combined);syncPendingMemory=combined;/* Delete only after a completed IndexedDB transaction. */try{localStorage.removeItem(SYNC_PENDING_KEY)}catch(e){};return combined})().catch(e=>{syncPendingFailure=e;toast("تعذر تهيئة التخزين الآمن للمزامنة: "+e.message);throw e});return syncPendingReady}
+function syncSavePending(changes){if(syncPendingMemory===null)throw Error("لم تكتمل تهيئة التخزين الآمن");const next=structuredClone(changes||[]);syncPendingMemory=next;syncPendingWrite=syncPendingWrite.catch(()=>{}).then(async()=>{await syncPendingDbPut(next);syncPendingFailure=null}).catch(e=>{syncPendingFailure=e;toast("تعذر حفظ تغييرات المزامنة في التخزين الآمن: "+e.message);throw e});syncPendingWrite.catch(()=>{});return syncPendingWrite}
+async function syncFlushPending(){await syncInitPending();await syncPendingWrite;if(syncPendingFailure)throw syncPendingFailure}
+
 function syncLocalSave(silent=true){
   data=syncNormalizeRows(data); localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
   if(!silent){if(navigator.onLine)toast("تم حفظ البيانات محلياً — جاري المزامنة");else toast("تم حفظ البيانات محلياً — بانتظار عودة الإنترنت")}
@@ -2200,6 +2210,7 @@ async function syncInitialMerge(){
   return await syncAdoptAuthoritativeSnapshot(true);
 }
 async function syncPush(){
+  await syncFlushPending();
   let pending=syncLoadPending();
   if(!pending.length)pending=syncRebuildPending();
   /* V72: حذف أسر إلى السحابة فقط إذا كان صريحاً (من زر الحذف) وبحد أقصى 30 في الإرسال الواحد.
@@ -2221,12 +2232,14 @@ async function syncPush(){
     if(restore.length){rebuildFilters();renderAll();toast(`تم منع حذف غير صريح/جماعي (${restore.length} سجل) — لم يُرسل للسحابة واستُعيدت السجلات`);}
     console.warn("V72 deletes blocked",__blocked.length,"restored",restore.length);
   }
+  await syncFlushPending();
   const originalTotal=pending.length;
   if(!pending.length)return {accepted:0,total:0,remaining:0,conflicts:[]};
   let accepted=0, conflicts=[];
   for(let attempt=0;attempt<3 && pending.length;attempt++){
     conflicts=[];
     for(let i=0;i<pending.length;i+=100){
+      await syncFlushPending();
       const batch=pending.slice(i,i+100);
       const r=await syncFetch("/sync/push",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),changes:batch})});
       const okIds=new Set((r.accepted||[]).map(x=>typeof x==="string"?x:x.opId));
@@ -2248,7 +2261,9 @@ async function syncPush(){
   if(!pending.length){
     syncSaveShadow(data);
     syncSavePending([]);
+    await syncFlushPending();
   }
+  await syncFlushPending();
   return {accepted,total:originalTotal,remaining:pending.length,conflicts};
 }
 async function syncFetchAuthoritativeSnapshot(){
@@ -2380,6 +2395,7 @@ async function syncPrimaryPullMissing(pulse){
 async function syncOnlineReconcile(reason="auto"){
   if(syncBusy||!navigator.onLine)return;syncBusy=true;
   try{
+    await syncInitPending();
     await fetchSyncRole(true);
     if(!syncRole.configured){
       if(syncRole.isPrimary){} else {console.warn("B1: unconfigured secondary; pending changes preserved");return;}
@@ -2486,7 +2502,7 @@ function showProgramUpdateNotice(){
 }
 
 function installCloudSync(){
-  data=syncNormalizeRows(data);syncLoadShadow();syncLoadPending();
+  data=syncNormalizeRows(data);syncLoadShadow();syncInitPending().catch(e=>console.error("Pending queue initialization blocked",e));
   if(!navigator.onLine && !data.length && !syncLoadPending().length){ syncLoadOfflineAuthoritativeCache(); }
 
   window.saveNow=function(){try{syncLocalSave(false);syncRebuildPending();syncOnlineReconcile("manual")}catch(e){toast("تعذر حفظ البيانات محلياً")}};
