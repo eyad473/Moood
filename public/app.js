@@ -932,6 +932,17 @@ function personRole(rows, roles){
   const wanted=new Set(roles.map(familyPrintRoleNorm));
   return rows.find(r=>wanted.has(familyPrintRoleNorm(r["صلة القرابة"]))) || null;
 }
+// طباعة فقط: لا نغيّر سجلات الأفراد أو قاعدة البيانات.
+// عند تضارب صلة القرابة مع الاسم، نتحقق من اسم الفرد وهوية الأسرة.
+function verifiedPrintHead(people, familyName){
+  const normalizedName=familyPrintRoleNorm(familyName);
+  const candidates=people.filter(p=>familyPrintRoleNorm(p["اسم الفرد"])===normalizedName);
+  const marked=candidates.find(p=>familyPrintRoleNorm(p["صلة القرابة"])==="رب الاسره");
+  if(marked)return marked;
+  if(candidates.length===1)return candidates[0];
+  // لا ننسب بيانات طفل لرب الأسرة اعتماداً على صلة القرابة وحدها.
+  return null;
+}
 function personValue(p,key){
   if(!p)return "";
   const map={
@@ -946,7 +957,7 @@ function personValue(p,key){
 }
 function familyPrintValue(row,people,key){
   // Never substitute a child or another family member for a missing head record.
-  const head=personRole(people,["رب الأسرة","رب الاسرة"]) || null;
+  const head=verifiedPrintHead(people,row["اسم رب الأسرة"]) || null;
   const wife=personRole(people,["زوجة","الزوجة","زوج"]) || null;
   const familyMapKeys={
     "اسم رب الأسرة":"اسم رب الأسرة","رقم هوية الأسرة":"رقم هوية الأسرة",
@@ -1034,8 +1045,8 @@ function printFamilyReport(){
   const rows=entries.map(([h,people],i)=>{
     // Family-wide fields are shared; prefer the actual head record when present.
     // Personal head fields are independently resolved by familyPrintValue.
-    const r=personRole(people,["رب الأسرة","رب الاسرة"]) || people[0] || {};
-    return {r,people,index:i+1};
+    const r=verifiedPrintHead(people,h) || people.find(p=>familyPrintRoleNorm(p["اسم رب الأسرة"])===familyPrintRoleNorm(h)) || {"اسم رب الأسرة":h};
+    return {r:{"اسم رب الأسرة":h,...r},people,index:i+1};
   });
 
   const title=mode==="head"?"كشف أرباب الأسر":"كشف العائلات";
