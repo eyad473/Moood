@@ -925,8 +925,12 @@ function familyPrintEntries(){
  const scope=document.getElementById("familyPrintScope")?.value||"all";
  return scope==="filtered"?familyVisibleEntries():[...familyMap().entries()];
 }
+function familyPrintRoleNorm(value){
+  return String(value??"").trim().replace(/[أإآٱ]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/[\u064B-\u065F\u0640]/g,"").replace(/\s+/g," ");
+}
 function personRole(rows, roles){
-  return rows.find(r=>roles.includes(norm(r["صلة القرابة"]))) || null;
+  const wanted=new Set(roles.map(familyPrintRoleNorm));
+  return rows.find(r=>wanted.has(familyPrintRoleNorm(r["صلة القرابة"]))) || null;
 }
 function personValue(p,key){
   if(!p)return "";
@@ -941,7 +945,8 @@ function personValue(p,key){
   return p[map[key]] ?? "";
 }
 function familyPrintValue(row,people,key){
-  const head=personRole(people,["رب الأسرة"]) || people[0] || null;
+  // Never substitute a child or another family member for a missing head record.
+  const head=personRole(people,["رب الأسرة","رب الاسرة"]) || null;
   const wife=personRole(people,["زوجة","الزوجة","زوج"]) || null;
   const familyMapKeys={
     "اسم رب الأسرة":"اسم رب الأسرة","رقم هوية الأسرة":"رقم هوية الأسرة",
@@ -1027,7 +1032,9 @@ function printFamilyReport(){
   if(mode!=="head" && !columns.length){toast("اختر عموداً واحداً على الأقل");return}
 
   const rows=entries.map(([h,people],i)=>{
-    const r=people[0]||{};
+    // Family-wide fields are shared; prefer the actual head record when present.
+    // Personal head fields are independently resolved by familyPrintValue.
+    const r=personRole(people,["رب الأسرة","رب الاسرة"]) || people[0] || {};
     return {r,people,index:i+1};
   });
 
