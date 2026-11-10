@@ -1609,7 +1609,7 @@ async function fundLedger(request,env){
  const [income,expense,rows,clothing]=await Promise.all([
  env.DB.prepare('SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_payments WHERE voided_at IS NULL').first(),
  env.DB.prepare('SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_expenses').first(),
- env.DB.prepare('SELECT * FROM camp_fund_expenses ORDER BY id DESC LIMIT 150').all(),
+ env.DB.prepare('SELECT id,kind,payee,description,amount_agorot,created_at,reference FROM camp_fund_expenses ORDER BY id DESC LIMIT 30').all(),
  env.DB.prepare('SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_clothing_income WHERE voided_at IS NULL').first()]);
  return json({ok:true,incomeAgorot:Number(income?.total||0)+Number(clothing?.total||0),contributionIncomeAgorot:Number(income?.total||0),clothingIncomeAgorot:Number(clothing?.total||0),expenseAgorot:Number(expense?.total||0),balanceAgorot:Number(income?.total||0)+Number(clothing?.total||0)-Number(expense?.total||0),expenses:rows.results||[]});
 }
@@ -2028,7 +2028,9 @@ export default {
     } catch (e) {
       const incidentId=crypto.randomUUID();
       console.error('worker_internal_error',incidentId,url.pathname,String(e?.stack||e));
-      return json({ ok: false, error: "خطأ داخلي", code:"SERVER_ERROR", incidentId, detail: String(e?.message || e) }, 500);
+      const internalMessage=String(e?.message||e||"");
+      const quota=/exceeded.*(row read|daily|limit)|free tier daily row read limit/i.test(internalMessage);
+      return json({ ok:false, error:quota?"تم تجاوز حصة قراءة قاعدة البيانات اليومية في Cloudflare D1؛ انتظر تجديد الحصة ولا تعِد تسجيل العملية قبل مراجعتها":"تعذر إتمام الطلب في الخادم؛ لم يتم تأكيد تسجيل العملية", code:quota?"D1_READ_QUOTA":"SERVER_ERROR", incidentId }, quota?503:500);
     }
   }
 };
