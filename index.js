@@ -1603,6 +1603,31 @@ async function fundLedgerSchemaInit(env){
   }
  }
 }
+// Read-only, admin-only financial diagnostics. No schema migration or writes.
+async function fundDiagnostics(request,env){
+ const auth=await fundAdmin(request,env);if(auth.error)return auth.error;
+ const checks=[];
+ const probes=[
+  ['payments_table',"SELECT name FROM sqlite_master WHERE type='table' AND name='camp_fund_payments'"],
+  ['expenses_table',"SELECT name FROM sqlite_master WHERE type='table' AND name='camp_fund_expenses'"],
+  ['clothing_table',"SELECT name FROM sqlite_master WHERE type='table' AND name='camp_fund_clothing_income'"],
+  ['payments_total','SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_payments WHERE voided_at IS NULL'],
+  ['expenses_total','SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_expenses'],
+  ['clothing_total','SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_clothing_income WHERE voided_at IS NULL'],
+  ['expenses_recent','SELECT id,kind,amount_agorot,created_at,reference FROM camp_fund_expenses ORDER BY id DESC LIMIT 1']
+ ];
+ for(const [name,sql] of probes){
+  try{
+   const result=await env.DB.prepare(sql).first();
+   checks.push({name,ok:true,exists: name.endsWith('_table')?Boolean(result):undefined});
+  }catch(e){
+   const message=String(e?.message||e||'');
+   const code=/no such table/i.test(message)?'MISSING_TABLE':/no such column/i.test(message)?'MISSING_COLUMN':/exceeded|quota|row read limit/i.test(message)?'D1_QUOTA':'D1_QUERY_FAILED';
+   checks.push({name,ok:false,code,detail:message.slice(0,240)});
+  }
+ }
+ return json({ok:true,readOnly:true,checks});
+}
 async function fundLedger(request,env){
  const auth=await fundAdmin(request,env);if(auth.error)return auth.error;
  await fundLedgerSchema(env);await winterClothingSchema(env);
@@ -1979,6 +2004,7 @@ export default {
       if (url.pathname === "/fund/admin/list" && request.method === "GET") return await fundList(request,env);
       if (url.pathname === "/fund/admin/payment" && request.method === "POST") return await fundSave(request,env);
       if (url.pathname === "/fund/admin/void" && request.method === "POST") return await fundVoid(request,env);
+      if (url.pathname === "/fund/admin/diagnostics" && request.method === "GET") return await fundDiagnostics(request,env);
       if (url.pathname === "/fund/admin/ledger" && request.method === "GET") return await fundLedger(request,env);
       if (url.pathname === "/fund/admin/expense" && request.method === "POST") return await fundExpenseSave(request,env);
       if (url.pathname === "/announcements" && request.method === "GET") return await listPublicAnnouncements(request, env);
