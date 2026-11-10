@@ -1615,7 +1615,7 @@ async function fundDiagnostics(request,env){
   ['expenses_table',"SELECT name FROM sqlite_master WHERE type='table' AND name='camp_fund_expenses'"],
   ['clothing_table',"SELECT name FROM sqlite_master WHERE type='table' AND name='camp_fund_clothing_income'"],
   ['payments_total','SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_payments WHERE voided_at IS NULL'],
-  ['expenses_total','SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_expenses'],
+  ['expenses_total','SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_expenses WHERE voided_at IS NULL'],
   ['clothing_total','SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_clothing_income WHERE voided_at IS NULL'],
   ['expenses_recent','SELECT id,kind,amount_agorot,created_at,reference FROM camp_fund_expenses ORDER BY id DESC LIMIT 1']
  ];
@@ -1636,8 +1636,8 @@ async function fundLedger(request,env){
  await fundLedgerSchema(env);await winterClothingSchema(env);
  const [income,expense,rows,clothing]=await Promise.all([
  env.DB.prepare('SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_payments WHERE voided_at IS NULL').first(),
- env.DB.prepare('SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_expenses').first(),
- env.DB.prepare('SELECT id,kind,payee,description,amount_agorot,created_at,reference FROM camp_fund_expenses ORDER BY id DESC LIMIT 30').all(),
+ env.DB.prepare('SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_expenses WHERE voided_at IS NULL').first(),
+ env.DB.prepare('SELECT id,CASE WHEN kind IN ('debt','operating') THEN kind ELSE category END AS kind,payee,reason AS description,amount_agorot,created_at,reference FROM camp_fund_expenses WHERE voided_at IS NULL ORDER BY id DESC LIMIT 30').all(),
  env.DB.prepare('SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_clothing_income WHERE voided_at IS NULL').first()]);
  return json({ok:true,incomeAgorot:Number(income?.total||0)+Number(clothing?.total||0),contributionIncomeAgorot:Number(income?.total||0),clothingIncomeAgorot:Number(clothing?.total||0),expenseAgorot:Number(expense?.total||0),balanceAgorot:Number(income?.total||0)+Number(clothing?.total||0)-Number(expense?.total||0),expenses:rows.results||[]});
 }
@@ -1648,8 +1648,8 @@ async function fundExpenseSave(request,env){
  if(!['debt','operating'].includes(kind)||payee.length<3||payee.length>150||description.length<8||description.length>500||reference.length>100||!Number.isSafeInteger(amount)||amount<1||amount>100000000)return json({ok:false,error:'بيانات المصروف غير صحيحة'},400);
  await fundLedgerSchema(env);await winterClothingSchema(env);
  // Conditional SQL INSERT enforces the balance against simultaneous expense submissions.
- const result=await env.DB.prepare(`INSERT INTO camp_fund_expenses(kind,payee,description,amount_agorot,created_at,created_by,reference)
- SELECT ?,?,?,?,?,?,? WHERE (SELECT COALESCE(SUM(amount_agorot),0) FROM camp_fund_payments WHERE voided_at IS NULL)+(SELECT COALESCE(SUM(amount_agorot),0) FROM camp_fund_clothing_income WHERE voided_at IS NULL)-(SELECT COALESCE(SUM(amount_agorot),0) FROM camp_fund_expenses)>=?`).bind(kind,payee,description,amount,Date.now(),auth.session.username||'admin',reference,amount).run();
+ const result=await env.DB.prepare(`INSERT INTO camp_fund_expenses(kind,category,payee,reason,amount_agorot,created_at,created_by,reference)
+ SELECT ?,?,?,?,?,?,?,? WHERE (SELECT COALESCE(SUM(amount_agorot),0) FROM camp_fund_payments WHERE voided_at IS NULL)+(SELECT COALESCE(SUM(amount_agorot),0) FROM camp_fund_clothing_income WHERE voided_at IS NULL)-(SELECT COALESCE(SUM(amount_agorot),0) FROM camp_fund_expenses WHERE voided_at IS NULL)>=?`).bind(kind,kind,payee,description,amount,Date.now(),auth.session.username||'admin',reference,amount).run();
  if(result.meta?.changes!==1)return json({ok:false,error:'الرصيد المتاح غير كافٍ، لم يُسجل المصروف'},409);
  return json({ok:true,id:result.meta?.last_row_id});
 }
