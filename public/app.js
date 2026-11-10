@@ -4503,3 +4503,40 @@ async function fundLoadClothingRequests(){
 }
 const winterClothingObserver=new MutationObserver(()=>{const root=document.getElementById('fundMessage');if(root&&!document.getElementById('winterClothingPanel'))fundLoadClothingRequests().catch(()=>{})});
 winterClothingObserver.observe(document.body,{childList:true,subtree:true});
+
+
+/* Fund diagnostics: read-only, authenticated via the existing administrator session. */
+async function fundRunDiagnostics(){
+  const output=document.getElementById('fundDiagnosticsOutput');
+  const button=document.getElementById('fundDiagnosticsButton');
+  if(!output)return;
+  if(button)button.disabled=true;
+  output.hidden=false;
+  output.textContent='جارٍ فحص استعلامات الصندوق للقراءة فقط…';
+  try{
+    const result=await authFetch('/fund/admin/diagnostics');
+    const checks=Array.isArray(result.checks)?result.checks:[];
+    const names={payments_table:'وجود جدول المساهمات',expenses_table:'وجود جدول المصروفات',clothing_table:'وجود جدول الكسوة',payments_total:'إجمالي المساهمات',expenses_total:'إجمالي المصروفات',clothing_total:'إجمالي الكسوة',expenses_recent:'آخر مصروف'};
+    const lines=checks.map(c=>{
+      const state=c.ok?(c.exists===false?'الجدول غير موجود':'سليم'):'فشل';
+      return (names[c.name]||c.name)+': '+state+(c.code?' ['+c.code+']':'')+(c.detail?' — '+c.detail:'');
+    });
+    output.textContent=lines.length?lines.join('\n'):'الخادم لم يُرجع نتائج للفحوصات.';
+  }catch(error){
+    output.textContent='تعذّر إجراء الفحص: '+(error?.message||'خطأ غير معروف')+(error?.code?' ['+error.code+']':'');
+  }finally{if(button)button.disabled=false;}
+}
+function fundInstallDiagnostics(){
+  const target=document.getElementById('fundLedger');
+  if(!target||document.getElementById('fundDiagnosticsButton'))return;
+  const container=document.createElement('div');
+  container.style.cssText='margin:12px 0;padding:12px;border:1px solid #cbd5e1;border-radius:12px;';
+  const button=document.createElement('button');
+  button.id='fundDiagnosticsButton';button.type='button';button.className='btn';
+  button.textContent='فحص صندوق المخيم (قراءة فقط)';button.addEventListener('click',fundRunDiagnostics);
+  const output=document.createElement('pre');output.id='fundDiagnosticsOutput';output.hidden=true;
+  output.dir='rtl';output.style.cssText='white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.8;margin:10px 0 0;user-select:text;';
+  container.append(button,output);target.parentNode.insertBefore(container,target);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',fundInstallDiagnostics);
+else fundInstallDiagnostics();
