@@ -1637,7 +1637,7 @@ async function fundLedger(request,env){
  const [income,expense,rows,clothing]=await Promise.all([
  env.DB.prepare('SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_payments WHERE voided_at IS NULL').first(),
  env.DB.prepare('SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_expenses WHERE voided_at IS NULL').first(),
- env.DB.prepare('SELECT id,CASE WHEN kind IN ('debt','operating') THEN kind ELSE category END AS kind,payee,reason AS description,amount_agorot,created_at,reference FROM camp_fund_expenses WHERE voided_at IS NULL ORDER BY id DESC LIMIT 30').all(),
+ env.DB.prepare("SELECT id, CASE WHEN kind IN ('debt','operating') THEN kind ELSE category END AS kind, payee, reason AS description, amount_agorot, created_at, reference FROM camp_fund_expenses WHERE voided_at IS NULL ORDER BY id DESC LIMIT 30").all(),
  env.DB.prepare('SELECT COALESCE(SUM(amount_agorot),0) AS total FROM camp_fund_clothing_income WHERE voided_at IS NULL').first()]);
  return json({ok:true,incomeAgorot:Number(income?.total||0)+Number(clothing?.total||0),contributionIncomeAgorot:Number(income?.total||0),clothingIncomeAgorot:Number(clothing?.total||0),expenseAgorot:Number(expense?.total||0),balanceAgorot:Number(income?.total||0)+Number(clothing?.total||0)-Number(expense?.total||0),expenses:rows.results||[]});
 }
