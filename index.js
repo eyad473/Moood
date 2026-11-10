@@ -1592,6 +1592,9 @@ async function fundLedgerSchemaInit(env){
  const info=await env.DB.prepare('PRAGMA table_info(camp_fund_expenses)').all();
  const columns=new Set((info.results||[]).map(x=>x.name));
  for(const [name,sql] of [
+  // Legacy expense rows have no reliable category: keep them explicitly unclassified.
+  // New expense inserts always provide 'debt' or 'operating'.
+  ['kind',`ALTER TABLE camp_fund_expenses ADD COLUMN kind TEXT NOT NULL DEFAULT 'legacy'`],
   ['reference',`ALTER TABLE camp_fund_expenses ADD COLUMN reference TEXT NOT NULL DEFAULT ''`],
   ['created_by',`ALTER TABLE camp_fund_expenses ADD COLUMN created_by TEXT NOT NULL DEFAULT 'legacy'`]
  ]){
