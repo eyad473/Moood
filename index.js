@@ -595,32 +595,8 @@ async function push(request, env) {
       continue;
     }
 
-    // Check only campaign distribution records; family data and all other sync scopes
-    // keep their existing behavior. Exclude this record while editing it.
-    if (recordId.startsWith('dist:') && operation !== 'delete' && !campaignCancelled(data)) {
-      const candidateType = campaignNorm(data?.type);
-      const candidateFamily = campaignFamily(data);
-      if (candidateType && (candidateFamily.id || candidateFamily.name)) {
-        let duplicate = null;
-        for (const [otherId, other] of campaignActive) {
-          if (otherId === recordId || campaignCancelled(other)) continue;
-          if (campaignNorm(other?.type) === candidateType && campaignSameFamily(data, other)) {
-            duplicate = { id: otherId, reference: String(other?.reference || '') };
-            break;
-          }
-        }
-        if (duplicate) {
-          conflicts.push({
-            opId, recordId,
-            reason: 'مرفوض: نوع المساعدة مسجل مسبقاً لهذه العائلة',
-            duplicateRecordId: duplicate.id,
-            duplicateReference: duplicate.reference
-          });
-          continue;
-        }
-      }
-    }
-
+    // V80: Historical aid is not a uniqueness constraint. Distinct recordId/opId
+    // means a distinct distribution; existing opId/version conflict checks remain.
     const nextVersion = current ? Number(current.version) + 1 : 1;
     const createdAt = now();
     const dataJson = operation === "delete" ? null : JSON.stringify(data);
