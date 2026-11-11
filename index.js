@@ -1308,6 +1308,34 @@ async function supportLookup(request, env) {
   const wa=await env.DB.prepare(`SELECT whatsapp_number FROM family_whatsapp WHERE family_id=? LIMIT 1`).bind(String(session.family_id)).first().catch(()=>null);
   return json({ok:true,family:{name:familyName,fields:supportPublicRecord(first),members:rows.map(supportPublicRecord),count:rows.length,whatsappNumber:wa?.whatsapp_number||''}});
 }
+// Resident distribution history: read-only, scoped exclusively to the verified support session.
+async function supportDistributionHistory(request, env) {
+  await ensureSupportSchema(env);
+  const token=cleanString(request.headers.get('X-Support-Session')||'',200);
+  const session=await supportSession(env,token);
+  if(!session)return json({ok:false,error:'انتهت جلسة التحقق. يرجى تسجيل الدخول مجدداً.'},401);
+  const familyId=String(session.family_id||'').trim();
+  if(!familyId)return json({ok:false,error:'تعذر تحديد الأسرة المتحقق منها.'},403);
+  // Do not match by names: names are non-unique and can leak another household's aid history.
+  const result=await env.DB.prepare(`SELECT record_id,data_json FROM sync_records
+    WHERE deleted=0 AND record_id LIKE 'dist:%' AND json_valid(data_json)
+    AND CAST(json_extract(data_json,'$.familyId') AS TEXT)=?
+    ORDER BY record_id LIMIT 10000`).bind(familyId).all();
+  const items=[];
+  for(const row of result.results||[]){
+    let d;try{d=JSON.parse(row.data_json)}catch{continue}
+    const status=String(d.workflowStatus||d.statusLabel||'').trim();
+    if(/ملغ|الغاء|cancel|void|pending|معلق|قيد المراجعة|بانتظار|مرشح|ترشيح/i.test(status))continue;
+    // Only confirmed/legacy receipt records; never expose notes, identities, or internal admin fields.
+    if(status && !/تم التسليم|تم الاستلام|مستلم|delivered|received|completed|approved/i.test(status))continue;
+    items.push({id:String(row.record_id),type:String(d.type||'مساعدة غير محددة').slice(0,160),
+      date:String(d.date||'').slice(0,10),quantity:d.quantity??null,
+      unit:String(d.unit||'').slice(0,60),reference:String(d.reference||'').slice(0,100),
+      beneficiaryName:String(d.beneficiaryName||'').slice(0,160)});
+  }
+  items.sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+  return json({ok:true,items,updatedAt:new Date().toISOString(),total:items.length});
+}
 /* AI-assisted automatic intake: clear routine requests only; no family data sent to model. */
 function classifyRoutineIntake(raw) {
  const s=String(raw||'').trim().slice(0,1200);
@@ -1994,6 +2022,7 @@ export default {
       if (url.pathname === "/support/contact" && request.method === "POST") return await supportSaveWhatsapp(request, env);
       if (url.pathname === "/support/whatsapp/admin" && request.method === "GET") return await listFamilyWhatsapp(request, env);
       if (url.pathname === "/support/lookup" && request.method === "POST") return await supportLookup(request, env);
+      if (url.pathname === "/support/distributions" && request.method === "POST") return await supportDistributionHistory(request, env);
       if (url.pathname === "/support/submit" && request.method === "POST") return await supportSubmit(request, env);
       if (url.pathname === "/support/notifications" && request.method === "GET") return await supportNotifications(request, env);
       if (url.pathname === "/support/logout" && request.method === "POST") return await supportLogout(request, env);
