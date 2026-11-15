@@ -321,6 +321,7 @@ async function deleteFamily(name){
  if(await confirmUI(`سيتم حذف عائلة «${name}» وجميع أفرادها (${n} سجل).
 
 لن يتم تنفيذ الحذف إلا بعد تأكيدك.`,{title:"حذف العائلة",okText:"حذف العائلة",danger:true})){
+  data=syncNormalizeRows(data);
   syncMarkExplicitDelete(data.filter(r=>r["اسم رب الأسرة"]===name));
   data=data.filter(r=>r["اسم رب الأسرة"]!==name);renumber();autoSave();rebuildFilters();renderAll();toast("تم حذف العائلة وجميع أفرادها");
  }
@@ -358,7 +359,8 @@ async function deletePerson(idx){
    const ok=await confirmUI(`هل تريد حذف الفرد «${r?.["اسم الفرد"]||""}»؟\n\nسيتم حفظ العملية محليًا ثم مزامنتها مع السحابة.`,{title:"حذف الفرد",okText:"حذف الفرد",danger:true});
    if(!ok)return;
  }
- syncMarkExplicitDelete([r]);
+ data=syncNormalizeRows(data);
+ syncMarkExplicitDelete([data[idx]]);
  data.splice(idx,1);renumber();autoSave();rebuildFilters();renderAll();toast("تم حذف الفرد");
 }
 function emptyRecord(){const r={};COLUMNS.forEach(k=>r[k]="");return r}
@@ -1838,7 +1840,7 @@ const SYNC_DEVICE_KEY = "aboreiban_sync_device_v1";
 const SYNC_CURSOR_KEY = "aboreiban_sync_cursor_v1";
 const SYNC_SHADOW_KEY = "aboreiban_sync_shadow_v1";
 const SYNC_PENDING_KEY = "aboreiban_sync_pending_v2";
-const APP_RELEASE_VERSION = "72.1-safe-sync"
+const APP_RELEASE_VERSION = "72.2-verified-deletion"
 const APP_RELEASE_KEY = "aboreiban_app_release_seen";
 let syncBusy=false, syncTimer=null, syncShadow=[], syncCursor=Number(localStorage.getItem(SYNC_CURSOR_KEY)||0), syncInitialized=false;
 let syncRole={configured:false,isPrimary:false,deviceId:"",primaryDeviceId:""};
@@ -1854,6 +1856,11 @@ function syncReadIdSet(k){try{return new Set(JSON.parse(localStorage.getItem(k)|
 function syncWriteIdSet(k,s){try{localStorage.setItem(k,JSON.stringify([...s].slice(-5000)))}catch(e){}}
 /* V72: الحذف إلى السحابة لا يُرسل إلا للسجلات التي حذفها المستخدم صراحةً (زر حذف عائلة/فرد). غياب سجل محلياً لأي سبب آخر لا يُعد حذفاً. */
 function syncMarkExplicitDelete(rows){const s=syncReadIdSet(SYNC_EXPL_DEL_KEY);(rows||[]).forEach(r=>{if(r&&r.__syncId)s.add(r.__syncId)});syncWriteIdSet(SYNC_EXPL_DEL_KEY,s)}
+function syncDeletionProtectedIds(){
+  const ids=syncReadIdSet(SYNC_EXPL_DEL_KEY);
+  try{for(const c of syncLoadPending())if(c.operation==="delete"&&c.explicitDelete===true)ids.add(c.recordId)}catch(e){}
+  return ids;
+}
 const AUTH_SNAPSHOT_CACHE_KEY="aboreiban_authoritative_snapshot_cache_v52_2";
 const SYNC_ROLE_CACHE_KEY="aboreiban_sync_role_cache_v52_2";
 let appReadOnly=true;
@@ -2145,7 +2152,7 @@ function syncBuildChanges(){
     if(!newMap.has(old.__syncId)){
       if(String(old.__syncId||"").startsWith("r-") && !__expl.has(old.__syncId))continue;
       const key=old.__syncId+"|delete",prev=prevMap.get(key);
-      changes.push({opId:prev?.opId||crypto.randomUUID(),recordId:old.__syncId,operation:"delete",updatedAt:Number(prev?.updatedAt||Date.now()),baseVersion:Number(old?.__syncVersion||0)});
+      changes.push({opId:prev?.opId||crypto.randomUUID(),recordId:old.__syncId,operation:"delete",explicitDelete:__expl.has(old.__syncId),updatedAt:Number(prev?.updatedAt||Date.now()),baseVersion:Number(old?.__syncVersion||0)});
     }
   }
   return changes;
@@ -2157,7 +2164,7 @@ function syncRebuildPending(){
   for(const old of previous){
     if(!old?.recordId||byId.has(old.recordId))continue;
     if(old.operation==="upsert" && data.some(r=>r.__syncId===old.recordId))byId.set(old.recordId,old);
-    if(old.operation==="delete" && syncReadIdSet(SYNC_EXPL_DEL_KEY).has(old.recordId) && !data.some(r=>r.__syncId===old.recordId))byId.set(old.recordId,old);
+    if(old.operation==="delete" && old.explicitDelete===true && syncReadIdSet(SYNC_EXPL_DEL_KEY).has(old.recordId) && !data.some(r=>r.__syncId===old.recordId))byId.set(old.recordId,old);
   }
   const result=[...byId.values()];syncSavePending(result);return result;
 }
@@ -2218,7 +2225,7 @@ function requirePrimaryForEdit(){if(!appReadOnly)return true;toast("هذا ال�
 
 async function syncFetch(path,options={}){const headers={"Content-Type":"application/json","X-Device-Id":syncDeviceId(),...displayAuthHeader(),...(options.headers||{})};const res=await fetch(SYNC_API_URL+path,{...options,headers,cache:"no-store"});let body=null;try{body=await res.json()}catch(e){const er=Error("استجابة غير صالحة من الخادم");er.status=res.status;throw er}if(!res.ok||body?.ok===false){const er=Error(body?.error||("HTTP "+res.status));er.status=res.status;er.code=body?.code||"";throw er}return body}
 function applyChangeToMap(map,c){if(c.operation==="delete")map.delete(c.recordId);else if(c.operation==="upsert"&&c.data){const x=structuredClone(c.data);x.__syncId=c.recordId;x.__syncVersion=Number(c.version||0);map.set(c.recordId,x)}}
-function syncApplyChanges(changes,{protectIds=null}={}){let changed=false;const byId=new Map(data.map((r,i)=>[r.__syncId,i]));for(const c of changes||[]){if(protectIds?.has(c.recordId))continue;if(c.operation==="delete"){if(String(c.recordId||"").startsWith("r-")){console.warn("B1: family delete event quarantined",c.recordId);continue;}const idx=byId.get(c.recordId);if(idx!==undefined){data.splice(idx,1);changed=true;byId.clear();data.forEach((r,i)=>byId.set(r.__syncId,i))}}else if(c.operation==="upsert"&&c.data){const incoming=structuredClone(c.data);incoming.__syncId=c.recordId;incoming.__syncVersion=Number(c.version||0);const idx=byId.get(c.recordId);if(idx===undefined){data.push(incoming);byId.set(c.recordId,data.length-1);changed=true}else if(syncComparable(data[idx])!==syncComparable(incoming)){data[idx]=incoming;changed=true}}}return changed}
+function syncApplyChanges(changes,{protectIds=null}={}){let changed=false;const byId=new Map(data.map((r,i)=>[r.__syncId,i]));for(const c of changes||[]){if(protectIds?.has(c.recordId))continue;if(c.operation==="delete"){if(String(c.recordId||"").startsWith("r-") && syncRole.isPrimary && !syncDeletionProtectedIds().has(c.recordId)){console.warn("B1: unrequested family delete quarantined",c.recordId);continue;}const idx=byId.get(c.recordId);if(idx!==undefined){data.splice(idx,1);changed=true;byId.clear();data.forEach((r,i)=>byId.set(r.__syncId,i))}}else if(c.operation==="upsert"&&c.data){const incoming=structuredClone(c.data);incoming.__syncId=c.recordId;incoming.__syncVersion=Number(c.version||0);const idx=byId.get(c.recordId);if(idx===undefined){data.push(incoming);byId.set(c.recordId,data.length-1);changed=true}else if(syncComparable(data[idx])!==syncComparable(incoming)){data[idx]=incoming;changed=true}}}return changed}
 async function syncPullApply(){
   // B1: Never advance the durable cursor while pages are still in flight.
   // The caller must apply/commit the returned changes before persisting a new cursor.
@@ -2245,9 +2252,9 @@ async function syncPush(){
      أي حذف غير صريح أو جماعي مشبوه لا يُرسل، وتُستعاد السجلات محلياً من آخر نسخة متزامنة. */
   const __expl=syncReadIdSet(SYNC_EXPL_DEL_KEY), __dedupRm=syncReadIdSet(SYNC_DEDUP_REMOVED_KEY);
   const __famDel=pending.filter(c=>c.operation==="delete"&&String(c.recordId||"").startsWith("r-"));
-  const __explicitDel=__famDel.filter(c=>__expl.has(c.recordId));
-  let __blocked=__famDel.filter(c=>!__expl.has(c.recordId));
-  if(__explicitDel.length>30)__blocked=__blocked.concat(__explicitDel);
+  const __explicitDel=__famDel.filter(c=>__expl.has(c.recordId)&&c.explicitDelete===true);
+  let __blocked=__famDel.filter(c=>!__expl.has(c.recordId)||c.explicitDelete!==true);
+  if(__explicitDel.length>30){toast("حذف أكثر من 30 سجل يحتاج مراجعة إدارية؛ لم يُرسل الحذف للسحابة");return {accepted:0,total:pending.length,remaining:pending.length,conflicts:[{code:"MASS_DELETE_BLOCKED"}]};}
   if(__blocked.length){
     const blockedIds=new Set(__blocked.map(c=>c.recordId));
     const have=new Set(data.map(r=>r.__syncId));
@@ -2272,7 +2279,7 @@ async function syncPush(){
       const r=await syncFetch("/sync/push",{method:"POST",body:JSON.stringify({deviceId:syncDeviceId(),changes:batch})});
       const okIds=new Set((r.accepted||[]).map(x=>typeof x==="string"?x:x.opId));
       accepted+=okIds.size;
-      try{const done=batch.filter(c=>okIds.has(c.opId)&&c.operation==="delete").map(c=>c.recordId);if(done.length){const ex=syncReadIdSet(SYNC_EXPL_DEL_KEY);done.forEach(id=>ex.delete(id));syncWriteIdSet(SYNC_EXPL_DEL_KEY,ex);}}catch(e){}
+      try{const done=batch.filter(c=>okIds.has(c.opId)&&c.operation==="delete").map(c=>c.recordId);if(done.length){const ex=syncReadIdSet(SYNC_EXPL_DEL_KEY);/* Keep tombstones: authoritative pull must never resurrect explicitly deleted records. */syncWriteIdSet(SYNC_EXPL_DEL_KEY,ex);}}catch(e){}
       conflicts.push(...(r.conflicts||[]));
       if(okIds.size){
         pending=pending.filter(c=>!okIds.has(c.opId));
@@ -2326,8 +2333,14 @@ async function syncAdoptAuthoritativeSnapshot(force=false){
   const newIds=new Set(snap.records.map(r=>r.recordId));
   const missing=[...oldIds].filter(id=>String(id).startsWith("r-")&&!newIds.has(id));
   if(missing.length){
-    console.error("B1: authoritative snapshot omits locally held family records",missing.length);
-    throw Error(`حماية البيانات: نسخة السحابة لا تحتوي ${missing.length} سجل أسرة موجود محلياً؛ تم إيقاف الاستبدال`);
+    // Verify every omission against an actual server-side tombstone before accepting a smaller snapshot.
+    const deleted=await syncFetch("/sync/deleted-status",{method:"POST",body:JSON.stringify({recordIds:missing})});
+    const confirmed=new Set(deleted.deletedIds||[]);
+    const unexplained=missing.filter(id=>!confirmed.has(id));
+    if(unexplained.length){
+      console.error("B1: authoritative snapshot omits live family records",unexplained.length);
+      throw Error(`حماية البيانات: نسخة السحابة لا تحتوي ${unexplained.length} سجل أسرة دون حذف موثق؛ تم إيقاف الاستبدال`);
+    }
   }
   const next=snap.records.map((x,i)=>{const r=structuredClone(x.data||{});r.__syncId=x.recordId;r.__syncVersion=Number(x.version||0);r["#"]=String(i+1);return r;});
   // Persist the complete authoritative snapshot BEFORE replacing the live UI data.
@@ -2394,8 +2407,9 @@ async function syncPrimaryPullMissing(pulse){
   let added=0,skippedDup=0;
   const acceptedCloudRows=[];
   const dedupRm=syncReadIdSet(SYNC_DEDUP_REMOVED_KEY);
+  const explicitRemoved=syncDeletionProtectedIds();
   for(const x of snap.records){
-    if(!x.recordId||have.has(x.recordId)||dedupRm.has(x.recordId))continue;
+    if(!x.recordId||have.has(x.recordId)||dedupRm.has(x.recordId)||explicitRemoved.has(x.recordId))continue;
     const r=structuredClone(x.data||{});
     if(!r||typeof r!=="object"||!Object.keys(r).length)continue;
     if(r["رقم هوية الفرد"]&&havePid.has(pidOf(r))){skippedDup++;continue;}
