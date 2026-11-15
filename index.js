@@ -396,6 +396,27 @@ async function health(env) {
   }
 }
 
+// Read-only verification: a missing family record may be removed from a display device
+// only when D1 explicitly marks that exact record as deleted.
+async function deletedStatus(request, env) {
+  const auth = await requireDisplayOrPrimary(request, env);
+  if (!auth.ok) return json({ok:false,error:auth.error,code:auth.code},401);
+  await ensureSchema(env);
+  let body;
+  try { body = await request.json(); } catch { return json({ok:false,error:"JSON غير صالح"},400); }
+  const ids = Array.isArray(body.recordIds) ? body.recordIds : [];
+  if (ids.length > 2000 || ids.some(id => typeof id !== "string" || !/^r-[a-zA-Z0-9_-]{1,180}$/.test(id)))
+    return json({ok:false,error:"معرّفات السجلات غير صالحة"},400);
+  const deletedIds=[];
+  for (let i=0;i<ids.length;i+=100) {
+    const chunk=ids.slice(i,i+100);
+    if (!chunk.length) continue;
+    const result=await env.DB.prepare(`SELECT record_id FROM sync_records WHERE deleted=1 AND record_id IN (${chunk.map(()=>"?").join(",")})`).bind(...chunk).all();
+    for (const row of result.results||[]) deletedIds.push(row.record_id);
+  }
+  return json({ok:true,deletedIds});
+}
+
 async function pull(request, env) {
   const auth = await requireDisplayOrPrimary(request, env);
   if (!auth.ok) return json({ ok:false,error:auth.error,code:auth.code },auth.code==="DISPLAY_DISABLED"?403:401);
@@ -527,10 +548,10 @@ async function push(request, env) {
     const opId = cleanString(item.opId, 200);
     const recordId = cleanString(item.recordId, 200);
     const operation = item.operation === "delete" ? "delete" : "upsert";
-    // EMERGENCY DATA PROTECTION: temporarily reject ALL family record deletions.
-    // Do not remove until authenticated deletion audit and recovery are deployed.
-    if (operation === "delete" && recordId.startsWith("r-")) {
-      conflicts.push({opId: cleanString(item.opId,200), recordId, reason:"حذف الأسر معطل مؤقتاً لحماية البيانات", code:"FAMILY_DELETE_LOCKED"});
+    // Explicit, authenticated family deletion only. Never infer a delete from a missing snapshot.
+    // A per-operation confirmation is required in addition to primary-device authentication.
+    if (operation === "delete" && recordId.startsWith("r-") && item.explicitDelete !== true) {
+      conflicts.push({opId, recordId, reason:"يتطلب حذف السجل تأكيداً صريحاً", code:"EXPLICIT_DELETE_REQUIRED"});
       continue;
     }
     const updatedAt = Number(item.updatedAt);
@@ -2051,6 +2072,7 @@ export default {
       if (url.pathname === "/sync/role" && request.method === "GET") return await role(request, env);
       if (url.pathname === "/sync/pulse" && request.method === "GET") return await syncPulse(request, env);
       if (url.pathname === "/sync/claim-primary" && request.method === "POST") return await claimPrimary(request, env);
+      if (url.pathname === "/sync/deleted-status" && request.method === "POST") return await deletedStatus(request, env);
       if (url.pathname === "/sync/pull" && request.method === "GET") return await pull(request, env);
       if (url.pathname === "/sync/push" && request.method === "POST") return await push(request, env);
       if (url.pathname === "/sync/primary-reconcile" && request.method === "POST") return await primaryReconcile(request, env);
