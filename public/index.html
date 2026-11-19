@@ -13,10 +13,21 @@
 <title>إدارة وكشف المخيمات</title>
 <link rel="preload" href="./assets/fonts/MF_Tahadath_Regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="./assets/fonts/MF_Tahadath_Bold.woff2" as="font" type="font/woff2" crossorigin>
+<script id="mo-v73-device-motion">(function(){var n=navigator;var low=(typeof n.hardwareConcurrency==='number'&&n.hardwareConcurrency<=4)||(typeof n.deviceMemory==='number'&&n.deviceMemory<=2);if(low)document.documentElement.classList.add('mo-low-motion');document.addEventListener('visibilitychange',function(){document.documentElement.classList.toggle('mo-page-hidden',document.hidden)});})();</script>
+<style id="mo-v73-perf">
+/* V73: paint and motion safeguards. No layout, colors, labels or data changes. */
+@media (prefers-reduced-motion: reduce){
+  .view.active,.local-house,.local-cloud,.local-dot,.mo-busy-indicator{animation:none!important}
+}
+@media (max-width:700px){
+  .table tbody tr{contain:style}
+}
+html.mo-low-motion .view.active,html.mo-low-motion .local-house,html.mo-low-motion .local-cloud,html.mo-low-motion .local-dot{animation:none!important}
+html.mo-page-hidden .local-house,html.mo-page-hidden .local-cloud,html.mo-page-hidden .local-dot{animation-play-state:paused!important}
+</style>
 <style id="local-font-faces">@font-face{font-family:"IBM Plex Sans Arabic";src:url("./assets/fonts/MF_Tahadath_Regular.woff2") format("woff2");font-weight:400 600;font-display:swap}@font-face{font-family:"IBM Plex Sans Arabic";src:url("./assets/fonts/MF_Tahadath_Bold.woff2") format("woff2");font-weight:700 900;font-display:swap}@font-face{font-family:Cairo;src:url("./assets/fonts/MF_Tahadath_Regular.woff2") format("woff2");font-display:swap}@font-face{font-family:Tajawal;src:url("./assets/fonts/MF_Tahadath_Regular.woff2") format("woff2");font-display:swap}</style>
 
 <style>
-500;600;700;800&family=Tajawal:wght@400;500;600;700;800&display=swap');
 :root{--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#64748b;--line:#e5e7eb;--primary:#2563eb;--primary2:#1d4ed8;--danger:#dc2626;--ok:#059669;--warn:#d97706;--shadow:0 8px 30px rgba(15,23,42,.07);--radius:18px}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Cairo,Tajawal,Arial,sans-serif}
 button,input,select,textarea{font:inherit}button{cursor:pointer}

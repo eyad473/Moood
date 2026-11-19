@@ -52,7 +52,12 @@ document.addEventListener('DOMContentLoaded',()=>setTimeout(initProgramLotties,5
   }
   function scan(root=document){root.querySelectorAll('input').forEach(setup)}
   scan();
-  new MutationObserver(muts=>muts.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType===1){if(n.matches?.('input'))setup(n);scan(n)}}))).observe(document.body,{childList:true,subtree:true});
+  let searchScanPending=false;
+  new MutationObserver(muts=>{
+    if(searchScanPending||!muts.some(m=>m.addedNodes.length))return;
+    searchScanPending=true;
+    requestAnimationFrame(()=>{searchScanPending=false;scan(document)});
+  }).observe(document.body,{childList:true,subtree:true});
   window.abuSearchDone=function(el){if(el) el.dispatchEvent(new Event('abu-search-finished'));else document.querySelectorAll('.search-loading-wrap').forEach(w=>w.classList.remove('is-searching'))};
 })();
 
@@ -2552,7 +2557,7 @@ function installCloudSync(){
   window.addEventListener("online",()=>syncOnlineReconcile("online"));
   window.addEventListener("offline",()=>{const n=syncLoadPending().length;if(n)toast(`⚠️ ${n} تعديل محفوظ محلياً — بانتظار عودة الإنترنت`)});
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")syncOnlineReconcile("visible")});
-  clearInterval(syncTimer);let syncTick=0;syncTimer=setInterval(()=>{syncTick++;if(appReadOnly){syncOnlineReconcile("timer");}else if(syncTick%6===0){syncOnlineReconcile("timer");}},2500);
+  clearInterval(syncTimer);let syncTick=0;syncTimer=setInterval(()=>{if(document.hidden)return;syncTick++;if(appReadOnly){syncOnlineReconcile("timer");}else if(syncTick%6===0){syncOnlineReconcile("timer");}},2500);
   showProgramUpdateNotice();
   setTimeout(()=>syncOnlineReconcile("startup"),700);
 }
@@ -3278,7 +3283,8 @@ if ('serviceWorker' in navigator) {
   },true);
 
   updateDailyHeader();
-  setInterval(updateDailyHeader,1000);
+  setInterval(()=>{if(!document.hidden)updateDailyHeader()},1000);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)updateDailyHeader()});
   window.addEventListener('online',updateDailyHeader);
   window.addEventListener('offline',updateDailyHeader);
 })();
@@ -3534,7 +3540,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     const r=document.getElementById('v59OpsRecords');if(r){let fam=0;try{fam=typeof familyMap==='function'?familyMap().size:0}catch(e){}r.textContent=`${fam.toLocaleString('ar-EG')} عائلة · ${(Array.isArray(data)?data.length:0).toLocaleString('ar-EG')} فرد/سجل`}
   }
   ready(()=>{
-    try{installStyles();installPalette();installHeaderTools();installOperationsPanel();refreshHealth();window.addEventListener('online',refreshHealth);window.addEventListener('offline',refreshHealth);window.addEventListener('storage',refreshHealth);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshHealth()});statusTimer=setInterval(refreshHealth,8000);
+    try{installStyles();installPalette();installHeaderTools();installOperationsPanel();refreshHealth();window.addEventListener('online',refreshHealth);window.addEventListener('offline',refreshHealth);window.addEventListener('storage',refreshHealth);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshHealth()});statusTimer=setInterval(()=>{if(!document.hidden)refreshHealth()},8000);
       document.addEventListener('keydown',e=>{const key=String(e.key||'').toLowerCase(),mod=e.ctrlKey||e.metaKey;const target=e.target;const editing=target&&(target.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));if(mod&&key==='k'){e.preventDefault();openPalette();return}if(key==='escape'&&palette?.classList.contains('open')){e.preventDefault();closePalette();return}if(!editing&&!mod&&!e.altKey&&key==='/'){e.preventDefault();openPalette();return}if(!editing&&e.altKey&&/^[1-8]$/.test(key)){const ids=['dashboard','familySearch','families','distributions','records','classified','syncCenter','settings'];showView(ids[Number(key)-1]);}});
       document.addEventListener('click',e=>{if(e.target.closest('.tab,.mobile-bottom-nav'))setTimeout(refreshHealth,100)});
       
