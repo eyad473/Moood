@@ -1,0 +1,21 @@
+/* MOODD V79 — progressive, CSS-only enhancements. No data or event logic changed. */
+:root{--mo79-ease:cubic-bezier(.2,.8,.2,1)}
+/* Authentication: responsive focus halo and tactile submission, without changing layout. */
+.display-login-box{isolation:isolate}
+.display-login-input-wrap input{transition:border-color 180ms ease,background-color 180ms ease,box-shadow 180ms ease!important}
+.display-login-input-wrap:focus-within .display-login-input-icon{color:#2563eb;transition:color 180ms ease}
+.display-login-submit{overflow:hidden;transform:translateZ(0);transition:transform 160ms var(--mo79-ease),opacity 160ms ease!important}
+.display-login-submit:active:not(:disabled){transform:scale(.985)!important}
+.display-login-submit:focus-visible{outline:3px solid #93c5fd;outline-offset:3px}
+/* Dashboard: restrained interactive depth; no perpetual animation. */
+#dashboard .stat,#dashboard .chart-card{transition:transform 190ms var(--mo79-ease),border-color 190ms ease!important}
+#dashboard .stat:active,#dashboard .chart-card:active{transform:scale(.992)}
+#dashboard .stat:focus-within,#dashboard .chart-card:focus-within{border-color:#93c5fd}
+/* Navigation: responsive touch feedback and active icon microinteraction. */
+.mobile-bottom-nav button,.tabs .tab,.drawer-items button{touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:transform 160ms var(--mo79-ease),opacity 160ms ease,background-color 160ms ease!important}
+.mobile-bottom-nav button:active,.tabs .tab:active,.drawer-items button:active{transform:scale(.955)!important}
+.mobile-bottom-nav button:focus-visible,.tabs .tab:focus-visible,.drawer-items button:focus-visible{outline:2px solid #60a5fa;outline-offset:-2px}
+@media (hover:hover) and (pointer:fine){#dashboard .stat:hover,#dashboard .chart-card:hover{transform:translate3d(0,-2px,0)}}
+@media(prefers-reduced-motion:reduce){.display-login-input-wrap input,.display-login-submit,#dashboard .stat,#dashboard .chart-card,.mobile-bottom-nav button,.tabs .tab,.drawer-items button{transition:none!important;animation:none!important;transform:none!important}}
+html.mo-low-motion #dashboard .stat,html.mo-low-motion #dashboard .chart-card,html.mo-low-motion .mobile-bottom-nav button{transition:none!important;animation:none!important}
+@media print{#dashboard .stat,#dashboard .chart-card{transform:none!important;transition:none!important}}
