@@ -1,0 +1,34 @@
+/* MOODD V80: focused, GPU-friendly motion; no data or navigation logic changes. */
+:root{--v80-ease:cubic-bezier(.22,1,.36,1)}
+@media screen and (prefers-reduced-motion:no-preference){
+/* Distinct page entrance, kept short to avoid obstructing interactions. */
+.view.active{animation:v80-page-enter 340ms var(--v80-ease) both!important}
+@keyframes v80-page-enter{from{opacity:.3;transform:translate3d(-17px,0,0) scale(.992)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}
+/* Dashboard reveal: animate only a handful of visible cards, not long lists. */
+#dashboard.view.active>.grid.stats>.stat:nth-child(-n+8){animation:v80-card-rise 520ms var(--v80-ease) both!important;animation-delay:calc(var(--v80-i,0) * 58ms)!important}
+#dashboard.view.active>.grid.stats>.stat:nth-child(2){--v80-i:1}#dashboard.view.active>.grid.stats>.stat:nth-child(3){--v80-i:2}#dashboard.view.active>.grid.stats>.stat:nth-child(4){--v80-i:3}#dashboard.view.active>.grid.stats>.stat:nth-child(5){--v80-i:4}#dashboard.view.active>.grid.stats>.stat:nth-child(6){--v80-i:5}#dashboard.view.active>.grid.stats>.stat:nth-child(7){--v80-i:6}#dashboard.view.active>.grid.stats>.stat:nth-child(8){--v80-i:7}
+#dashboard.view.active .dashboard-charts>.chart-card:nth-child(-n+4){animation:v80-card-rise 500ms var(--v80-ease) both!important;animation-delay:calc(120ms + var(--v80-i,0) * 65ms)!important}
+#dashboard.view.active .dashboard-charts>.chart-card:nth-child(2){--v80-i:1}#dashboard.view.active .dashboard-charts>.chart-card:nth-child(3){--v80-i:2}#dashboard.view.active .dashboard-charts>.chart-card:nth-child(4){--v80-i:3}
+@keyframes v80-card-rise{from{opacity:0;transform:translate3d(0,22px,0) scale(.96)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}
+/* Login: sequenced appearance without touching authentication code. */
+.display-login-overlay:not([hidden]) .display-login-box{animation:v80-login-shell 540ms var(--v80-ease) both!important}
+.display-login-overlay:not([hidden]) .display-login-brand{animation:v80-login-item 450ms var(--v80-ease) 85ms both}
+.display-login-overlay:not([hidden]) .login-subtitle{animation:v80-login-item 450ms var(--v80-ease) 145ms both}
+.display-login-overlay:not([hidden]) .display-login-field:first-child{animation:v80-login-item 450ms var(--v80-ease) 205ms both}
+.display-login-overlay:not([hidden]) .display-login-field:nth-child(2){animation:v80-login-item 450ms var(--v80-ease) 265ms both}
+.display-login-overlay:not([hidden]) .display-login-submit{animation:v80-login-item 450ms var(--v80-ease) 325ms both}
+@keyframes v80-login-shell{from{opacity:0;transform:translate3d(0,34px,0) scale(.94)}to{opacity:1;transform:none}}
+@keyframes v80-login-item{from{opacity:0;transform:translate3d(0,14px,0)}to{opacity:1;transform:none}}
+/* Nav indicator is separate from buttons and never intercepts touches. */
+.mobile-bottom-nav{isolation:isolate}
+.mobile-bottom-nav .v80-nav-indicator{position:absolute;z-index:0;top:0;left:0;width:0;height:0;border-radius:15px;background:linear-gradient(135deg,rgba(37,99,235,.17),rgba(14,165,233,.11));border:1px solid rgba(59,130,246,.25);box-shadow:0 4px 14px rgba(37,99,235,.10);pointer-events:none;opacity:0;transform:translate3d(0,0,0);transition:transform 390ms var(--v80-ease),width 390ms var(--v80-ease),height 390ms var(--v80-ease),opacity 180ms ease}
+.mobile-bottom-nav .v80-nav-indicator.v80-visible{opacity:1}
+.mobile-bottom-nav>button{position:relative;z-index:1;background:transparent!important;border-color:transparent!important;transition:color 220ms ease,transform 260ms var(--v80-ease)!important}
+.mobile-bottom-nav>button.active,.mobile-bottom-nav>button[aria-current="page"]{background:transparent!important;color:#2563eb!important}
+.mobile-bottom-nav>button.active .mo-bottom-icon,.mobile-bottom-nav>button[aria-current="page"] .mo-bottom-icon{animation:v80-nav-pop 400ms var(--v80-ease) both!important}
+@keyframes v80-nav-pop{0%{transform:translateY(6px) scale(.75);opacity:.5}65%{transform:translateY(-3px) scale(1.14);opacity:1}100%{transform:translateY(0) scale(1);opacity:1}}
+.mobile-bottom-nav>button:active{transform:scale(.91)!important}
+}
+html[data-theme="dark"] .mobile-bottom-nav .v80-nav-indicator{background:linear-gradient(135deg,rgba(59,130,246,.3),rgba(14,165,233,.17));border-color:rgba(125,177,255,.45)}
+@media(prefers-reduced-motion:reduce){.mobile-bottom-nav .v80-nav-indicator{display:none!important}.view.active,#dashboard.view.active>.grid.stats>.stat,#dashboard.view.active .dashboard-charts>.chart-card,.display-login-overlay .display-login-box,.display-login-overlay .display-login-brand,.display-login-overlay .login-subtitle,.display-login-overlay .display-login-field,.display-login-overlay .display-login-submit{animation:none!important}}
+@media print{.mobile-bottom-nav .v80-nav-indicator{display:none!important}.view.active,#dashboard.view.active>.grid.stats>.stat,#dashboard.view.active .dashboard-charts>.chart-card{animation:none!important}}
