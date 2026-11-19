@@ -1947,6 +1947,32 @@ html[data-theme="dark"]{--mo-interaction-ring:#93c5fd;--motion-focus:rgba(147,19
 <script src="./scripts/09-moood-interaction-phase4-behavior.js"></script>
 
 <script id="abu-v77-startup-controller">(function(){'use strict';var screen=document.getElementById('abu-startup');if(!screen)return;var ended=false;var state=document.getElementById('abu-startup-state');function finish(){if(ended)return;ended=true;screen.classList.add('abu-ready');screen.setAttribute('aria-hidden','true');setTimeout(function(){if(screen.parentNode)screen.parentNode.removeChild(screen)},350)}function isReady(){var app=document.querySelector('.app');var view=document.querySelector('.view.active');var login=document.getElementById('displayLoginOverlay');return !!((login&&!login.hidden)||(app&&view&&view.getClientRects().length))}function check(){if(ended)return;if(isReady()){if(state)state.textContent='الواجهة جاهزة';requestAnimationFrame(function(){requestAnimationFrame(finish)})}}if(document.readyState==='complete')check();else window.addEventListener('load',check,{once:true});document.addEventListener('DOMContentLoaded',function(){requestAnimationFrame(check)},{once:true});var observer=new MutationObserver(check);observer.observe(document.body,{childList:true,attributes:true,attributeFilter:['class','hidden'],subtree:false});var tries=0;var ticker=setInterval(function(){check();if(ended||++tries>45){clearInterval(ticker);observer.disconnect()}},200);setTimeout(function(){if(!ended){if(state)state.textContent='التطبيق يستغرق وقتًا أطول من المعتاد…';}},3500);setTimeout(function(){if(!ended){if(state)state.textContent='يمكنك متابعة فتح التطبيق';finish()}},12000)})();</script>
+
+<!-- V78: lightweight, compositor-friendly motion enhancements; no application logic changes -->
+<style id="abu-v78-native-motion">
+:root{--abu-motion-ease:cubic-bezier(.2,.8,.2,1);--abu-motion-time:190ms}
+/* Navigation feedback is limited to compositor-friendly properties. */
+.mobile-bottom-nav button,.drawer-items button,.tabs .tab{transform:translateZ(0);transition:transform 160ms var(--abu-motion-ease),opacity 160ms ease,background-color 160ms ease,color 160ms ease!important}
+.mobile-bottom-nav button:active,.drawer-items button:active,.tabs .tab:active{transform:scale(.965)!important;filter:none!important}
+.mobile-bottom-nav button.active .mo-bottom-icon,.mobile-bottom-nav button[aria-current="page"] .mo-bottom-icon{animation:abu-v78-icon-in 210ms var(--abu-motion-ease) both}
+@keyframes abu-v78-icon-in{from{opacity:.72;transform:translateY(3px) scale(.93)}to{opacity:1;transform:translateY(0) scale(1)}}
+/* Active section entrance: short and consistent; never animate the hidden DOM. */
+.view.active{animation:abu-v78-view-in 190ms var(--abu-motion-ease) both!important}
+@keyframes abu-v78-view-in{from{opacity:.72;transform:translate3d(0,6px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+/* First few dashboard cards cascade without touching data or re-rendering. */
+#dashboard.view.active .stat:nth-child(-n+6),#dashboard.view.active .chart-card:nth-child(-n+4){animation:abu-v78-card-in 230ms var(--abu-motion-ease) both;animation-delay:calc(min(var(--abu-v78-order,0),4) * 32ms)}
+#dashboard.view.active .stat:nth-child(2),#dashboard.view.active .chart-card:nth-child(2){--abu-v78-order:1}
+#dashboard.view.active .stat:nth-child(3),#dashboard.view.active .chart-card:nth-child(3){--abu-v78-order:2}
+#dashboard.view.active .stat:nth-child(4),#dashboard.view.active .chart-card:nth-child(4){--abu-v78-order:3}
+@keyframes abu-v78-card-in{from{opacity:.6;transform:translate3d(0,7px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+/* Modal and drawer animation remains controlled by existing open/close state. */
+.modal.show .modalbox{animation:abu-v78-modal-in 210ms var(--abu-motion-ease) both!important}
+@keyframes abu-v78-modal-in{from{opacity:.7;transform:translate3d(0,10px,0) scale(.99)}to{opacity:1;transform:translate3d(0,0,0) scale(1)}}
+/* Eliminate perpetual layout-moving shimmer on constrained phones. */
+html.mo-low-motion .housing-chart-fill::after,html.mo-low-motion .health-fill::after,html.mo-page-hidden .housing-chart-fill::after,html.mo-page-hidden .health-fill::after{animation:none!important}
+@media(prefers-reduced-motion:reduce){.view.active,#dashboard.view.active .stat,#dashboard.view.active .chart-card,.modal.show .modalbox,.mobile-bottom-nav button.active .mo-bottom-icon,.mobile-bottom-nav button[aria-current="page"] .mo-bottom-icon{animation:none!important;transition:none!important;transform:none!important}}
+@media print{.view.active,#dashboard.view.active .stat,#dashboard.view.active .chart-card,.modal.show .modalbox{animation:none!important;transform:none!important}}
+</style>
 </body>
 </html>
 <style>.original-governorate-card .housing-chart-item{cursor:pointer}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-track{box-shadow:0 0 0 3px rgba(59,130,246,.18),0 4px 14px rgba(37,99,235,.13);transform:translateY(-1px)}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-fill{filter:brightness(1.16)}</style>
