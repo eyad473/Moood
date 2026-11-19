@@ -11,12 +11,16 @@
 <meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
 <meta content="#0f172a" name="theme-color"/>
 <title>إدارة وكشف المخيمات</title>
+<link rel="preload" href="./assets/fonts/MF_Tahadath_Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="./assets/fonts/MF_Tahadath_Bold.woff2" as="font" type="font/woff2" crossorigin>
+<style id="local-font-faces">@font-face{font-family:"IBM Plex Sans Arabic";src:url("./assets/fonts/MF_Tahadath_Regular.woff2") format("woff2");font-weight:400 600;font-display:swap}@font-face{font-family:"IBM Plex Sans Arabic";src:url("./assets/fonts/MF_Tahadath_Bold.woff2") format("woff2");font-weight:700 900;font-display:swap}@font-face{font-family:Cairo;src:url("./assets/fonts/MF_Tahadath_Regular.woff2") format("woff2");font-display:swap}@font-face{font-family:Tajawal;src:url("./assets/fonts/MF_Tahadath_Regular.woff2") format("woff2");font-display:swap}</style>
+
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Tajawal:wght@400;500;600;700;800&display=swap');
+500;600;700;800&family=Tajawal:wght@400;500;600;700;800&display=swap');
 :root{--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#64748b;--line:#e5e7eb;--primary:#2563eb;--primary2:#1d4ed8;--danger:#dc2626;--ok:#059669;--warn:#d97706;--shadow:0 8px 30px rgba(15,23,42,.07);--radius:18px}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Cairo,Tajawal,Arial,sans-serif}
 button,input,select,textarea{font:inherit}button{cursor:pointer}
-.app{min-height:100vh}.top{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.app{min-height:100vh}.top{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.94);border-bottom:1px solid var(--line)}
 .topin{max-width:1500px;margin:auto;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .brand{display:flex;align-items:center;gap:12px}.logo{width:45px;height:45px;border-radius:14px;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;display:grid;place-items:center;font-weight:800;font-size:20px;box-shadow:0 8px 18px #2563eb33}.brand h1{font-size:18px;margin:0}.brand small{color:var(--muted)}
 .actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--line);background:#fff;color:var(--text);padding:9px 13px;border-radius:11px;font-weight:700}.btn:hover{background:#f8fafc}.btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}.btn.primary:hover{background:var(--primary2)}.btn.danger{background:#fee2e2;color:#991b1b;border-color:#fecaca}.btn.ok{background:#d1fae5;color:#065f46;border-color:#a7f3d0}
@@ -411,7 +415,7 @@ button:focus-visible,summary:focus-visible,[role="button"]:focus-visible{outline
 .mobile-bottom-nav{display:none}
 @media(max-width:700px){
   body{padding-bottom:78px!important}
-  .mobile-bottom-nav{position:fixed;z-index:9999;left:0;right:0;bottom:0;display:flex;align-items:stretch;gap:2px;overflow-x:hidden;overflow-y:hidden;padding:7px 5px calc(7px + env(safe-area-inset-bottom));background:rgba(255,255,255,.97);border-top:1px solid #dfe3e8;box-shadow:0 -5px 20px rgba(0,0,0,.08);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);scrollbar-width:none}
+  .mobile-bottom-nav{position:fixed;z-index:9999;left:0;right:0;bottom:0;display:flex;align-items:stretch;gap:2px;overflow-x:hidden;overflow-y:hidden;padding:7px 5px calc(7px + env(safe-area-inset-bottom));background:rgba(255,255,255,.97);border-top:1px solid #dfe3e8;box-shadow:0 -5px 20px rgba(0,0,0,.08);scrollbar-width:none}
   .mobile-bottom-nav::-webkit-scrollbar{display:none}
   .mobile-bottom-nav button{flex:1 1 0;min-width:0;min-height:58px;border:0;background:transparent;border-radius:12px;color:#64748b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
   .mobile-bottom-nav button span{font-size:20px;line-height:1}
@@ -563,7 +567,7 @@ html[data-theme="dark"] .table th{background:#172033;color:#cbd5e1}
 html[data-theme="dark"] .table tr:hover td{background:#172033}
 html[data-theme="dark"] .modalbox,html[data-theme="dark"] .modalhead,html[data-theme="dark"] .modalfoot{background:#111827;color:var(--text);border-color:var(--line)}
 html[data-theme="dark"] .report-fields-guide{background:#0d1525;border-color:#293548}
-.theme-toggle{display:flex;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.08);color:#fff;padding:10px 12px;border-radius:13px;font-weight:800;cursor:pointer;transition:all .3s ease;backdrop-filter:blur(10px)}
+.theme-toggle{display:flex;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.08);color:#fff;padding:10px 12px;border-radius:13px;font-weight:800;cursor:pointer;transition:background .3s ease,border-color .3s ease,color .3s ease,transform .3s ease;backdrop-filter:blur(10px)}
 .theme-toggle:hover{background:rgba(255,255,255,.14);transform:translateY(-1px)}.theme-toggle-icon{font-size:17px;line-height:1}.theme-toggle-text{font-size:11px;white-space:nowrap}
 html[data-theme="dark"] body{background:#0b1120;color:#e5e7eb}html[data-theme="dark"] .top{background:rgba(11,17,32,.92);border-color:#253044}html[data-theme="dark"] .btn{background:#111827;color:#e5e7eb;border-color:#2d3a50}html[data-theme="dark"] .btn:hover{background:#182235}html[data-theme="dark"] .btn.primary{background:#2563eb;color:#fff}html[data-theme="dark"] .tab{background:#182235;color:#cbd5e1}html[data-theme="dark"] .tab.active{background:#e5e7eb;color:#111827}html[data-theme="dark"] .card,html[data-theme="dark"] .stat,html[data-theme="dark"] .chart-card,html[data-theme="dark"] .report-group-card,html[data-theme="dark"] .report-field-item{background:#111827;border-color:#293548}html[data-theme="dark"] .report-fields-section{background:#0d1525;border-color:#293548}html[data-theme="dark"] .field input,html[data-theme="dark"] .field select,html[data-theme="dark"] .field textarea{background:#0f172a;color:#e5e7eb;border-color:#334155}html[data-theme="dark"] .table th{background:#172033;color:#cbd5e1}html[data-theme="dark"] .table tr:hover td{background:#172033}html[data-theme="dark"] .report-field-item:hover{background:#172033}html[data-theme="dark"] .family-result-card,html[data-theme="dark"] .family-card{background:#111827;border-color:#293548}html[data-theme="dark"] .family-mini-field,html[data-theme="dark"] .family-info-item{background:#0d1525}html[data-theme="dark"] .daily-header{box-shadow:0 14px 34px rgba(0,0,0,.35)}
 @media(max-width:700px){.report-group-actions{grid-template-columns:1fr}.report-fields-grid{grid-template-columns:1fr}.daily-header{align-items:flex-start;flex-direction:column}.daily-header-actions{width:100%;justify-content:stretch}.daily-header-actions>*{flex:1}.theme-toggle{justify-content:center}}
@@ -694,7 +698,7 @@ html[data-theme="dark"] .drawer-panel button,html[data-theme="dark"] [data-drawe
 html[data-theme="dark"] .drawer-panel button:hover,html[data-theme="dark"] [data-drawer-view]:hover{background:#17263a;color:#fff}
 html[data-theme="dark"] .drawer-copyright{border-color:#293a51!important;color:#94a6bf!important}
 html[data-theme="dark"] .drawer-copyright strong{color:#e8eef8!important}
-html[data-theme="dark"] .mobile-bottom-nav{background:rgba(10,18,31,.96)!important;border-color:#293a51!important;box-shadow:0 -8px 28px #0003!important;backdrop-filter:blur(18px)}
+html[data-theme="dark"] .mobile-bottom-nav{background:rgba(10,18,31,.96)!important;border-color:#293a51!important;box-shadow:0 -8px 28px #0003!important}
 html[data-theme="dark"] .mobile-bottom-nav button{background:#142238!important;color:#b8c8dc!important;border:1px solid #293a51!important}
 html[data-theme="dark"] .mobile-bottom-nav button.active,html[data-theme="dark"] .mobile-bottom-nav button[aria-current="page"]{background:#1d3d70!important;color:#fff!important;border-color:#477fca!important}
 html[data-theme="dark"] .toast{background:#e5edf8!important;color:#102033!important;box-shadow:0 14px 40px #0005}
@@ -790,9 +794,6 @@ html[data-theme="dark"] .abu-badge-float{border-color:#141e2b}
 
 
 <!-- Open-source font: IBM Plex Sans Arabic, SIL OFL 1.1; official Google Fonts distribution. -->
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style id="abu-oreiban-enterprise-typography-v1">
 :root {
   --type-family:'IBM Plex Sans Arabic',Tahoma,Arial,sans-serif;
@@ -1033,7 +1034,7 @@ button:disabled,.btn:disabled{cursor:not-allowed;opacity:.65}
 </style>
 <style id="fund-finance-layout-2026">
 .fund-finance-panel{direction:rtl;text-align:right;margin:16px 0;padding:16px;border:1px solid #dce3ec;border-radius:18px;background:#fff;color:#192638;max-width:100%;box-sizing:border-box;overflow:hidden}.fund-finance-heading{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:16px}.fund-finance-heading h3,.fund-finance-section h4{margin:0;font-size:1.12rem}.fund-finance-heading span,.fund-finance-section-head span{font-size:.8rem;color:#64748b}.fund-finance-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:22px}.fund-finance-stats>div{background:#f5f8fb;border:1px solid #e2e8f0;border-radius:12px;padding:12px 10px;min-width:0}.fund-finance-stats small{display:block;font-size:.77rem;color:#526176;margin-bottom:8px}.fund-finance-stats strong{font-size:1.08rem;white-space:nowrap;direction:ltr;unicode-bidi:isolate;display:block;text-align:right}.fund-finance-section{margin-top:20px}.fund-finance-section-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px}.fund-finance-section-head .btn{font-size:.88rem;white-space:normal}.fund-finance-list{border:1px solid #e5eaf0;border-radius:12px;overflow:hidden}.fund-finance-entry{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #edf0f5;min-width:0}.fund-finance-entry:last-child{border-bottom:0}.fund-finance-entry-main{display:flex;flex-direction:column;gap:4px;min-width:0;overflow-wrap:anywhere}.fund-finance-entry-main b{font-size:.92rem}.fund-finance-entry-main span{font-size:.8rem;color:#58687c}.fund-finance-negative{color:#ad3535;white-space:nowrap;font-size:.9rem}.fund-void-btn{flex-shrink:0;font-size:.82rem!important;padding:8px 10px!important}.fund-finance-empty{padding:15px;color:#64748b;margin:0}@media(max-width:520px){.fund-finance-panel{padding:12px}.fund-finance-stats{grid-template-columns:1fr;gap:7px}.fund-finance-stats>div{display:flex;align-items:center;justify-content:space-between;gap:8px}.fund-finance-stats small{margin:0}.fund-finance-entry{align-items:flex-start}.fund-void-btn{max-width:100px}}
-</style></head>
+</style><style id="performance-accessibility">@media(prefers-reduced-motion:reduce){.view.active{animation:none!important}*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}.view.active{animation-duration:190ms!important}</style></head>
 <body>
 <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"><defs><symbol id="mo-icon-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></symbol>
 <symbol id="mo-icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></symbol>
@@ -1844,200 +1845,12 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 <style id="mobile-drawer-final-overrides">
 @media(max-width:700px){.mobile-bottom-nav{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;padding:7px 12px max(7px,env(safe-area-inset-bottom))!important}.mobile-bottom-nav button{height:52px!important;min-height:52px!important;border-radius:14px!important}.mobile-bottom-nav button small{font-size:11px!important;line-height:14px!important}}
 </style>
-<script id="login-log-module">
-(function(){
- 'use strict';
- var DEFAULT_BASE='https://moood.eyad2000515.workers.dev';
- var CAP={base:'',auth:'',device:''};
- var origFetch=window.fetch;
- function pick(h,name){try{if(!h)return '';if(typeof h.get==='function')return h.get(name)||'';if(Array.isArray(h)){var f=h.filter(function(x){return String(x[0]).toLowerCase()===name.toLowerCase()})[0];return f?f[1]:''}var k=Object.keys(h).filter(function(x){return x.toLowerCase()===name.toLowerCase()})[0];return k?h[k]:''}catch(e){return ''}}
- // نلتقط ترويسة الجهاز والمفتاح من طلبات المزامنة التي يرسلها التطبيق نفسه، فلا نحتاج لإعدادات إضافية
- window.fetch=function(input,init){
-  try{
-   var url=typeof input==='string'?input:((input&&input.url)||String(input));
-   var u=new URL(url,location.href);
-   if(/^\/(sync|support|announcements)\//.test(u.pathname)){
-    var h=(init&&init.headers)||(input&&input.headers);
-    var dev=pick(h,'X-Device-Id'),auth=pick(h,'Authorization');
-    if(dev||auth){CAP.base=u.origin;if(dev)CAP.device=dev;if(auth)CAP.auth=auth}
-   }
-  }catch(e){}
-  return origFetch.apply(this,arguments);
- };
- var $=function(id){return document.getElementById(id)};
- var sec=$('loginLog');if(!sec)return;
- var timer=null,busy=false,searchT=null;
- var LABEL={login:'دخول جديد',return:'عودة للجلسة',logout:'خروج',failed:'محاولة فاشلة'};
- var dFmt=new Intl.DateTimeFormat('ar-u-nu-latn',{timeZone:'Asia/Gaza',day:'2-digit',month:'2-digit',year:'numeric'});
- var tFmt=new Intl.DateTimeFormat('ar-u-nu-latn',{timeZone:'Asia/Gaza',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
- function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
- function ago(ms){var s=Math.max(0,Math.round((Date.now()-ms)/1000));if(s<45)return 'الآن';var m=Math.round(s/60);if(m<60)return 'قبل '+m+' دقيقة';var h=Math.round(m/60);if(h<24)return 'قبل '+h+' ساعة';var d=Math.round(h/24);return 'قبل '+d+' يوم'}
- function status(t,err){var el=$('llStatus');el.textContent=t;el.style.color=err?'#b91c1c':''}
- function render(data){
-  var s=data.summary||{};
-  $('llLogins').textContent=s.logins;$('llReturns').textContent=s.returns;$('llFamilies').textContent=s.families;$('llFailed').textContent=s.failed;
-  $('llLast').textContent='آخر نشاط: '+(s.lastActivityAt?ago(s.lastActivityAt):'—');
-  var list=$('llList'),items=data.items||[];
-  if(!items.length){list.innerHTML='<div class="ll-empty">لا توجد عمليات دخول مسجّلة بعد.<br>ستظهر هنا فور دخول أي رب أسرة إلى بوابة الأهالي.</div>';return}
-  list.innerHTML=items.map(function(r){
-   var ev=LABEL[r.event]?r.event:'login';
-   var name=r.familyName||'غير معروف';
-   var meta='<div><span>رقم الهوية</span><b>'+esc(r.familyId)+'</b></div>';
-   if(r.device)meta+='<div><span>الجهاز والمتصفح</span><b>'+esc(r.device)+'</b></div>';
-   if(r.country)meta+='<div><span>الدولة (حسب الاتصال)</span><b>'+esc(r.country)+'</b></div>';
-   return '<div class="ll-row ev-'+ev+'"><div class="ll-top"><span class="ll-badge">'+LABEL[ev]+'</span><div class="ll-time"><b>'+esc(tFmt.format(new Date(r.at)))+'</b><small>'+esc(dFmt.format(new Date(r.at)))+' · '+esc(ago(r.at))+'</small></div></div><div class="ll-name">'+esc(name)+'</div><div class="ll-meta">'+meta+'</div></div>';
-  }).join('');
- }
- function load(){
-  if(busy)return;
-  if(!CAP.device&&!CAP.auth){status('بانتظار اتصال التطبيق بالسحابة...');clearTimeout(load.retry);load.retry=setTimeout(function(){if(sec.classList.contains('active'))load()},2500);return}
-  busy=true;
-  var d=new Date();d.setHours(0,0,0,0);
-  var p=new URLSearchParams({limit:'150',since:String(d.getTime())});
-  var ev=$('llEvent').value,q=$('llSearch').value.trim();if(ev)p.set('event',ev);if(q)p.set('q',q);
-  var h={Accept:'application/json'};if(CAP.auth)h.Authorization=CAP.auth;if(CAP.device)h['X-Device-Id']=CAP.device;
-  origFetch.call(window,(CAP.base||DEFAULT_BASE)+'/support/logins?'+p.toString(),{headers:h,cache:'no-store'})
-   .then(function(r){return r.json().catch(function(){return {}}).then(function(b){return {r:r,b:b}})})
-   .then(function(x){
-    if(!x.r.ok||!x.b.ok){status(x.b.error||'تعذر تحميل السجل. تأكد من أنك على الجهاز الرئيسي وأن الـ Worker محدّث.',true);return}
-    render(x.b);status('آخر تحديث: '+tFmt.format(new Date())+' · يتحدث تلقائيًا كل 20 ثانية')
-   })
-   .catch(function(){status('تعذر الاتصال بالخادم.',true)})
-   .then(function(){busy=false});
- }
- function start(){load();clearInterval(timer);timer=setInterval(function(){if(!document.hidden)load()},20000)}
- function stop(){clearInterval(timer);timer=null}
- new MutationObserver(function(){sec.classList.contains('active')?start():stop()}).observe(sec,{attributes:true,attributeFilter:['class']});
- $('llRefresh').addEventListener('click',load);
- $('llEvent').addEventListener('change',load);
- $('llSearch').addEventListener('input',function(){clearTimeout(searchT);searchT=setTimeout(load,350)});
- // احتياط: إن لم يُفعّل التطبيق الصفحة الجديدة تلقائيًا نفعّلها هنا
- document.addEventListener('click',function(e){
-  var b=e.target.closest&&e.target.closest('[data-view="loginLog"],[data-drawer-view="loginLog"]');if(!b)return;
-  setTimeout(function(){
-   if(!sec.classList.contains('active')){
-    Array.prototype.forEach.call(document.querySelectorAll('.view.active'),function(v){v.classList.remove('active')});
-    Array.prototype.forEach.call(document.querySelectorAll('.tab.active'),function(t){t.classList.remove('active')});
-    sec.classList.add('active');var tab=document.querySelector('.tab[data-view="loginLog"]');if(tab)tab.classList.add('active');
-    var dr=$('mobileDrawerBackdrop');if(dr)dr.classList.remove('open');window.scrollTo(0,0);
-   }
-  },80);
- });
-})();
-</script>
-<script id="family-whatsapp-admin-module">
-(function(){
- 'use strict';
- var DEFAULT_BASE='https://moood.eyad2000515.workers.dev',CAP={base:'',auth:'',device:''};
- var priorFetch=window.fetch;
- function header(h,n){try{if(!h)return '';if(typeof h.get==='function')return h.get(n)||'';if(Array.isArray(h)){var x=h.find(function(a){return String(a[0]).toLowerCase()===n.toLowerCase()});return x?x[1]:''}var k=Object.keys(h).find(function(x){return x.toLowerCase()===n.toLowerCase()});return k?h[k]:''}catch(e){return ''}}
- window.fetch=function(input,init){
-  try{var raw=typeof input==='string'?input:((input&&input.url)||String(input));var u=new URL(raw,location.href);
-   if(/^\/(sync|support|announcements)\//.test(u.pathname)){var h=(init&&init.headers)||(input&&input.headers);var d=header(h,'X-Device-Id'),a=header(h,'Authorization');if(d||a){CAP.base=u.origin;if(d)CAP.device=d;if(a)CAP.auth=a;}}
-  }catch(e){}
-  return priorFetch.apply(this,arguments);
- };
- var $=function(id){return document.getElementById(id)},items=[],busy=false;
- function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
- function status(t,err){var e=$('waStatus');if(e){e.textContent=t;e.style.background=err?'#fff1f2':'';e.style.color=err?'#991b1b':''}}
- function render(){
-  var q=($('waSearch').value||'').trim().toLowerCase(),f=$('waFilter').value;
-  var rows=items.filter(function(x){var hit=!q||(String(x.familyName||'').toLowerCase().includes(q)||String(x.familyId||'').toLowerCase().includes(q));return hit&&(f==='all'||(f==='has'?!!x.whatsappNumber:!x.whatsappNumber));});
-  $('waList').innerHTML=rows.length?rows.map(function(x){
-   var action=x.whatsappNumber?'<a class="wa-send" target="_blank" rel="noopener" href="https://wa.me/'+encodeURIComponent(x.whatsappNumber.replace(/\D/g,''))+'">إرسال رسالة واتساب ↗</a>':'<span class="wa-missing">لم يُسجّل رقم بعد</span>';
-   return '<article class="wa-family-row"><div class="wa-family-main"><b>'+esc(x.familyName||'أسرة بدون اسم')+'</b><small>رقم هوية الأسرة: '+esc(x.familyId)+'</small></div><div class="wa-family-actions">'+(x.whatsappNumber?'<span class="wa-phone">'+esc(x.whatsappNumber)+'</span>':'')+action+'</div></article>';
-  }).join(''):'<div class="empty">لا توجد أسر مطابقة لخيارات البحث.</div>';
- }
- async function load(){
-  if(busy)return;
-  if(!CAP.auth&&!CAP.device){status('بانتظار اتصال البرنامج الرئيسي بالخادم...',false);return;}
-  busy=true;status('جارٍ تحميل أرقام واتساب الأسر...');
-  try{
-   var h={Accept:'application/json'};if(CAP.auth)h.Authorization=CAP.auth;if(CAP.device)h['X-Device-Id']=CAP.device;
-   var r=await priorFetch.call(window,(CAP.base||DEFAULT_BASE)+'/support/whatsapp/admin',{method:'GET',headers:h,cache:'no-store'});
-   var b=await r.json().catch(function(){return {}});
-   if(!r.ok||!b.ok)throw new Error(b.error||'تعذر تحميل الأرقام. افتح البرنامج من الحساب الرئيسي وتأكد من تحديث Worker.');
-   items=b.items||[];$('waTotal').textContent=b.summary.total;$('waHas').textContent=b.summary.withWhatsapp;$('waMissing').textContent=b.summary.missing;
-   render();status('تم تحديث القائمة — '+items.length+' أسرة. الأرقام محفوظة في قاعدة بيانات البرنامج الرئيسي.');
-  }catch(e){status(e.message||'تعذر الاتصال بالخادم.',true)}
-  finally{busy=false;}
- }
- $('waRefresh').addEventListener('click',load);$('waSearch').addEventListener('input',render);$('waFilter').addEventListener('change',render);
- var sec=$('whatsapp'),timer=null;
- function watch(){if(!sec)return;if(sec.classList.contains('active'))load()}
- if(sec){new MutationObserver(watch).observe(sec,{attributes:true,attributeFilter:['class']});}
- document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-view="whatsapp"],[data-drawer-view="whatsapp"]');if(!b)return;setTimeout(function(){var target=$('whatsapp');if(target){document.querySelectorAll('.view.active').forEach(function(v){v.classList.remove('active')});document.querySelectorAll('.tab.active').forEach(function(t){t.classList.remove('active')});target.classList.add('active');var mainTab=document.querySelector('.tab[data-view="whatsapp"]');if(mainTab)mainTab.classList.add('active');var drawer=$('mobileDrawerBackdrop');if(drawer)drawer.classList.remove('open');window.scrollTo(0,0);watch();}},80);});
- window.addEventListener('online',watch);
-})();
-</script>
-<script id="home-phase2-behavior">
-(function(){'use strict';
- const $=id=>document.getElementById(id);
- const numeric=id=>{const v=$(id)?.textContent||'';if(!/[0-9٠-٩۰-۹]/.test(v))return null;const normalized=v.replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[٬,\s]/g,'');const n=Number(normalized.replace(/[^0-9.]/g,''));return Number.isFinite(n)?n:null};
- const format=n=>n.toLocaleString('ar-EG');
- function update(){const families=numeric('sFamilies'),people=numeric('sPeople'),inside=numeric('sInside'),complete=numeric('sComplete'),partial=numeric('dashPartial'),missing=numeric('dashIncomplete'),issues=numeric('dashErrors');
- const brief=$('homeBriefText'),alerts=$('homeAlertsBody');if(!brief||!alerts)return;
- if(families===null||people===null){brief.textContent='الإحصائيات غير متاحة حالياً. يرجى التأكد من تحميل البيانات.';alerts.textContent='بانتظار اكتمال تحميل فحص البيانات.';return;}
- brief.textContent=`يضم الكشف حالياً ${format(families)} عائلة بإجمالي ${format(people)} فرد. ${inside===null?'':`منها ${format(inside)} عائلة داخل المخيم. `}${complete===null?'':`نسبة اكتمال البيانات ${format(complete)}%.`}`;
- if(issues===null||partial===null||missing===null){alerts.textContent='بانتظار اكتمال فحص جودة السجلات.';return;}
- const parts=[];if(missing>0)parts.push(`${format(missing)} عائلة ببيانات ناقصة`);if(partial>0)parts.push(`${format(partial)} عائلة ببيانات جزئية`);if(issues>0)parts.push(`${format(issues)} ملاحظة في فحص جودة البيانات`);
- alerts.textContent=parts.length?parts.join(' · ')+' — افتح فحص التفاصيل للمراجعة.':'لا توجد ملاحظات ظاهرة في فحص جودة البيانات الحالي.';
- }
- function act(type){try{switch(type){case 'family-add':return typeof openFamilyModal==='function'?openFamilyModal():undefined;case 'person-add':return typeof openPersonModal==='function'?openPersonModal():undefined;case 'families':return typeof showView==='function'?showView('families'):undefined;case 'family-search':return typeof showView==='function'?showView('familySearch'):undefined;case 'support':return typeof window.openSupportInbox==='function'?window.openSupportInbox():undefined;case 'excel':return typeof exportExcel==='function'?exportExcel():undefined;case 'backup':return typeof backup==='function'?backup():undefined;case 'fund':return typeof showView==='function'?showView('campFund'):undefined;case 'quality':return typeof openQualityModal==='function'?openQualityModal():undefined;}}catch(err){console.error('Home shortcut:',err);if(typeof toast==='function')toast('تعذر فتح الإجراء، يرجى المحاولة من القائمة الرئيسية.');}}
- document.addEventListener('click',e=>{const btn=e.target.closest('[data-home-op]');if(btn)act(btn.dataset.homeOp)});
- document.addEventListener('DOMContentLoaded',()=>{update();const ids=['sFamilies','sPeople','sInside','sComplete','dashPartial','dashIncomplete','dashErrors'];let scheduled=false;const observer=new MutationObserver(()=>{if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;update()})});ids.forEach(id=>{if($(id))observer.observe($(id),{childList:true,characterData:true,subtree:true})});});
-})();
-</script>
-<script id="home-phase3-analysis-behavior">
-(function(){'use strict';
- const $=id=>document.getElementById(id);
- const number=id=>{const raw=$(id)?.textContent||'';if(!/[0-9٠-٩۰-۹]/.test(raw))return null;const v=raw.replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[٬,\s]/g,'').replace(/[^0-9.]/g,'');const n=Number(v);return Number.isFinite(n)?n:null};
- const fmt=n=>n.toLocaleString('ar-EG');
- function update(){
-  const families=number('sFamilies'),inside=number('sInside'),people=number('sPeople');
-  const outside=$('homeOutsideCount'),pop=$('homePopulationSummary'),health=$('homeHealthSummary');
-  if(!outside||!pop||!health)return;
-  outside.textContent=families===null||inside===null||inside>families?'غير متاح':fmt(families-inside);
-  if(people===null){pop.textContent='بانتظار البيانات';health.textContent='بانتظار البيانات';return}
-  const genders=$('genderChart');const labels=genders?.querySelectorAll('svg g[transform="translate(250 62)"] text')||[];
-  pop.textContent=people===0?'لا توجد سجلات':fmt(people)+' فرد مسجل';
-  const rows=Array.from($('healthChart')?.querySelectorAll('.health-item')||[]);
-  let total=0,valid=0;for(const row of rows){const b=row.querySelector('.health-top b');if(!b)continue;const n=Number(b.textContent.replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/[٬,\s]/g,''));if(Number.isFinite(n)){total+=n;valid++}}
-  health.textContent=people===0?'لا توجد سجلات':valid?fmt(total)+' حالة مصنفة':'غير متاح';
- }
- function setup(){const ids=['sFamilies','sInside','sPeople','healthChart'];let queued=false;const observer=new MutationObserver(()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;update()})});ids.forEach(id=>{const el=$(id);if(el)observer.observe(el,{childList:true,subtree:true,characterData:true})});update()}
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
-})();
-</script>
-<script id="home-phase4-readonly-health">
-(function(){'use strict';
- // Display-only observer: never calls APIs, changes records or alters existing render functions.
- const ready=()=>{
-  const panel=document.getElementById('homeReadiness'),label=document.getElementById('homeReadinessText'),stamp=document.getElementById('homeReadinessTime');
-  if(!panel||!label||!stamp)return;
-  const ids=['sFamilies','sPeople','sInside','sComplete'];
-  const els=ids.map(id=>document.getElementById(id));
-  const hasNumber=el=>el&&/[0-9٠-٩۰-۹]/.test(el.textContent||'');
-  let lastSnapshot='',lastValidAt=null;
-  const refresh=()=>{
-   const online=navigator.onLine;
-   const valid=els.every(hasNumber);
-   const snapshot=els.map(el=>(el?.textContent||'').trim()).join('|');
-   if(valid&&snapshot!==lastSnapshot){lastSnapshot=snapshot;lastValidAt=new Date();}
-   const status=!online?'offline':valid?'ready':'waiting';panel.dataset.status=status;
-   label.textContent=!online?'الجهاز غير متصل بالإنترنت؛ قد تكون الأرقام المعروضة محلية أو قديمة':valid?'الإحصائيات ظاهرة في الواجهة (لا يؤكد هذا نجاح المزامنة السحابية)':'بانتظار ظهور الإحصائيات؛ تحقق من تحميل البيانات';
-   stamp.textContent=lastValidAt?'آخر تغيّر ظاهر: '+lastValidAt.toLocaleTimeString('ar-PS',{hour:'2-digit',minute:'2-digit'}):'لم يُرصد تحديث بعد';
-  };
-  let pending=false;const schedule=()=>{if(pending)return;pending=true;requestAnimationFrame(()=>{pending=false;refresh()})};
-  const observer=new MutationObserver(schedule);
-  els.filter(Boolean).forEach(el=>observer.observe(el,{childList:true,characterData:true,subtree:true}));
-  window.addEventListener('online',schedule);window.addEventListener('offline',schedule);
-  refresh();
- };
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
-})();
-</script>
-<script src="./app.js?v=71.0-admin-login"></script>
+<script src="./scripts/01-login-log-module.js"></script>
+<script src="./scripts/02-family-whatsapp-admin-module.js"></script>
+<script src="./scripts/03-home-phase2-behavior.js"></script>
+<script src="./scripts/04-home-phase3-analysis-behavior.js"></script>
+<script src="./scripts/05-home-phase4-readonly-health.js"></script>
+<script src="./scripts/06-inline.js"></script>
 
 <!-- Interaction phase 2: navigation, drawer and dialog motion; no data-layer changes -->
 <style id="moood-interaction-phase2">
@@ -2057,37 +1870,7 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 .drawer-close:focus-visible,.drawer-items button:focus-visible,.mobile-bottom-nav button:focus-visible,.modal button:focus-visible{outline:3px solid #3b82f6;outline-offset:2px}
 @media(prefers-reduced-motion:reduce){.view.active{animation:none!important}.drawer-backdrop,.drawer-panel,.drawer-items button,.mobile-bottom-nav button,.modal .modalbox{transition:none!important}.modal .modalbox{transform:none!important}}
 </style>
-<script id="moood-interaction-phase2-behavior">
-(function(){'use strict';
-function setup(){
- const drawer=document.getElementById('mobileDrawerBackdrop');
- const openButton=document.getElementById('mobileDrawerOpen');
- const closeButton=document.getElementById('mobileDrawerClose');
- if(!drawer||!openButton)return;
- let wasOpen=drawer.classList.contains('open');
- let previousFocus=null;
- const update=()=>{
-  const opened=drawer.classList.contains('open');
-  drawer.setAttribute('aria-hidden',String(!opened));
-  openButton.setAttribute('aria-expanded',String(opened));
-  if(opened===wasOpen)return;
-  wasOpen=opened;
-  if(opened){previousFocus=document.activeElement;requestAnimationFrame(()=>{if(drawer.classList.contains('open'))(closeButton||drawer.querySelector('button'))?.focus({preventScroll:true})})}
-  else if(drawer.contains(document.activeElement)){(previousFocus&&previousFocus.isConnected?previousFocus:openButton).focus({preventScroll:true})}
- };
- new MutationObserver(update).observe(drawer,{attributes:true,attributeFilter:['class']});update();
- drawer.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){e.preventDefault();(closeButton||openButton).click();return}
-  if(e.key!=='Tab'||!drawer.classList.contains('open'))return;
-  const controls=[...drawer.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(x=>x.getClientRects().length);
-  if(!controls.length)return;
-  if(e.shiftKey&&document.activeElement===controls[0]){e.preventDefault();controls[controls.length-1].focus()}
-  else if(!e.shiftKey&&document.activeElement===controls[controls.length-1]){e.preventDefault();controls[0].focus()}
- });
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
-})();
-</script>
+<script src="./scripts/07-moood-interaction-phase2-behavior.js"></script>
 
 <!-- Interaction phase 3: feedback, real loading states and filter affordances. Presentation only. -->
 <style id="moood-interaction-phase3">
@@ -2113,52 +1896,7 @@ button[aria-busy="true"],.btn[aria-busy="true"]{opacity:.82}
 .table tbody tr:hover{background-color:rgba(37,99,235,.045)}
 @media(prefers-reduced-motion:reduce){.mo-busy-indicator{animation:none;border-right-color:currentColor}.filters :is(input,select),.dist-filters :is(input,select),.empty,.dist-empty,.dist-smart-empty,.table tbody tr{transition:none!important}}
 </style>
-<script id="moood-interaction-phase3-behavior">
-(function(){'use strict';
-function setup(){
- const toast=document.getElementById('toast');
- if(toast){
-  toast.setAttribute('aria-atomic','true');
-  toast.setAttribute('tabindex','0');
-  // Observe only text and class changes; never intercept the existing toast function.
-  let pending=false;
-  const update=()=>{
-   pending=false;
-   const msg=(toast.textContent||'').trim();
-   const error=/تعذر|فشل|خطأ|غير متاح|لم يتم|error|failed/i.test(msg);
-   const warning=!error&&/تنبيه|تحذير|انتبه|يرجى|warning/i.test(msg);
-   const success=!error&&!warning&&/تم |نجاح|بنجاح|اكتمل|success/i.test(msg);
-   toast.classList.toggle('mo-toast-error',error);
-   toast.classList.toggle('mo-toast-warning',warning);
-   toast.classList.toggle('mo-toast-success',success);
-   toast.setAttribute('role',error?'alert':'status');
-   toast.setAttribute('aria-live',error?'assertive':'polite');
-  };
-  new MutationObserver(()=>{if(!pending){pending=true;requestAnimationFrame(update)}}).observe(toast,{childList:true,subtree:true,characterData:true});
-  update();
-  toast.addEventListener('keydown',e=>{if(e.key==='Escape'&&toast.classList.contains('show')){toast.click();e.preventDefault()}});
- }
- // Visual indicators only: do not debounce or replace application search listeners.
- const fields=document.querySelectorAll('.filters input,.filters select,.dist-filters input,.dist-filters select');
- for(const field of fields){
-  const sync=()=>{const value=String(field.value||'').trim();const defaultValue=field.tagName==='SELECT'?(field.options[0]?.value||''):'';field.classList.toggle('mo-filter-active',value!==''&&value!==defaultValue)};
-  field.addEventListener('input',sync,{passive:true});field.addEventListener('change',sync);sync();
- }
- // If the existing application explicitly marks a button busy, show a spinner.
- // Never infer loading from a click or declare success before the server confirms it.
- const refreshBusy=(el)=>{
-  if(!(el instanceof HTMLElement)||!el.matches('button[aria-busy],.btn[aria-busy]'))return;
-  const busy=el.getAttribute('aria-busy')==='true';
-  const indicator=el.querySelector(':scope > .mo-busy-indicator');
-  if(busy&&!indicator){const i=document.createElement('span');i.className='mo-busy-indicator';i.setAttribute('aria-hidden','true');el.appendChild(i)}
-  if(!busy&&indicator)indicator.remove();
- };
- document.querySelectorAll('button[aria-busy],.btn[aria-busy]').forEach(refreshBusy);
- new MutationObserver(records=>{for(const r of records)if(r.type==='attributes')refreshBusy(r.target)}).observe(document.body,{subtree:true,attributes:true,attributeFilter:['aria-busy']});
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
-})();
-</script>
+<script src="./scripts/08-moood-interaction-phase3-behavior.js"></script>
 
 
 <!-- Interaction phase 4: final responsive, accessibility and performance hardening. -->
@@ -2188,31 +1926,7 @@ html[data-theme="dark"]{--mo-interaction-ring:#93c5fd;--motion-focus:rgba(147,19
  .mo-busy-indicator{animation:none!important}
 }
 </style>
-<script id="moood-interaction-phase4-behavior">
-(function(){'use strict';
- function init(){
-  // Make existing mobile navigation and drawer buttons report the active page.
-  // Only add accessibility metadata: never dispatch clicks or change navigation state.
-  const navs=[...document.querySelectorAll('.mobile-bottom-nav button,.drawer-items button')];
-  if(navs.length){
-   const refresh=()=>{
-    for(const b of navs){
-     const active=b.classList.contains('active')||b.getAttribute('data-active')==='true';
-     if(active)b.setAttribute('aria-current','page');
-     else b.removeAttribute('aria-current');
-    }
-   };
-   const observer=new MutationObserver(refresh);
-   for(const b of navs)observer.observe(b,{attributes:true,attributeFilter:['class','data-active']});
-   refresh();
-  }
-  // Keep modal overlays from exposing invisible controls to screen readers only
-  // where the app explicitly sets aria-hidden; no interference with modal lifecycle.
-  document.querySelectorAll('button[disabled]').forEach(b=>b.setAttribute('aria-disabled','true'));
- }
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
-})();
-</script>
+<script src="./scripts/09-moood-interaction-phase4-behavior.js"></script>
 
 </body>
 </html>
