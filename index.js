@@ -1992,52 +1992,6 @@ async function winterBridge(request,env){
  }
  return json({ok:false,error:'مسار غير معروف'},404);
 }
-// Staff-only, read-only endpoint. Embed into Moood index.js (same module scope).
-const lookupNormalize=v=>String(v||'').normalize('NFKC').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[\u064b-\u065fـ]/g,'').toLowerCase().trim();
-const lookupDigits=v=>String(v||'').replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776)).replace(/\D/g,'');
-const lookupKey=async(v,secret)=>{const raw=new TextEncoder().encode(String(secret||'lookup')+':'+v);return [...new Uint8Array(await crypto.subtle.digest('SHA-256',raw))].map(x=>x.toString(16).padStart(2,'0')).join('').slice(0,32)};
-const lookupMask=v=>{const s=lookupDigits(v);return s?('••••••'+s.slice(-3)):''};
-const lookupStatus=r=>String(r.workflowStatus||r.statusLabel||'').toLowerCase();
-const lookupInactive=r=>/ملغ|معلق|معلّق|مرشح|مرشّح|قيد المراجعة|cancel|pending|nominat|review/.test(lookupStatus(r));
-const lookupFuzzy=(a,b)=>{if(Math.abs(a.length-b.length)>1)return false;if(a===b)return true;let i=0,j=0,d=0;while(i<a.length&&j<b.length){if(a[i]===b[j]){i++;j++;continue}if(++d>1)return false;if(a.length>b.length)i++;else if(a.length<b.length)j++;else{i++;j++}}return d+Math.max(a.length-i,b.length-j)<=1};
-const lookupNameMatch=(name,q)=>{const words=lookupNormalize(name).split(/\s+/),terms=lookupNormalize(q).split(/\s+/).filter(Boolean);return terms.every(t=>words.some(w=>w.includes(t)||(t.length>=4&&lookupFuzzy(w,t))))};
-async function staffDistributionLookup(request,env){
- const origin=request.headers.get('Origin')||'';const allowed=String(env.STAFF_LOOKUP_ORIGIN||'');
- const headers={'cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer','vary':'Origin'};
- if(origin&&origin===allowed)headers['access-control-allow-origin']=origin;
- const respond=(data,status=200)=>json(data,status,headers);
- if(origin&&origin!==allowed)return respond({ok:false,error:'المصدر غير مصرح'},403);
- const auth=await displaySession(request,env);
- if(!auth.ok)return respond({ok:false,code:auth.code,error:auth.error},401);
- const p=auth.role==='admin'?{distributions:true,search:true,ids:true,notes:true,phones:true}:auth.permissions||{};
- if(!p.distributions)return respond({ok:false,code:'DISPLAY_PERMISSION_DENIED',error:'لا تملك صلاحية الاطلاع على التوزيعات'},403);
- const t=now(),minute=t-60000;
- const recent=await env.DB.prepare("SELECT COUNT(*) AS n FROM display_activity WHERE account_id=? AND action='dist_lookup' AND created_at>?").bind(auth.accountId,minute).first();
- if(Number(recent?.n||0)>=30)return respond({ok:false,code:'RATE_LIMIT',error:'تجاوزت 30 عملية بحث خلال دقيقة، حاول لاحقاً'},429);
- let body;try{body=await request.json()}catch{return respond({ok:false,error:'طلب غير صالح'},400)}
- const mode=body.mode==='id'?'id':body.mode==='name'?'name':null,q=String(body.q||'').trim().slice(0,100),selected=String(body.familyId||'').slice(0,64),includeInactive=body.includeInactive===true;
- if(!mode||(!q&&!selected))return respond({ok:false,error:'أدخل الاسم أو رقم الهوية'},400);
- if(mode==='id'&&!p.ids)return respond({ok:false,code:'DISPLAY_PERMISSION_DENIED',error:'لا تملك صلاحية البحث بالهوية'},403);
- if(mode==='name'&&!p.search)return respond({ok:false,code:'DISPLAY_PERMISSION_DENIED',error:'لا تملك صلاحية البحث بالاسم'},403);
- if(selected&&mode==='name'&&!p.search)return respond({ok:false,code:'DISPLAY_PERMISSION_DENIED'},403);
- if(mode==='id'&&!selected&&lookupDigits(q).length!==9)return respond({ok:false,error:'رقم الهوية يجب أن يتكون من 9 أرقام'},400);
- await logDisplayActivity(env,auth.accountId,auth.username,'dist_lookup','mode='+mode+' last3='+(selected||lookupDigits(q)).slice(-3),request.headers.get('X-Device-Id')||'');
- const rows=await env.DB.prepare("SELECT record_id,data_json FROM sync_records WHERE deleted=0 AND (record_id LIKE 'r-%' OR record_id LIKE 'dist:%') LIMIT 10000").all();
- const families=new Map(),dists=[];
- for(const row of rows.results||[]){let r;try{r=JSON.parse(row.data_json)}catch{continue}
-  if(String(row.record_id).startsWith('dist:')){dists.push(r);continue}
-  const id=lookupDigits(r['رقم هوية الأسرة']);if(!id)continue;
-  let f=families.get(id);if(!f){f={id,name:String(r['اسم رب الأسرة']||r['اسم رب العائلة']||r['اسم رب الاسرة']||r['الاسم رباعي']||r['الاسم']||'أسرة'),count:0};families.set(id,f)}f.count++;
- }
- const candidates=[...families.values()].filter(f=>mode==='id'?f.id===lookupDigits(q):lookupNameMatch(f.name,q)).slice(0,30);
- const serialize=async f=>({selectionKey:await lookupKey(f.id,env.STAFF_LOOKUP_SECRET||env.SYNC_API_KEY),name:f.name,maskedId:lookupMask(f.id),count:f.count});
- if(!selected&&mode==='name')return respond({ok:true,kind:'candidates',items:await Promise.all(candidates.map(serialize)),permissions:{ids:!!p.ids,notes:!!p.notes}});
- const id=selected?((await Promise.all([...families.keys()].map(async id=>({id,key:await lookupKey(id,env.STAFF_LOOKUP_SECRET||env.SYNC_API_KEY)})))).find(x=>x.key===selected)?.id||''):(mode==='id'?lookupDigits(q):'');
- const f=families.get(id);if(!f||mode==='name'&&!candidates.some(x=>x.id===id))return respond({ok:true,kind:'history',family:null,items:[]});
- const items=dists.filter(r=>lookupDigits(r.familyId)===id&&(includeInactive||!lookupInactive(r))).map(r=>({type:String(r.type||''),date:String(r.date||''),quantity:r.quantity,unit:String(r.unit||''),reference:String(r.reference||''),campaign:String(r.campaign||''),distributedBy:String(r.distributedBy||''),status:String(r.statusLabel||r.workflowStatus||'تم التسليم'),inactive:lookupInactive(r),deliveredAt:r.deliveredAt||null,...(p.notes?{notes:r.notes||r.details||''}:{})})).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
- return respond({ok:true,kind:'history',family:await serialize(f),items,permissions:{ids:!!p.ids,notes:!!p.notes}});
-}
-
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
@@ -2089,8 +2043,6 @@ export default {
       if (url.pathname === "/support/contact" && request.method === "POST") return await supportSaveWhatsapp(request, env);
       if (url.pathname === "/support/whatsapp/admin" && request.method === "GET") return await listFamilyWhatsapp(request, env);
       if (url.pathname === "/support/lookup" && request.method === "POST") return await supportLookup(request, env);
-      if (url.pathname === "/staff/distributions/lookup" && request.method === "POST") return await staffDistributionLookup(request, env);
-      if (url.pathname === "/staff/distributions/lookup" && request.method === "POST") return await staffDistributionLookup(request, env);
       if (url.pathname === "/support/distributions" && request.method === "POST") return await supportDistributionHistory(request, env);
       if (url.pathname === "/support/submit" && request.method === "POST") return await supportSubmit(request, env);
       if (url.pathname === "/support/notifications" && request.method === "GET") return await supportNotifications(request, env);
