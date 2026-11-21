@@ -154,8 +154,8 @@ async function ensureAuthSchema(env){
   ]);
   displayAuthSchemaReady=true;
 }
-const DEFAULT_DISPLAY_PERMISSIONS={dashboard:true,families:true,people:true,search:true,reports:true,distributions:true,ids:false,phones:false,health:false,notes:false,lookupAllResidences:false};
-function normalizeDisplayPermissions(x){let p={...DEFAULT_DISPLAY_PERMISSIONS};if(x&&typeof x==='object'){for(const k of Object.keys(p))p[k]=x[k]===true}return p}
+const DEFAULT_DISPLAY_PERMISSIONS={dashboard:true,families:true,people:true,search:true,reports:true,distributions:true,ids:false,phones:false,health:false,notes:false,lookupAllResidences:false,lookupInside:true,lookupOutside:false};
+function normalizeDisplayPermissions(x){let p={...DEFAULT_DISPLAY_PERMISSIONS};if(x&&typeof x==='object'){for(const k of Object.keys(p))p[k]=x[k]===true}if(x&&typeof x==='object'&&Object.prototype.hasOwnProperty.call(x,'lookupAllResidences')&&!Object.prototype.hasOwnProperty.call(x,'lookupOutside')){p.lookupInside=true;p.lookupOutside=x.lookupAllResidences===true;}return p}
 function parseDisplayPermissions(v){try{return normalizeDisplayPermissions(JSON.parse(v||'{}'))}catch{return {...DEFAULT_DISPLAY_PERMISSIONS}}}
 async function logDisplayActivity(env,accountId,username,action,details='',deviceId=''){try{await env.DB.prepare(`INSERT INTO display_activity(account_id,username,action,details,device_id,created_at) VALUES(?,?,?,?,?,?)`).bind(accountId||null,cleanString(username,120),cleanString(action,120),cleanString(details,500),cleanString(deviceId,120),now()).run()}catch(e){}}
 function redactDisplayData(data,permissions){const p=normalizeDisplayPermissions(permissions);if(!data||typeof data!=='object')return data;const o={...data};const keys=Object.keys(o);for(const k of keys){const n=String(k);if(!p.ids && /(^|\s)(رقم هوية|رقم الهوية|الهوية|id)(\s|$)/i.test(n))delete o[k];if(!p.phones && /جوال|هاتف|هاتف|phone|mobile/i.test(n))delete o[k];if(!p.health && /مرض|إصابة|إعاقة|حامل|مرضعة|يتيم|صحي|health|injur|disab/i.test(n))delete o[k];if(!p.notes && /ملاحظات|note/i.test(n))delete o[k]}return o}
@@ -2017,7 +2017,7 @@ async function staffDistributionLookup(request,env){
  let body;try{body=await request.json()}catch{return respond({ok:false,error:'طلب غير صالح'},400)}
  const mode=['id','name','size'].includes(body.mode)?body.mode:null,q=String(body.q||'').trim().slice(0,100),selected=String(body.familyId||'').slice(0,64),includeInactive=body.includeInactive===true;
  if(!mode||(!q&&!selected))return respond({ok:false,error:'أدخل الاسم أو رقم الهوية أو عدد الأفراد'},400);
- if(mode==='size'&&(!p.search||!p.families))return respond({ok:false,code:'DISPLAY_PERMISSION_DENIED',error:'لا تملك صلاحية تصنيف العائلات'},403);
+ if(mode==='size'&&!p.search)return respond({ok:false,code:'DISPLAY_PERMISSION_DENIED',error:'لا تملك صلاحية تصنيف العائلات'},403);
  if(mode==='size'&&(!/^[0-9]{1,3}$/.test(q)||Number(q)<1||Number(q)>100))return respond({ok:false,error:'عدد الأفراد يجب أن يكون بين 1 و100'},400);
  if(mode==='id'&&!p.ids)return respond({ok:false,code:'DISPLAY_PERMISSION_DENIED',error:'لا تملك صلاحية البحث بالهوية'},403);
  if(mode==='name'&&!p.search)return respond({ok:false,code:'DISPLAY_PERMISSION_DENIED',error:'لا تملك صلاحية البحث بالاسم'},403);
@@ -2035,15 +2035,16 @@ async function staffDistributionLookup(request,env){
   f.count++;
  }
  // Server-enforced residence scope. Unknown residence is not visible to restricted accounts.
- const allowedFamilies=[...families.values()].filter(f=>auth.role==='admin'||p.lookupAllResidences===true||f.residence==='داخل المخيم');
+ const scope=auth.role==='admin'?{inside:true,outside:true}:{inside:p.lookupInside===true,outside:p.lookupOutside===true};
+ const allowedFamilies=[...families.values()].filter(f=>f.residence==='داخل المخيم'?scope.inside:f.residence==='خارج المخيم'?scope.outside:auth.role==='admin');
  const candidates=allowedFamilies.filter(f=>mode==='id'?f.id===lookupDigits(q):mode==='size'?f.count===Number(q):lookupNameMatch(f.name,q)).slice(0,500);
  const deliveredIds=new Set(dists.filter(r=>!lookupInactive(r)&&/تم التسليم|delivered|مستلم|مسلم/i.test(String(r.statusLabel||r.workflowStatus||'تم التسليم'))).map(r=>lookupDigits(r.familyId)));
  const serialize=async f=>({selectionKey:await lookupKey(f.id,env.STAFF_LOOKUP_SECRET||env.SYNC_API_KEY),name:f.name,maskedId:lookupMask(f.id),count:f.count,residence:f.residence,benefited:deliveredIds.has(f.id)});
- if(!selected&&(mode==='name'||mode==='size'))return respond({ok:true,kind:'candidates',items:await Promise.all(candidates.map(serialize)),permissions:{ids:!!p.ids,notes:!!p.notes,lookupAllResidences:auth.role==='admin'||p.lookupAllResidences===true}});
+ if(!selected&&(mode==='name'||mode==='size'))return respond({ok:true,kind:'candidates',items:await Promise.all(candidates.map(serialize)),permissions:{ids:!!p.ids,notes:!!p.notes,lookupInside:scope.inside,lookupOutside:scope.outside}});
  const id=selected?((await Promise.all(allowedFamilies.map(async f=>({id:f.id,key:await lookupKey(f.id,env.STAFF_LOOKUP_SECRET||env.SYNC_API_KEY)})))).find(x=>x.key===selected)?.id||''):(mode==='id'?lookupDigits(q):'');
  const f=allowedFamilies.find(x=>x.id===id);if(!f||(mode==='name'||mode==='size')&&!candidates.some(x=>x.id===id))return respond({ok:true,kind:'history',family:null,items:[]});
  const items=dists.filter(r=>lookupDigits(r.familyId)===id&&(includeInactive||!lookupInactive(r))).map(r=>({type:String(r.type||''),date:String(r.date||''),quantity:r.quantity,unit:String(r.unit||''),reference:String(r.reference||''),campaign:String(r.campaign||''),distributedBy:String(r.distributedBy||''),status:String(r.statusLabel||r.workflowStatus||'تم التسليم'),inactive:lookupInactive(r),deliveredAt:r.deliveredAt||null,...(p.notes?{notes:r.notes||r.details||''}:{})})).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
- return respond({ok:true,kind:'history',family:await serialize(f),items,permissions:{ids:!!p.ids,notes:!!p.notes}});
+ return respond({ok:true,kind:'history',family:await serialize(f),items,permissions:{ids:!!p.ids,notes:!!p.notes,lookupInside:scope.inside,lookupOutside:scope.outside}});
 }
 
 export default {
