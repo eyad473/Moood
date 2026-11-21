@@ -2,25 +2,6 @@
 
 <html dir="rtl" lang="ar">
 <head>
-<script id="moood-mobile-diagnostics">
-(function(){
- if(!/(?:\?|&)debug=1(?:&|$)/.test(location.search))return;
- var events=[],panel,details;
- function log(s){events.push(new Date().toLocaleTimeString('ar-EG')+' '+String(s).slice(0,450));if(events.length>70)events.shift();if(details)details.textContent=events.join('\n');}
- window.addEventListener('error',function(e){var t=e.target;if(t&&t!==window){log('RESOURCE ERROR: '+(t.src||t.href||t.tagName));return;}log('JS ERROR: '+e.message+' @ '+(e.filename||'')+':'+e.lineno+':'+e.colno);},true);
- window.addEventListener('unhandledrejection',function(e){log('PROMISE ERROR: '+String(e.reason&& (e.reason.stack||e.reason.message)||e.reason));});
- document.addEventListener('click',function(e){var b=e.target.closest('button,a,[onclick]');if(b)log('CLICK: '+(b.id||b.textContent||b.tagName).trim().slice(0,75));},true);
- function init(){
- panel=document.createElement('section');panel.id='moood-debug-panel';panel.setAttribute('dir','rtl');panel.style.cssText='position:fixed!important;bottom:8px!important;left:8px!important;right:8px!important;z-index:2147483647!important;background:#101827!important;color:#fff!important;border:2px solid #fbbf24!important;border-radius:14px!important;padding:12px!important;max-height:65vh!important;overflow:auto!important;font:14px/1.6 Arial,sans-serif!important;box-shadow:0 4px 24px #0009!important';
- panel.innerHTML='<div style="display:flex;gap:8px;align-items:center;justify-content:space-between"><b>تشخيص MOODD للهاتف</b><button type="button" id="moood-debug-close" style="padding:8px;background:#ddd;color:#111;border-radius:7px">إخفاء</button></div><div id="moood-debug-status" style="margin:8px 0"></div><pre id="moood-debug-details" style="white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.5 monospace;max-height:30vh;overflow:auto"></pre><button type="button" id="moood-debug-copy" style="padding:10px;background:#fbbf24;color:#111;border-radius:7px">نسخ تقرير التشخيص</button>';
- document.body.appendChild(panel);details=document.getElementById('moood-debug-details');
- document.getElementById('moood-debug-close').onclick=function(){panel.style.display='none';};
- document.getElementById('moood-debug-copy').onclick=function(){var t='MOODD DIAGNOSTICS\n'+document.getElementById('moood-debug-status').textContent+'\n'+events.join('\n');if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){alert('تم النسخ')},function(){prompt('انسخ التقرير',t)});else prompt('انسخ التقرير',t);};
- setTimeout(function(){var app=document.querySelector('.app'),v=document.querySelector('.view.active'),a=document.querySelector('script[src*="app.js"]');document.getElementById('moood-debug-status').textContent='app.js: '+(a?'مستدعى':'غير مستدعى')+' | app: '+(app?'موجود':'غير موجود')+' | active view: '+(v?'موجود':'غير موجود')+' | readyState: '+document.readyState;log('Diagnostic ready');},1000);
- }
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
-})();
-</script>
 <style id="abu-v76-first-paint">html,body{margin:0;min-height:100%;background:#f6f8fc}#abu-startup{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:#f6f8fc;color:#102a43;direction:rtl;font-family:Arial,sans-serif}#abu-startup .abu-panel{text-align:center;width:min(84vw,360px);padding:30px 18px}#abu-startup .abu-mark{width:76px;height:76px;margin:0 auto 19px;border-radius:24px;background:linear-gradient(145deg,#0b776b,#124b70);display:grid;place-items:center}#abu-startup .abu-mark svg{width:44px;height:44px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}#abu-startup .abu-title{font-size:23px;font-weight:800;line-height:1.7}#abu-startup .abu-sub{font-size:13px;color:#5c7086;margin-top:5px}#abu-startup .abu-progress{height:3px;background:#dce7ee;border-radius:99px;overflow:hidden;margin:27px auto 15px;max-width:225px}#abu-startup .abu-progress:after{content:"";display:block;height:100%;width:35%;background:#0d887c;border-radius:inherit;animation:abu-v75-slide 1.25s ease-in-out infinite}#abu-startup .abu-state{font-size:12px;color:#60778c;min-height:22px}#abu-startup .abu-foot{position:absolute;bottom:max(22px,env(safe-area-inset-bottom));font-size:11px;color:#8493a5;left:0;right:0;text-align:center}@media(prefers-color-scheme:dark){html,body,#abu-startup{background:#101b2c}#abu-startup{color:#edf4fa}}@media(prefers-reduced-motion:reduce){#abu-startup .abu-progress:after{animation:none}}</style>
 <link href="./manifest.webmanifest" rel="manifest"/>
 <meta content="#0f172a" name="theme-color"/>
@@ -91,7 +72,7 @@
 <link rel="stylesheet" href="./assets/moood-v80-motion.css"/>
 </head>
 <body>
-<div aria-hidden="true" id="abConfirmBackdrop"><div aria-modal="true" id="abConfirmBox" role="dialog"><div id="abConfirmIcon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-check"></use></svg></div><div id="abConfirmTitle">تأكيد العملية</div><div id="abConfirmText"></div><div id="abConfirmActions"><button class="ab-cancel" id="abConfirmCancel">إلغاء</button><button class="ab-ok" id="abConfirmOk">متابعة</button></div></div>
+<div aria-hidden="true" id="abConfirmBackdrop"><div aria-modal="true" id="abConfirmBox" role="dialog"><div id="abConfirmIcon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-check"></use></svg></div><div id="abConfirmTitle">تأكيد العملية</div><div id="abConfirmText"></div><div id="abConfirmActions"><button class="ab-cancel" id="abConfirmCancel">إلغاء</button><button class="ab-ok" id="abConfirmOk">متابعة</button></div></div></div>
 <div id="abu-startup" role="status" aria-live="polite" aria-label="جار تجهيز تطبيق مخيم أبو عريبان"><div class="abu-panel"><div class="abu-mark"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 23 24 8l18 15M11 21v19h26V21M19 40V28h10v12"/><path d="M17 18h14"/></svg></div><div class="abu-title">مخيم أبو عريبان</div><div class="abu-sub">نظام إدارة بيانات المخيم</div><div class="abu-progress" aria-hidden="true"></div><div class="abu-state" id="abu-startup-state">جارٍ تجهيز الواجهة…</div></div><div class="abu-foot">إدارة مخيم أبو عريبان</div>
 </div><!-- end abu-startup: keep application styles outside removable loading overlay -->
 <style id="mo-v73-perf">
