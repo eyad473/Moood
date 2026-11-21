@@ -110,6 +110,15 @@
 
 <link rel="stylesheet" href="./assets/moood-v79-interactions.css"/>
 <link rel="stylesheet" href="./assets/moood-v80-motion.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap"/>
+
+<style id="moood-official-ibm-plex-font">
+/* Official IBM Plex Sans Arabic via Google Fonts. No aliases to other font files. */
+:root{--type-family:'IBM Plex Sans Arabic',sans-serif!important;--font-body:'IBM Plex Sans Arabic',sans-serif!important;--font-heading:'IBM Plex Sans Arabic',sans-serif!important;--font-numbers:'IBM Plex Sans Arabic',sans-serif!important}
+html,body,body *,body *::before,body *::after,button,input,select,textarea,option,svg text{font-family:'IBM Plex Sans Arabic',sans-serif!important}
+</style>
 </head>
 <body>
 <div id="abu-startup" role="status" aria-live="polite" aria-label="جار تجهيز تطبيق مخيم أبو عريبان"><div class="abu-panel"><div class="abu-mark"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 23 24 8l18 15M11 21v19h26V21M19 40V28h10v12"/><path d="M17 18h14"/></svg></div><div class="abu-title">مخيم أبو عريبان</div><div class="abu-sub">نظام إدارة بيانات المخيم</div><div class="abu-progress" aria-hidden="true"></div><div class="abu-state" id="abu-startup-state">جارٍ تجهيز الواجهة…</div></div><div class="abu-foot">إدارة مخيم أبو عريبان</div></div>
@@ -123,7 +132,7 @@
 }
 html.mo-low-motion .view.active,html.mo-low-motion .local-house,html.mo-low-motion .local-cloud,html.mo-low-motion .local-dot{animation:none!important}
 html.mo-page-hidden .local-house,html.mo-page-hidden .local-cloud,html.mo-page-hidden .local-dot{animation-play-state:paused!important}
-</style><style id="local-font-faces">@font-face{font-family:"IBM Plex Sans Arabic";src:url("./assets/fonts/MF_Tahadath_Regular.woff2") format("woff2");font-weight:400 600;font-display:swap}@font-face{font-family:"IBM Plex Sans Arabic";src:url("./assets/fonts/MF_Tahadath_Bold.woff2") format("woff2");font-weight:700 900;font-display:swap}@font-face{font-family:Cairo;src:url("./assets/fonts/MF_Tahadath_Regular.woff2") format("woff2");font-display:swap}@font-face{font-family:Tajawal;src:url("./assets/fonts/MF_Tahadath_Regular.woff2") format("woff2");font-display:swap}</style><style>
+</style><style>
 :root{--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#64748b;--line:#e5e7eb;--primary:#2563eb;--primary2:#1d4ed8;--danger:#dc2626;--ok:#059669;--warn:#d97706;--shadow:0 8px 30px rgba(15,23,42,.07);--radius:18px}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Cairo,Tajawal,Arial,sans-serif}
 button,input,select,textarea{font:inherit}button{cursor:pointer}
