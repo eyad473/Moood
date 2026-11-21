@@ -78,7 +78,7 @@ function load(){
     bootUsingEmbeddedSeed=false;
     data=saved?JSON.parse(saved):[];
   }catch(e){bootUsingEmbeddedSeed=false;data=[]}
-  data = Array.isArray(data)?data:[];
+  data = Array.isArray(data)?data.filter(r => r && typeof r === "object"):[];
   ensureFamilyHeadRecords(true);
   syncAutomaticOrphans(true);
   rebuildFilters(); renderAll();
@@ -3055,7 +3055,7 @@ function exportStyledExcel(rows,filename="كشف_أبو_عريبان",sheetName=
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js', {scope: './'}).catch(() => {});
+    navigator.serviceWorker.register('./sw.js?v=84', {scope: './'}).catch(() => {});
   });
 }
 
@@ -3292,17 +3292,20 @@ if ('serviceWorker' in navigator) {
 })();
 
 /* V53.3.1.1_LOGIN_UX_START */
-let protectedAppStarted=false;
+var protectedAppStarted=false;
 function startProtectedApp(){
   if(protectedAppStarted)return;
   protectedAppStarted=true;
-  load();
-  // EMERGENCY: automatic dedup disabled to protect newly added families.
-  // runSmartDedup("startup");
-  initReportColumns();
-  renderPersonPicker();
-  initV5();
-  installCloudSync();
+  // Each initializer is isolated; failures are reported without stopping subsequent setup.
+  for(const [step,run] of [
+    ["load",()=>load()],
+    ["initReportColumns",()=>initReportColumns()],
+    ["renderPersonPicker",()=>renderPersonPicker()],
+    ["initV5",()=>initV5()],
+    ["installCloudSync",()=>installCloudSync()]
+  ]){
+    try{run()}catch(error){console.error("MOODD startup / "+step,error);window.__MOOOD_BOOT_ERROR__?.("Startup "+step+": "+(error?.message||error));}
+  }
 }
 function loginUiError(message){
   const er=document.getElementById("displayLoginError"); if(!er)return;
@@ -4700,3 +4703,6 @@ else fundInstallDiagnostics();
  }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })();
+
+/* V84: top-level script evaluation completed; authentication and sync are independent. */
+window.__MOOOD_BOOTED__=true;

@@ -1,15 +1,15 @@
-const CACHE = "abu-oreiban-v83-distribution-details";
-const SHELL = ["./scripts/11-moood-v81-dashboard.js","./assets/moood-v80-motion.css","./scripts/10-moood-v80-motion.js","./assets/moood-v79-interactions.css","./", "./index.html", "./app.js", "./manifest.webmanifest", "./assets/fonts/MF_Tahadath_Regular.woff2", "./assets/fonts/MF_Tahadath_Bold.woff2","./scripts/01-login-log-module.js","./scripts/02-family-whatsapp-admin-module.js","./scripts/03-home-phase2-behavior.js","./scripts/04-home-phase3-analysis-behavior.js","./scripts/05-home-phase4-readonly-health.js","./scripts/06-inline.js","./scripts/07-moood-interaction-phase2-behavior.js","./scripts/08-moood-interaction-phase3-behavior.js","./scripts/09-moood-interaction-phase4-behavior.js"];
-self.addEventListener("install", event => {event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()));});
-self.addEventListener("activate", event => {event.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(k=>k.startsWith('abu-oreiban-')&&k!==CACHE).map(k=>caches.delete(k)));if(self.registration.navigationPreload){try{await self.registration.navigationPreload.enable()}catch(e){}}await self.clients.claim();const clients=await self.clients.matchAll({type:'window'});clients.forEach(c=>c.postMessage({type:'APP_UPDATE_AVAILABLE',version:CACHE}));})());});
-self.addEventListener("fetch", event => {
- const req=event.request;if(req.method!=="GET")return;
- const url=new URL(req.url);if(url.origin!==self.location.origin)return;
- // Never cache data endpoints, requests with query parameters other than versioned static assets, or API calls.
- if(url.pathname.includes('/api/')||url.pathname.startsWith('/sync')||req.headers.has('authorization'))return;
+const CACHE = "abu-oreiban-v84-network-first";
+const SHELL = ["./", "./index.html", "./app.js?v=84", "./manifest.webmanifest", "./assets/fonts/MF_Tahadath_Regular.woff2", "./assets/fonts/MF_Tahadath_Bold.woff2", "./assets/moood-v79-interactions.css", "./assets/moood-v80-motion.css", "./scripts/01-login-log-module.js?v=84", "./scripts/02-family-whatsapp-admin-module.js?v=84", "./scripts/03-home-phase2-behavior.js?v=84", "./scripts/04-home-phase3-analysis-behavior.js?v=84", "./scripts/05-home-phase4-readonly-health.js?v=84", "./scripts/07-moood-interaction-phase2-behavior.js?v=84", "./scripts/08-moood-interaction-phase3-behavior.js?v=84", "./scripts/09-moood-interaction-phase4-behavior.js?v=84", "./scripts/10-moood-v80-motion.js?v=84", "./scripts/11-moood-v81-dashboard.js?v=84"];
+self.addEventListener('install',event=>{event.waitUntil((async()=>{const cache=await caches.open(CACHE);await Promise.allSettled(SHELL.map(async path=>{const req=new Request(new URL(path,self.registration.scope),{cache:'reload'});const response=await fetch(req);if(response.ok)await cache.put(req,response)}));await self.skipWaiting()})())});
+self.addEventListener('activate',event=>{event.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)));await self.clients.claim()})())});
+function isAsset(path){return /\.(?:js|css|woff2?|ttf|svg|png|jpg|jpeg|webp|ico)$/i.test(path)}
+function networkFirst(request,event){return (async()=>{const cache=await caches.open(CACHE);let timer;try{const response=await Promise.race([fetch(request),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('network timeout')),4000)})]);if(response.ok)event.waitUntil(cache.put(request,response.clone()));return response}catch(e){return (await cache.match(request))||Response.error()}finally{clearTimeout(timer)}})()}
+function cacheFirst(request,event){return (async()=>{const cache=await caches.open(CACHE);const hit=await cache.match(request);if(hit)return hit;try{const response=await fetch(request);if(response.ok)event.waitUntil(cache.put(request,response.clone()));return response}catch(e){return Response.error()}})()}
+self.addEventListener('fetch',event=>{
+ const request=event.request;if(request.method!=='GET')return;
+ const url=new URL(request.url);if(url.origin!==self.location.origin)return;
+ if(url.pathname.startsWith('/sync')||url.pathname.startsWith('/api/')||url.pathname.startsWith('/staff/')||request.headers.has('authorization'))return;
  const path=url.pathname;
- const shell= req.mode==='navigate'||SHELL.some(s=>new URL(s,self.registration.scope).pathname===path);
- if(shell){event.respondWith((async()=>{const cache=await caches.open(CACHE);const key=req.mode==='navigate'?new URL('./index.html',self.registration.scope):new URL(path,self.location.origin);const cached=await cache.match(key);if(cached)return cached;try{const response=await fetch(req);if(response.ok)event.waitUntil(cache.put(key,response.clone()));return response}catch(e){return (await cache.match('./index.html'))||Response.error()}})());return}
- if(!/\.(?:css|js|woff2?|ttf|svg|png|jpg|jpeg|webp|ico|json)$/i.test(path))return;
- event.respondWith((async()=>{const cache=await caches.open(CACHE);const cached=await cache.match(req);const network=fetch(req).then(r=>{if(r.ok)event.waitUntil(cache.put(req,r.clone()));return r}).catch(()=>null);return cached||(await network)||Response.error()})());
+ if(request.mode==='navigate'||path.endsWith('/index.html')||path.endsWith('/app.js')||path.includes('/scripts/')&&path.endsWith('.js')||path.endsWith('.css')){event.respondWith(networkFirst(request,event));return;}
+ if(/\.(?:woff2?|ttf|svg|png|jpg|jpeg|webp|ico)$/i.test(path)){event.respondWith(cacheFirst(request,event));return;}
 });

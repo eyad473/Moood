@@ -2,6 +2,46 @@
 
 <html dir="rtl" lang="ar">
 <head>
+<script id="moood-v84-boot-diagnostics">
+(function(){
+  var VERSION='84', problems=[], banner;
+  function show(message){
+    problems.push(String(message));
+    function paint(){
+      if(!document.body)return;
+      if(!banner){banner=document.createElement('div');banner.id='moood-boot-error';banner.setAttribute('role','status');banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;pointer-events:none;background:#a50016;color:white;padding:9px 12px;font:12px/1.6 sans-serif;direction:rtl;white-space:pre-wrap;overflow-wrap:anywhere;max-height:40vh;overflow-y:auto';document.body.appendChild(banner);}
+      banner.textContent=problems.slice(-4).join('\n');
+    }
+    if(document.body)paint();else document.addEventListener('DOMContentLoaded',paint,{once:true});
+  }
+  window.__MOOOD_BOOT_ERROR__=show;
+  window.addEventListener('error',function(e){
+    if(e.target&&e.target!==window){var el=e.target;if(el.tagName==='SCRIPT'||el.tagName==='LINK')show('تعذر تحميل مورد: '+(el.src||el.href));return;}
+    show('JavaScript: '+(e.message||'خطأ غير معروف')+' | '+(e.filename||'unknown')+':'+(e.lineno||0));
+  },true);
+  window.addEventListener('unhandledrejection',function(e){show('Promise: '+String(e.reason&&e.reason.message||e.reason||'غير معروف'));});
+  window.addEventListener('load',function(){setTimeout(async function(){
+    if(window.__MOOOD_BOOTED__===true)return;
+    var status='غير متاح',type='غير متاح',length='غير متاح';
+    try{var r=await fetch('./app.js?v='+VERSION+'&diagnostic='+Date.now(),{cache:'no-store'});status=r.status;type=r.headers.get('content-type')||'';length=(await r.text()).length;}catch(e){status='fetch failed: '+e.message;}
+    show('app.js لم يكتمل | HTTP '+status+' | content-type: '+type+' | length: '+length+' | SW controller: '+Boolean(navigator.serviceWorker&&navigator.serviceWorker.controller));
+  },3000);});
+  // One-time, version-aware cleanup: never touch localStorage or IndexedDB.
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.getRegistration('./').then(async function(reg){
+      if(!reg||!reg.active)return;
+      var active=reg.active.scriptURL||'';
+      if(new URL(active).searchParams.get('v')===VERSION)return;
+      var guard='moood-sw-cleanup-'+VERSION;
+      try{if(sessionStorage.getItem(guard)==='done')return;sessionStorage.setItem(guard,'done');}catch(e){return;}
+      await reg.unregister();
+      if('caches' in window){var keys=await caches.keys();await Promise.all(keys.filter(function(k){return k.startsWith('abu-oreiban-')}).map(function(k){return caches.delete(k)}));}
+      location.reload();
+    }).catch(function(e){show('SW cleanup: '+e.message)});
+  }
+})();
+</script>
+
 <style id="abu-v76-first-paint">html,body{margin:0;min-height:100%;background:#f6f8fc}#abu-startup{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:#f6f8fc;color:#102a43;direction:rtl;font-family:Arial,sans-serif}#abu-startup .abu-panel{text-align:center;width:min(84vw,360px);padding:30px 18px}#abu-startup .abu-mark{width:76px;height:76px;margin:0 auto 19px;border-radius:24px;background:linear-gradient(145deg,#0b776b,#124b70);display:grid;place-items:center}#abu-startup .abu-mark svg{width:44px;height:44px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}#abu-startup .abu-title{font-size:23px;font-weight:800;line-height:1.7}#abu-startup .abu-sub{font-size:13px;color:#5c7086;margin-top:5px}#abu-startup .abu-progress{height:3px;background:#dce7ee;border-radius:99px;overflow:hidden;margin:27px auto 15px;max-width:225px}#abu-startup .abu-progress:after{content:"";display:block;height:100%;width:35%;background:#0d887c;border-radius:inherit;animation:abu-v75-slide 1.25s ease-in-out infinite}#abu-startup .abu-state{font-size:12px;color:#60778c;min-height:22px}#abu-startup .abu-foot{position:absolute;bottom:max(22px,env(safe-area-inset-bottom));font-size:11px;color:#8493a5;left:0;right:0;text-align:center}@media(prefers-color-scheme:dark){html,body,#abu-startup{background:#101b2c}#abu-startup{color:#edf4fa}}@media(prefers-reduced-motion:reduce){#abu-startup .abu-progress:after{animation:none}}</style>
 <link href="./manifest.webmanifest" rel="manifest"/>
 <meta content="#0f172a" name="theme-color"/>
@@ -26,7 +66,7 @@
 
 
 
-</div>
+<div aria-hidden="true" id="abConfirmBackdrop"><div aria-modal="true" id="abConfirmBox" role="dialog"><div id="abConfirmIcon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-check"></use></svg></div><div id="abConfirmTitle">تأكيد العملية</div><div id="abConfirmText"></div><div id="abConfirmActions"><button class="ab-cancel" id="abConfirmCancel">إلغاء</button><button class="ab-ok" id="abConfirmOk">متابعة</button></div></div></div>
 
 
 
@@ -72,9 +112,7 @@
 <link rel="stylesheet" href="./assets/moood-v80-motion.css"/>
 </head>
 <body>
-<div aria-hidden="true" id="abConfirmBackdrop"><div aria-modal="true" id="abConfirmBox" role="dialog"><div id="abConfirmIcon"><svg class="mo-icon" aria-hidden="true" focusable="false"><use href="#mo-icon-check"></use></svg></div><div id="abConfirmTitle">تأكيد العملية</div><div id="abConfirmText"></div><div id="abConfirmActions"><button class="ab-cancel" id="abConfirmCancel">إلغاء</button><button class="ab-ok" id="abConfirmOk">متابعة</button></div></div></div>
 <div id="abu-startup" role="status" aria-live="polite" aria-label="جار تجهيز تطبيق مخيم أبو عريبان"><div class="abu-panel"><div class="abu-mark"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 23 24 8l18 15M11 21v19h26V21M19 40V28h10v12"/><path d="M17 18h14"/></svg></div><div class="abu-title">مخيم أبو عريبان</div><div class="abu-sub">نظام إدارة بيانات المخيم</div><div class="abu-progress" aria-hidden="true"></div><div class="abu-state" id="abu-startup-state">جارٍ تجهيز الواجهة…</div></div><div class="abu-foot">إدارة مخيم أبو عريبان</div>
-</div><!-- end abu-startup: keep application styles outside removable loading overlay -->
 <style id="mo-v73-perf">
 /* V73: paint and motion safeguards. No layout, colors, labels or data changes. */
 @media (prefers-reduced-motion: reduce){
@@ -1867,13 +1905,12 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 <style id="mobile-drawer-final-overrides">
 @media(max-width:700px){.mobile-bottom-nav{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important;padding:7px 12px max(7px,env(safe-area-inset-bottom))!important}.mobile-bottom-nav button{height:52px!important;min-height:52px!important;border-radius:14px!important}.mobile-bottom-nav button small{font-size:11px!important;line-height:14px!important}}
 </style>
-<script src="./scripts/01-login-log-module.js"></script>
-<script src="./scripts/02-family-whatsapp-admin-module.js"></script>
-<script src="./scripts/03-home-phase2-behavior.js"></script>
-<script src="./scripts/04-home-phase3-analysis-behavior.js"></script>
-<script src="./scripts/05-home-phase4-readonly-health.js"></script>
-<script src="./app.js?v=83"></script>
-<script src="./scripts/06-inline.js"></script>
+<script src="./scripts/01-login-log-module.js?v=84"></script>
+<script src="./scripts/02-family-whatsapp-admin-module.js?v=84"></script>
+<script src="./scripts/03-home-phase2-behavior.js?v=84"></script>
+<script src="./scripts/04-home-phase3-analysis-behavior.js?v=84"></script>
+<script src="./scripts/05-home-phase4-readonly-health.js?v=84"></script>
+<script src="./app.js?v=84"></script>
 
 <!-- Interaction phase 2: navigation, drawer and dialog motion; no data-layer changes -->
 <style id="moood-interaction-phase2">
@@ -1893,7 +1930,7 @@ html[data-theme="dark"] .ll-row{background:#141e2b;border-color:#334154}
 .drawer-close:focus-visible,.drawer-items button:focus-visible,.mobile-bottom-nav button:focus-visible,.modal button:focus-visible{outline:3px solid #3b82f6;outline-offset:2px}
 @media(prefers-reduced-motion:reduce){.view.active{animation:none!important}.drawer-backdrop,.drawer-panel,.drawer-items button,.mobile-bottom-nav button,.modal .modalbox{transition:none!important}.modal .modalbox{transform:none!important}}
 </style>
-<script src="./scripts/07-moood-interaction-phase2-behavior.js"></script>
+<script src="./scripts/07-moood-interaction-phase2-behavior.js?v=84"></script>
 
 <!-- Interaction phase 3: feedback, real loading states and filter affordances. Presentation only. -->
 <style id="moood-interaction-phase3">
@@ -1919,7 +1956,7 @@ button[aria-busy="true"],.btn[aria-busy="true"]{opacity:.82}
 .table tbody tr:hover{background-color:rgba(37,99,235,.045)}
 @media(prefers-reduced-motion:reduce){.mo-busy-indicator{animation:none;border-right-color:currentColor}.filters :is(input,select),.dist-filters :is(input,select),.empty,.dist-empty,.dist-smart-empty,.table tbody tr{transition:none!important}}
 </style>
-<script src="./scripts/08-moood-interaction-phase3-behavior.js"></script>
+<script src="./scripts/08-moood-interaction-phase3-behavior.js?v=84"></script>
 
 
 <!-- Interaction phase 4: final responsive, accessibility and performance hardening. -->
@@ -1949,7 +1986,7 @@ html[data-theme="dark"]{--mo-interaction-ring:#93c5fd;--motion-focus:rgba(147,19
  .mo-busy-indicator{animation:none!important}
 }
 </style>
-<script src="./scripts/09-moood-interaction-phase4-behavior.js"></script>
+<script src="./scripts/09-moood-interaction-phase4-behavior.js?v=84"></script>
 
 <script id="abu-v77-startup-controller">(function(){'use strict';var screen=document.getElementById('abu-startup');if(!screen)return;var ended=false;var state=document.getElementById('abu-startup-state');function finish(){if(ended)return;ended=true;screen.classList.add('abu-ready');screen.setAttribute('aria-hidden','true');setTimeout(function(){if(screen.parentNode)screen.parentNode.removeChild(screen)},350)}function isReady(){var app=document.querySelector('.app');var view=document.querySelector('.view.active');var login=document.getElementById('displayLoginOverlay');return !!((login&&!login.hidden)||(app&&view&&view.getClientRects().length))}function check(){if(ended)return;if(isReady()){if(state)state.textContent='الواجهة جاهزة';requestAnimationFrame(function(){requestAnimationFrame(finish)})}}if(document.readyState==='complete')check();else window.addEventListener('load',check,{once:true});document.addEventListener('DOMContentLoaded',function(){requestAnimationFrame(check)},{once:true});var observer=new MutationObserver(check);observer.observe(document.body,{childList:true,attributes:true,attributeFilter:['class','hidden'],subtree:false});var tries=0;var ticker=setInterval(function(){check();if(ended||++tries>45){clearInterval(ticker);observer.disconnect()}},200);setTimeout(function(){if(!ended){if(state)state.textContent='التطبيق يستغرق وقتًا أطول من المعتاد…';}},3500);setTimeout(function(){if(!ended){if(state)state.textContent='يمكنك متابعة فتح التطبيق';finish()}},12000)})();</script>
 
@@ -1978,8 +2015,8 @@ html.mo-low-motion .housing-chart-fill::after,html.mo-low-motion .health-fill::a
 @media(prefers-reduced-motion:reduce){.view.active,#dashboard.view.active .stat,#dashboard.view.active .chart-card,.modal.show .modalbox,.mobile-bottom-nav button.active .mo-bottom-icon,.mobile-bottom-nav button[aria-current="page"] .mo-bottom-icon{animation:none!important;transition:none!important;transform:none!important}}
 @media print{.view.active,#dashboard.view.active .stat,#dashboard.view.active .chart-card,.modal.show .modalbox{animation:none!important;transform:none!important}}
 </style>
-<script defer src="./scripts/10-moood-v80-motion.js"></script>
-<script defer src="./scripts/11-moood-v81-dashboard.js"></script>
+<script defer src="./scripts/10-moood-v80-motion.js?v=84"></script>
+<script defer src="./scripts/11-moood-v81-dashboard.js?v=84"></script>
 </body>
 </html>
 <style>.original-governorate-card .housing-chart-item{cursor:pointer}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-track{box-shadow:0 0 0 3px rgba(59,130,246,.18),0 4px 14px rgba(37,99,235,.13);transform:translateY(-1px)}.original-governorate-card .housing-chart-item.is-chart-active .housing-chart-fill{filter:brightness(1.16)}</style>
