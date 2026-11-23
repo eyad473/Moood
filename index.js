@@ -1352,7 +1352,7 @@ async function supportDistributionHistory(request, env) {
     items.push({id:String(row.record_id),type:String(d.type||'مساعدة غير محددة').slice(0,160),
       date:String(d.date||'').slice(0,10),quantity:d.quantity??null,
       unit:String(d.unit||'').slice(0,60),reference:String(d.reference||'').slice(0,100),details:String(d.details||'').slice(0,5000),
-      beneficiaryName:String(d.beneficiaryName||'').slice(0,160)});
+      beneficiaryName:String(d.beneficiaryName||'').slice(0,160),beneficiaryType:String(d.beneficiaryType||'').slice(0,40)});
   }
   items.sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
   return json({ok:true,items,updatedAt:new Date().toISOString(),total:items.length});
@@ -2043,7 +2043,7 @@ async function staffDistributionLookup(request,env){
  if(!selected&&(mode==='name'||mode==='size'))return respond({ok:true,kind:'candidates',items:await Promise.all(candidates.map(serialize)),permissions:{ids:!!p.ids,notes:!!p.notes,lookupInside:scope.inside,lookupOutside:scope.outside}});
  const id=selected?((await Promise.all(allowedFamilies.map(async f=>({id:f.id,key:await lookupKey(f.id,env.STAFF_LOOKUP_SECRET||env.SYNC_API_KEY)})))).find(x=>x.key===selected)?.id||''):(mode==='id'?lookupDigits(q):'');
  const f=allowedFamilies.find(x=>x.id===id);if(!f||(mode==='name'||mode==='size')&&!candidates.some(x=>x.id===id))return respond({ok:true,kind:'history',family:null,items:[]});
- const items=dists.filter(r=>lookupDigits(r.familyId)===id&&(includeInactive||!lookupInactive(r))).map(r=>({type:String(r.type||''),date:String(r.date||''),quantity:r.quantity,unit:String(r.unit||''),reference:String(r.reference||''),campaign:String(r.campaign||''),distributedBy:String(r.distributedBy||''),details:String(r.details||'').slice(0,5000),status:String(r.statusLabel||r.workflowStatus||'تم التسليم'),inactive:lookupInactive(r),deliveredAt:r.deliveredAt||null,...(p.notes?{notes:r.notes||''}:{})})).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+ const items=dists.filter(r=>lookupDigits(r.familyId)===id&&(includeInactive||!lookupInactive(r))).map(r=>({type:String(r.type||''),date:String(r.date||''),quantity:r.quantity,unit:String(r.unit||''),reference:String(r.reference||''),campaign:String(r.campaign||''),distributedBy:String(r.distributedBy||''),details:String(r.details||'').slice(0,5000),beneficiaryName:String(r.beneficiaryName||'').slice(0,160),beneficiaryType:String(r.beneficiaryType||'').slice(0,40),status:String(r.statusLabel||r.workflowStatus||'تم التسليم'),inactive:lookupInactive(r),deliveredAt:r.deliveredAt||null,...(p.notes?{notes:r.notes||''}:{})})).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
  return respond({ok:true,kind:'history',family:await serialize(f),items,permissions:{ids:!!p.ids,notes:!!p.notes,lookupInside:scope.inside,lookupOutside:scope.outside}});
 }
 
