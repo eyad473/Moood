@@ -67,3 +67,34 @@ export async function institutionClassifications(request,env) {
    return send(form+'<output>'+count+' فرد</output><p>جميع الأفراد المسجلين · تاريخ احتساب العمر '+day+' بتوقيت غزة</p>');
  }catch{return send(form+'النتيجة غير متاحة حالياً.',503);}
 }
+
+// Publish only the two explicitly enabled, camp-wide totals.
+const overviewCache = new WeakMap();
+export async function publicOverview(request,env) {
+ const headers={'Cache-Control':'no-store','Access-Control-Allow-Origin':'*','X-Robots-Tag':'noindex'};
+ const respond=(value,status)=>Response.json(value,{status,headers});
+ const min=Number(env.MIN_CELL);
+ if(request.method!=='GET')return respond({},405);
+ if(env.PUBLIC_TOTALS_ENABLED!=='true'||!Number.isSafeInteger(min)||min<2)return respond({},503);
+ try {
+   let entry=overviewCache.get(env.DB);
+   if(!entry || entry.expires<=Date.now()){
+     const asOf=new Date().toISOString();
+     const pending=env.DB.prepare(`WITH ids AS (
+       SELECT CASE WHEN json_valid(data_json) THEN trim(json_extract(data_json,'$."رقم هوية الفرد"')) END AS p,
+              CASE WHEN json_valid(data_json) THEN trim(json_extract(data_json,'$."رقم هوية الأسرة"')) END AS f
+       FROM sync_records WHERE deleted=0 AND record_id GLOB 'r-*'
+     ), members AS (
+       SELECT p,min(f) AS family,count(DISTINCT f) AS families,
+       max(p IS NULL OR length(p)<>9 OR p GLOB '*[^0-9]*' OR f IS NULL OR length(f)<>9 OR f GLOB '*[^0-9]*') AS invalid
+       FROM ids GROUP BY p
+     ) SELECT count(*) AS people,count(DISTINCT family) AS households,
+       coalesce(sum(invalid OR families<>1),0) AS errors FROM members`).first();
+     entry={pending,asOf,expires:Date.now()+300000};
+     overviewCache.set(env.DB,entry);
+   }
+   const row=await entry.pending;
+   if(!row||row.errors||![row.people,row.households].every(n=>Number.isSafeInteger(n)&&n>=min))return respond({},503);
+   return respond({people:row.people,households:row.households,asOf:entry.asOf},200);
+ }catch{return respond({},503);}
+}
