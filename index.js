@@ -1,3 +1,4 @@
+import { institutionClassifications, publicOverview } from "./institution-classifications.js";
 import { palpayIngest, palpayInbox, palpayCandidates } from "./palpay-intake.js";
 import { handleAiChat } from "./ai-assistant.js";
 
@@ -2062,6 +2063,8 @@ export default {
 
     const url = new URL(request.url);
     try {
+      if (url.pathname === "/institutions/public-totals") return publicOverview(request,env);
+      if (url.pathname === "/institutions/classifications") return institutionClassifications(request, env);
       if (url.pathname.startsWith("/winter/bridge/")) return await winterBridge(request,env);
       if (url.pathname === "/api/ai/chat" && request.method === "POST") return await aiChatWithRoutineIntake(request, env);
       if (url.pathname === "/palpay/ingest" && request.method === "POST") {
