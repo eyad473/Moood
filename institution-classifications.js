@@ -75,7 +75,8 @@ export async function publicOverview(request,env) {
  const respond=(value,status)=>Response.json(value,{status,headers});
  const min=Number(env.MIN_CELL);
  if(request.method!=='GET')return respond({},405);
- if(env.PUBLIC_TOTALS_ENABLED!=='true'||!Number.isSafeInteger(min)||min<2)return respond({},503);
+ const includeAge=env.PUBLIC_TOTALS_ENABLED==='overview-and-age';
+ if((env.PUBLIC_TOTALS_ENABLED!=='true'&&!includeAge)||!Number.isSafeInteger(min)||min<2)return respond({},503);
  try {
    let entry=overviewCache.get(env.DB);
    if(!entry || entry.expires<=Date.now()){
@@ -95,6 +96,15 @@ export async function publicOverview(request,env) {
    }
    const row=await entry.pending;
    if(!row||row.errors||![row.people,row.households].every(n=>Number.isSafeInteger(n)&&n>=min))return respond({},503);
-   return respond({people:row.people,households:row.households,asOf:entry.asOf},200);
+   const result={people:row.people,households:row.households,asOf:entry.asOf};
+   if(includeAge){
+     const day=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Gaza',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+     const ages=await totals(env.DB,day);
+     if(ages && !ages.errors && ages.total===row.people && [ages.a,ages.b,ages.c,ages.d,ages.e].every(n=>Number.isSafeInteger(n)&&n>=min)){
+       result.age={adult:ages.d+ages.e,child:ages.a+ages.b+ages.c,school:ages.b,older:ages.e};
+       result.ageDay=day;
+     }
+   }
+   return respond(result,200);
  }catch{return respond({},503);}
 }
